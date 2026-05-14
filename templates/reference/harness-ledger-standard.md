@@ -8,8 +8,8 @@ Harness Ledger 是 `docs/` 骨架的全局更新总账，位置固定为：
 docs/Harness-Ledger.md
 ```
 
-它记录每个非平凡任务是否按 SOP 维护了 task plan、Feature SSoT、Regression SSoT、
-Walkthrough、Lessons SSoT 和 reference/template 文档。
+它记录每个非平凡任务是否按 SOP 维护了 task plan、review report、Feature SSoT、
+Regression SSoT、Walkthrough、Lessons SSoT 和 reference/template 文档。
 
 ## 何时更新
 
@@ -19,6 +19,7 @@ Walkthrough、Lessons SSoT 和 reference/template 文档。
 - Bootstrap harness 完成
 - 同步或升级最新版 coding-agent-harness
 - 新增或修改 AGENTS.md / CLAUDE.md / reference / template
+- 创建或更新 required review report
 - 修改 Feature SSoT、Regression SSoT、Lessons SSoT 任一文件
 - 创建 walkthrough
 - Lessons approved 后合入正式 reference
@@ -56,6 +57,8 @@ Walkthrough、Lessons SSoT 和 reference/template 文档。
 任务完成前确认：
 
 - [ ] `progress.md` 已更新
+- [ ] `review.md` 已创建/更新，或标记 `n/a` / `skipped-with-reason`
+- [ ] Closeout reviewer / subagent 已执行，或标记 `skipped-with-reason`
 - [ ] Feature SSoT 已更新或标记 `n/a`
 - [ ] Regression SSoT / Cadence Ledger 已更新或标记 `n/a`
 - [ ] Walkthrough 已创建或有明确跳过原因

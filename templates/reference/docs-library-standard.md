@@ -23,7 +23,7 @@
 | Harness Ledger | `Harness-Ledger.md` | 全局上下文回写总账 |
 | 架构设计 | `03-ARCHITECTURE/` | ADR、技术方案、设计讨论 |
 | 测试相关 | `05-TEST-QA/` | Regression SSoT、Cadence Ledger、测试策略 |
-| 任务计划 | `09-PLANNING/TASKS/` | 每个任务一个子目录 |
+| 任务计划 | `09-PLANNING/TASKS/` | 每个任务一个子目录，包含 task plan / progress / findings / review |
 | Walkthrough | `10-WALKTHROUGH/` | 每个 wave 一篇 |
 | 标准文件 | `11-REFERENCE/` | agent 按需加载的规范 |
 | 临时文件 | `99-TMP/` | 定期清理 |
@@ -31,6 +31,7 @@
 ## 归档规则
 
 - 已完成的任务计划保留在原位，不移动
+- `review.md` 保留在对应任务目录，不移动到 walkthrough 或根目录
 - `docs/Harness-Ledger.md` 保留在 docs 根目录，是根目录过程文件禁令的唯一例外
 - 99-TMP/ 下的文件超过 7 天未更新应清理
 - 标准文件更新时，在文件头部记录最后更新日期

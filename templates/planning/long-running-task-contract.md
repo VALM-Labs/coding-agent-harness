@@ -29,6 +29,7 @@
 - Continuous execution: [allowed / not allowed]
 - May continue without asking after each loop: [yes / no]
 - May start reviewer agent / subagent: [yes / no]
+- Review report required: [yes / no; if yes, write `review.md`]
 - Actions that still require human approval:
   - [高风险操作，如 destructive migration / production deploy / secret change]
 
@@ -39,11 +40,12 @@ Each loop must include:
 1. [implement / edit / configure]
 2. [run locally]
 3. [test / smoke / inspect]
-4. [self-review]
-5. [reviewer or subagent review, if required]
+4. [self-review with Confidence Challenge]
+5. [reviewer or subagent review, if required, with `review.md` update]
 6. [fix findings]
 7. [rerun evidence]
-8. [update progress.md]
+8. [rerun Confidence Challenge until no open material finding]
+9. [update progress.md]
 
 Minimum loop count or no-finding requirement:
 
@@ -58,6 +60,7 @@ Minimum loop count or no-finding requirement:
   - [regressions]
   - [missing tests]
   - [unverified assumptions]
+  - [material findings / no-finding statement in `review.md`]
 - Reviewer must not:
   - [越权改动 / 重写不相关模块 / 推翻 scope]
 
@@ -71,6 +74,7 @@ Required evidence before completion:
 - [ ] [browser / UI / manual inspection]
 - [ ] [live environment smoke]
 - [ ] [reviewer no material findings]
+- [ ] [`review.md` completed if review is required]
 - [ ] [walkthrough / PR / release note]
 
 ## Stop Condition
@@ -81,6 +85,7 @@ The task may stop only when:
 - [ ] [required tests or regression gates pass]
 - [ ] [runtime / console / request errors are cleared or documented]
 - [ ] [reviewer has no material finding, if reviewer is required]
+- [ ] [`review.md` has no open P0/P1 findings, if review is required]
 - [ ] [residual risks are documented and non-blocking]
 
 ## Pause Conditions
@@ -98,6 +103,7 @@ Pause and report if:
 - [ ] Code / config changes
 - [ ] Tests / regression evidence
 - [ ] Docs updates
+- [ ] `review.md` report, if required
 - [ ] `progress.md` / `findings.md` updates
 - [ ] Harness Ledger update
 - [ ] Walkthrough

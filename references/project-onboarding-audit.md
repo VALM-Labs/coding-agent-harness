@@ -103,7 +103,7 @@
 最小配置：
 - AGENTS.md
 - docs/11-REFERENCE/ 下 2-3 个标准文件
-- Planning 三件套模板
+- Planning task plan / findings / progress / review 模板
 - 简化版 Regression SSoT（可以只有 tests + local_smoke 两层）
 - Harness Ledger（只记录 task closeout 行）
 - Walkthrough 模板

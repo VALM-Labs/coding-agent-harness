@@ -4,11 +4,11 @@ description: >
   Coding Agent Harness 工程方法论。为使用 Coding Agent（Codex、Claude Code、Gemini CLI 等）
   做长程项目开发的团队，在用户的项目上构建一套完整的 harness 工程体系。
   包括：项目诊断、AGENTS.md + CLAUDE.md 入口文件生成、docs/ 目录搭建、Planning Loop、SSoT 治理、
-  Long-Running Task Protocol、Worktree 并行开发、Regression SSoT 与 Evidence Depth
-  分级回归、Walkthrough 收口、Cadence Ledger、经验沉淀回流（Lessons SSoT）、
+  Long-Running Task Protocol、Adversarial Review Report、Review Routing、Worktree 并行开发、
+  Regression SSoT 与 Evidence Depth 分级回归、Walkthrough 收口、Cadence Ledger、经验沉淀回流（Lessons SSoT）、
   Harness Ledger 全局上下文回写总账。
   当用户要求设置 coding agent 的开发流程、建立回归测试体系、设计 AGENTS.md / CLAUDE.md、
-  规划长程 agent 任务的执行框架、子代理审查循环、搭建 harness、或者提到 harness engineering 时，使用此技能。
+  规划长程 agent 任务的执行框架、子代理审查循环、对抗性 review 报告、搭建 harness、或者提到 harness engineering 时，使用此技能。
   也适用于"帮我搭一套 agent 开发规范"、"怎么让 AI 在长任务上不跑偏"、
   "怎么做 agent 的回归测试"、"帮我初始化项目的 harness"等场景。
 ---
@@ -23,6 +23,7 @@ description: >
 - **上下文不是越多越好，是越准越好。** AGENTS.md 做目录不做百科；CLAUDE.md 只做 Claude Code 兼容 shim，不做第二份规范。
 - **单元测试只是底线，不是保障。** 真正的保障需要多层证据（Evidence Depth）。
 - **长程任务先设计合同，再开放执行。** 连续跑数小时的前提是 Goal、Scope、Review Loop、Evidence、Stop Condition 都清楚。
+- **审查必须落盘。** 对抗性 review 是独立交付物，不应只留在对话、progress 或 walkthrough 里；reviewer 必须用 Confidence Challenge 反复挑战方案，直到没有 open material finding。
 - **严肃项目用顶级模型。** 便宜模型的返工成本远高于差价。
 - **强制流程优于口头约定。** 每个步骤都应该是 agent 可自主执行的。
 
@@ -70,10 +71,13 @@ coding-agent-harness"，不要重新 bootstrap 覆盖整个项目。先执行增
 ### Phase 5: 生成 Reference 标准文件
 
 读 `references/docs-directory-standard.md` 中的 reference 文件清单，根据项目需要生成对应的标准文件到 `docs/11-REFERENCE/`。使用 `templates/reference/` 下的模板。
+标准 harness 安装必须包含 `adversarial-review-standard.md` 和
+`review-routing-standard.md`，因为 planned task closeout 默认启用 reviewer routing。
 
 ### Phase 6: 初始化 Planning Loop
 
-读 `references/planning-loop.md`，在 `docs/09-PLANNING/TASKS/` 下建立任务模板目录。使用 `templates/planning/` 下的三件套模板。
+读 `references/planning-loop.md`，在 `docs/09-PLANNING/TASKS/` 下建立任务模板目录。使用 `templates/planning/` 下的任务模板。
+模板目录必须额外包含 `review.md`，用于 reviewer agent / subagent / 自审写入对抗性 review 报告。
 
 ### Phase 7: 初始化 Long-Running Task Protocol
 
@@ -120,9 +124,12 @@ harness bootstrap 完成后，项目中至少应存在以下文件：
 - [ ] `AGENTS.md`，100-300 行，宪章 + 索引结构
 - [ ] `CLAUDE.md`，Claude Code 兼容 shim，指向 `AGENTS.md`（不复制完整规范）
 - [ ] `docs/11-REFERENCE/` 下至少 3 个标准文件
-- [ ] `docs/09-PLANNING/TASKS/_task-template/` 包含三件套模板
+- [ ] `docs/09-PLANNING/TASKS/_task-template/` 包含 task plan / findings / progress / review 模板
 - [ ] `docs/11-REFERENCE/long-running-task-standard.md`
+- [ ] `docs/11-REFERENCE/adversarial-review-standard.md`
+- [ ] `docs/11-REFERENCE/review-routing-standard.md`
 - [ ] `docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md`
+- [ ] `docs/09-PLANNING/TASKS/_task-template/review.md`
 - [ ] `docs/05-TEST-QA/Regression-SSoT.md`
 - [ ] `docs/05-TEST-QA/Cadence-Ledger.md`
 - [ ] `docs/10-WALKTHROUGH/_walkthrough-template.md`
@@ -141,14 +148,16 @@ harness bootstrap 完成后，项目中至少应存在以下文件：
 harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 
 1. **Brainstorming** — 讨论需求，产出设计记录
-2. **Planning with Files** — 建任务目录，三件套文件
+2. **Planning with Files** — 建任务目录，task plan / findings / progress / review 文件
 3. **Long-Running Contract（如适用）** — 明确连续执行权限、review loop、evidence、stop condition
 4. **SSoT 排期** — 回写到 Feature SSoT
 5. **Worktree 并行开发** — 开独立 worktree，分支隔离
-6. **Merge + 自动回归** — Cadence Ledger 触发对应回归面
-7. **Walkthrough 收口** — 写收口记录
-8. **Harness Ledger 回写** — 记录本轮上下文维护是否完成
-9. **Worktree 清理** — 删除已 merge 的 worktree
+6. **Adversarial Review Report（如适用）** — 在任务目录写 `review.md`，记录 material findings / no-finding / residual risk
+7. **Review Routing** — planned task 收口前自动触发 subagent / reviewer 审查，或记录 skip reason
+8. **Merge + 自动回归** — Cadence Ledger 触发对应回归面
+9. **Walkthrough 收口** — 写收口记录并引用 review report
+10. **Harness Ledger 回写** — 记录本轮上下文维护是否完成
+11. **Worktree 清理** — 删除已 merge 的 worktree
 
 ---
 
@@ -161,6 +170,8 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 | 目录结构 | `references/docs-directory-standard.md` | Phase 3, 5 |
 | Planning Loop | `references/planning-loop.md` | Phase 6 |
 | Long-Running Task | `references/long-running-task-standard.md` | Phase 7 |
+| Adversarial Review | `references/adversarial-review-standard.md` | Phase 5, 6, 7 |
+| Review Routing | `references/review-routing-standard.md` | Phase 5, 6, 7 |
 | SSoT 治理 | `references/ssot-governance.md` | Phase 8 |
 | 经验沉淀 | `references/lessons-governance.md` | Phase 8b |
 | Harness Ledger | `references/harness-ledger.md` | Phase 8c |
@@ -186,11 +197,14 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 | Task Plan | `templates/planning/task_plan.md` | Phase 6 |
 | Findings | `templates/planning/findings.md` | Phase 6 |
 | Progress | `templates/planning/progress.md` | Phase 6 |
+| Review Report | `templates/planning/review.md` | Phase 6 |
 | Long-Running Task Contract | `templates/planning/long-running-task-contract.md` | Phase 7 |
 | Walkthrough | `templates/walkthrough/walkthrough-template.md` | Phase 10 |
 | Testing Standard | `templates/reference/testing-standard.md` | Phase 5 |
 | Execution Workflow | `templates/reference/execution-workflow-standard.md` | Phase 5 |
 | Long-Running Task Standard | `templates/reference/long-running-task-standard.md` | Phase 7 |
+| Adversarial Review Standard | `templates/reference/adversarial-review-standard.md` | Phase 5 |
+| Review Routing Standard | `templates/reference/review-routing-standard.md` | Phase 5 |
 | Docs Library | `templates/reference/docs-library-standard.md` | Phase 5 |
 | Harness Ledger Standard | `templates/reference/harness-ledger-standard.md` | Phase 5 |
 | Regression Governance | `templates/reference/regression-ssot-governance.md` | Phase 5 |

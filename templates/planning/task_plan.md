@@ -28,8 +28,15 @@
 - 连续执行权限：[已授权 / 未授权 / 不适用]
 - Stop Condition 摘要：[一句话说明什么时候可以停]
 
+## Review 判定
+- 是否需要对抗性 review：[是 / 否]
+- 若是，报告文件：`review.md`
+- Reviewer：[self / subagent / external / human / 不适用]
+- No-finding 要求：[例如 reviewer 无 material finding / 不适用]
+
 ## 关联
 - Feature SSoT 条目：[引用]
 - 相关 Regression Gate：[引用]
+- Review Report：[路径 / 不适用]
 - Harness Ledger 条目：[完成时填写 / HL-...]
 - 前置任务：[引用，如无则写"无"]

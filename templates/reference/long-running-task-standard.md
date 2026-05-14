@@ -64,15 +64,16 @@
 
 ### Review Loop
 
-写清每轮闭环：
+写清每轮闭环和 review report 落点：
 
 1. implement
 2. run locally
 3. test / smoke / inspect
-4. self-review
-5. reviewer / subagent review（如适用）
+4. self-review with Confidence Challenge
+5. reviewer / subagent review（如适用，并更新 `review.md`）
 6. fix findings
 7. rerun evidence
+8. rerun Confidence Challenge until no open material finding
 
 如使用 reviewer / subagent，必须写清：
 
@@ -80,6 +81,11 @@
 - 负责的文件或问题域
 - 输出格式
 - no-finding 的判断口径
+- 是否必须回答“你对这个方案、实现和策略有 100% 的信心吗？”
+
+如果使用 reviewer agent、subagent 或外部审查者，必须在任务目录写 `review.md`，
+并按 `adversarial-review-standard.md` 记录 material findings、no-finding statement、
+evidence checked 和 residual risk。
 
 ### Evidence
 
@@ -92,6 +98,7 @@
 - live environment smoke
 - logs / screenshots / traces
 - reviewer findings
+- `review.md` 中的 material finding 状态与 residual routing
 - walkthrough / PR checks
 
 ### Stop Condition
@@ -102,6 +109,7 @@
 - 目标 tests / regression gates 通过
 - runtime / console / request errors 清零或有明确残项
 - reviewer 无 material findings
+- `review.md` 已完成，且无 open P0/P1 finding
 - residual risks 已记录且不阻塞目标
 
 ### Deliverables
@@ -110,6 +118,7 @@
 - tests / regression evidence
 - docs updates
 - planning progress / findings
+- review report（如适用）
 - walkthrough
 - Harness Ledger
 - PR / commit / release note
@@ -140,5 +149,7 @@
 
 - `execution-workflow-standard.md` 在开始任务前要求判断是否属于长程任务
 - `docs/09-PLANNING/TASKS/_task-template/` 包含 long-running task contract 模板
+- `docs/09-PLANNING/TASKS/_task-template/` 包含 `review.md` 模板
+- `docs/11-REFERENCE/adversarial-review-standard.md` 定义 reviewer 报告规范
 - regression / testing 标准能提供可复查证据，而不是只依赖主观判断
 - `docs/Harness-Ledger.md` 记录长程任务是否完成必要的上下文回写

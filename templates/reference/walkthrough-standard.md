@@ -19,8 +19,9 @@ Walkthrough 是每个 wave / feature 完成后的收口记录。给下一轮 age
 2. **改动范围**：改了哪些模块/文件
 3. **关键决策**：为什么选了方案 A 而不是方案 B
 4. **验证结果**：跑了什么测试、回归结果、evidence depth
-5. **Residual**：遗留问题（如无则显式写"无"）
-6. **关联**：task plan 路径、SSoT 条目、regression gate、Harness Ledger ID、commit hash
+5. **Review Report**：如有 `review.md`，引用 material finding 状态、no-finding 结论和 accepted residual
+6. **Residual**：遗留问题（如无则显式写"无"）
+7. **关联**：task plan 路径、SSoT 条目、regression gate、Harness Ledger ID、commit hash
 
 ## 写作原则
 

@@ -45,6 +45,12 @@ AGENTS.md 只包含两类内容：
 - 长程任务 / 连续执行 / 子代理审查：
   先读 docs/11-REFERENCE/long-running-task-standard.md
 
+- 对抗性 review / reviewer 报告：
+  先读 docs/11-REFERENCE/adversarial-review-standard.md
+
+- Reviewer / subagent / 外部审查路由：
+  先读 docs/11-REFERENCE/review-routing-standard.md
+
 - 前端 / UI 任务：
   先读 docs/11-REFERENCE/frontend-standard.md
 ```
@@ -61,6 +67,8 @@ AGENTS.md 只包含两类内容：
         ├── testing-standard.md
         ├── execution-workflow-standard.md
         ├── long-running-task-standard.md
+        ├── adversarial-review-standard.md
+        ├── review-routing-standard.md
         ├── engineering-standard.md
         ├── frontend-standard.md
         ├── docs-library-standard.md

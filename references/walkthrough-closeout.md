@@ -25,6 +25,7 @@
 - [跑了哪些测试]
 - [回归结果]
 - [Evidence Depth 到了哪一层]
+- [Review Report: review.md 路径、material finding 状态、no-finding 结论]
 
 ## Residual
 - [遗留问题1]
@@ -48,9 +49,10 @@ docs/10-WALKTHROUGH/<YYYY-MM-DD-wave名称>.md
 1. **每个 wave 必须有 walkthrough** — 没有 walkthrough 的 wave 视为未完成
 2. **Walkthrough 必须包含 residual** — 即使没有遗留问题，也要显式写“无 residual”
 3. **Walkthrough 必须引用验证结果** — 跑了什么、结果是什么
-4. **Walkthrough 不是代码注释** — 不需要逐行解释代码，重点是决策和验证
-5. **Walkthrough 完成后必须执行经验沉淀检查** — 见下方“经验沉淀检查”章节
-6. **收口后必须更新 Harness Ledger** — 记录本轮上下文回写是否完成
+4. **如有 review.md，Walkthrough 必须引用审查结论** — material findings、no-finding statement、accepted residual 必须可追溯
+5. **Walkthrough 不是代码注释** — 不需要逐行解释代码，重点是决策和验证
+6. **Walkthrough 完成后必须执行经验沉淀检查** — 见下方“经验沉淀检查”章节
+7. **收口后必须更新 Harness Ledger** — 记录本轮上下文回写是否完成
 
 ## 经验沉淀检查
 
@@ -76,7 +78,7 @@ docs/10-WALKTHROUGH/<YYYY-MM-DD-wave名称>.md
 `docs/Harness-Ledger.md`：
 
 1. 为本轮任务追加或更新对应 `HL-*` 条目
-2. 记录 Task Plan、Feature SSoT、Regression SSoT、Walkthrough、Lessons Check 的结果
+2. 记录 Task Plan、Feature SSoT、Regression SSoT、Review Report、Walkthrough、Lessons Check 的结果
 3. 列出本轮触碰的 harness 文档
 4. 如有未完成项，使用 `missing` 或 `skipped-with-reason` 并写明 residual
 

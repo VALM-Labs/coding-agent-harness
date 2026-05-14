@@ -79,7 +79,7 @@
 
 ### Review Loop
 
-定义每一轮的闭环。常见组合：
+定义每一轮的闭环，并写清 review report 的落点。常见组合：
 
 - implement -> test -> self-review -> fix
 - implement -> browser/manual smoke -> reviewer agent -> fix
@@ -90,7 +90,13 @@
 - reviewer 只审查还是可改代码
 - reviewer 负责哪些文件或问题域
 - 主 agent 如何吸收反馈
+- reviewer 是否必须写 `review.md`
+- reviewer 是否必须执行 Confidence Challenge：“你对这个方案、实现和策略有 100% 的信心吗？”
 - 几轮 review 后才允许停止
+
+如果 review loop 使用 reviewer agent、subagent 或外部审查者，必须在任务目录写
+`review.md`，并按 `docs/11-REFERENCE/adversarial-review-standard.md` 记录 material findings、
+no-finding statement、evidence checked 和 residual risk。
 
 ### Evidence Depth
 
@@ -103,6 +109,7 @@
 - live environment smoke
 - logs / screenshots / traces
 - reviewer findings and no-finding confirmation
+- `review.md` 中的 material finding 状态与 residual routing
 - walkthrough / release notes / PR checks
 
 证据必须能被后来的人复查，不能只写“看起来可以”。
@@ -117,6 +124,7 @@
 - 目标 regression gate 通过
 - console / request / page / runtime errors 清零或有明确残项
 - reviewer 没有 material finding
+- `review.md` 已完成，且无 open P0/P1 finding
 - 自审没有明显不满意项
 - residual items 已记录，且不阻塞本轮目标
 
@@ -127,6 +135,7 @@
 - 代码改动
 - 测试或 regression gate
 - docs / task plan / progress / findings 回写
+- review report（如适用）
 - walkthrough
 - Harness Ledger
 - PR / commit / release note
@@ -182,6 +191,8 @@
 
 - `AGENTS.md` 的 Task-Type Reading Matrix 指向 `docs/11-REFERENCE/long-running-task-standard.md`
 - `docs/09-PLANNING/TASKS/_task-template/` 包含 long-running task contract 模板
+- `docs/09-PLANNING/TASKS/_task-template/` 包含 `review.md` 模板
+- `docs/11-REFERENCE/adversarial-review-standard.md` 定义 reviewer 报告规范
 - `execution-workflow-standard.md` 在开始任务前要求判断是否属于长程任务
 - regression / testing 标准能提供可复查证据，而不是只依赖主观判断
 - `docs/Harness-Ledger.md` 记录长程任务是否完成必要的上下文回写

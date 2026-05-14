@@ -2,7 +2,7 @@
 
 ## 核心思路
 
-每个非平凡任务必须有独立的任务目录和三件套文件。这是 agent 在长时间执行过程中不偏离目标的锚点。
+每个非平凡任务必须有独立的任务目录和稳定的任务文件。这是 agent 在长时间执行过程中不偏离目标的锚点。
 
 ## 任务目录结构
 
@@ -11,6 +11,7 @@ docs/09-PLANNING/TASKS/<YYYY-MM-DD-任务名>/
 ├── task_plan.md    ← 计划：目标、范围、步骤、验收标准
 ├── findings.md     ← 发现：执行过程中的研究发现和技术决策
 ├── progress.md     ← 进度：每个阶段的状态更新和验证结果
+├── review.md       ← 对抗性审查报告（需要 reviewer / subagent / release review 时必填）
 └── long-running-task-contract.md ← 长程任务合同（仅长程任务需要）
 ```
 
@@ -20,8 +21,9 @@ docs/09-PLANNING/TASKS/<YYYY-MM-DD-任务名>/
 2. **每个阶段后更新 progress.md** — 记录做了什么、验证了什么
 3. **研究发现写入 findings.md** — 不丢失中间产物
 4. **禁止在项目根目录放过程文件** — task_plan.md、findings.md、progress.md 只能在任务目录内
-5. **长程任务必须补合同** — 如果任务需要连续执行、多轮审查或子代理 review，先补 `long-running-task-contract.md`
-6. **任务收口必须回写 Harness Ledger** — 只在任务完成或上下文回写状态变化时记录，不记录每次 `progress.md` 更新
+5. **对抗性审查必须写 review.md** — 如果任务使用 reviewer / subagent / release review，按 `adversarial-review-standard.md` 写报告
+6. **长程任务必须补合同** — 如果任务需要连续执行、多轮审查或子代理 review，先补 `long-running-task-contract.md`
+7. **任务收口必须回写 Harness Ledger** — 只在任务完成或上下文回写状态变化时记录，不记录每次 `progress.md` 更新
 
 ## task_plan.md 模板
 
@@ -52,6 +54,11 @@ docs/09-PLANNING/TASKS/<YYYY-MM-DD-任务名>/
 - 是否属于长程任务：[是 / 否]
 - 若是，合同文件：`long-running-task-contract.md`
 - Stop Condition 摘要：[什么时候可以停]
+
+## Review 判定
+- 是否需要对抗性 review：[是 / 否]
+- 若是，报告文件：`review.md`
+- Reviewer：[self / subagent / external / human]
 ```
 
 ## 为什么这套东西有效
@@ -64,7 +71,8 @@ docs/09-PLANNING/TASKS/<YYYY-MM-DD-任务名>/
 ## 与 Anthropic Long-running Agents 方案的对照
 
 Anthropic 的方案用 Feature List JSON + progress file + git commit 做跨 session 交接。
-三件套（task_plan + findings + progress）是同一思路的更细粒度表达。
+task_plan + findings + progress 是同一思路的更细粒度表达；`review.md` 负责保存
+对抗性审查结论，避免 review 只留在对话里。
 
 ## findings.md 模板
 

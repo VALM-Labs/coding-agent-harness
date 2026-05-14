@@ -18,11 +18,17 @@
 - 回归结果：[通过/失败，引用 Regression SSoT]
 - Evidence Depth：[到了哪一层]
 
+## Review Report
+- Report：[review.md 路径 / 不适用]
+- Material findings：[无 / 已修复 / accepted residual，列出 ID]
+- No-finding statement：[有 / 无 / 不适用]
+
 ## Residual
 - [遗留问题1，如无则写"无"]
 
 ## 关联
 - Task Plan：[路径]
+- Review Report：[路径 / 不适用]
 - Feature SSoT 条目：[引用]
 - Regression Gate：[引用]
 - Harness Ledger：[HL-...]
