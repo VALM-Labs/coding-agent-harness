@@ -219,6 +219,17 @@ function markdownTableRows(content, idPattern) {
     .filter((cells) => cells.length > 0 && idPattern.test(cells[0] || ""));
 }
 
+function checkDuplicateIds(rows, sourcePath) {
+  const seen = new Set();
+  for (const cells of rows) {
+    const id = cells[0];
+    if (seen.has(id)) {
+      fail(`${sourcePath} contains duplicate closeout id: ${id}`);
+    }
+    seen.add(id);
+  }
+}
+
 function checkCloseoutSsot() {
   const closeoutPath = "docs/10-WALKTHROUGH/Closeout-SSoT.md";
   if (!exists(closeoutPath)) return;
@@ -234,9 +245,10 @@ function checkCloseoutSsot() {
   if (!exists("docs/Harness-Ledger.md")) return;
   const ledgerContent = read("docs/Harness-Ledger.md");
   const ledgerRows = markdownTableRows(ledgerContent, /^H-\d+/i);
-  const closeoutRows = new Map(
-    markdownTableRows(closeoutContent, /^H-\d+/i).map((cells) => [cells[0], cells])
-  );
+  const closeoutTableRows = markdownTableRows(closeoutContent, /^H-\d+/i);
+  checkDuplicateIds(ledgerRows, "docs/Harness-Ledger.md");
+  checkDuplicateIds(closeoutTableRows, closeoutPath);
+  const closeoutRows = new Map(closeoutTableRows.map((cells) => [cells[0], cells]));
 
   for (const cells of ledgerRows) {
     const id = cells[0];
