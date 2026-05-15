@@ -57,6 +57,8 @@ const statusWords = ["designed", "implemented", "verified", "blocked-with-owner"
 const closedLedgerStatuses = new Set(["closed", "closed-with-residual", "closed-local-only"]);
 const allowedWalkthroughSkip =
   /walkthrough skipped-with-reason:\s*(docs-only|no-runtime|superseded|historical-backfill|owner-deferred)/i;
+const lessonsCreatedPattern = /checked-created:\s*(L-\d{4}-\d{2}-\d{2}-\d{3}|L-\d+)/i;
+const lessonsNonePattern = /checked-none:\s*\S+/i;
 
 const failures = [];
 const warnings = [];
@@ -242,6 +244,21 @@ function markdownTableRows(content, idPattern) {
     .filter((cells) => cells.length > 0 && idPattern.test(cells[0] || ""));
 }
 
+function markdownTable(content) {
+  return content
+    .split(/\r?\n/)
+    .filter((line) => line.trim().startsWith("|"))
+    .map((line) => line.split("|").slice(1, -1).map((cell) => cell.trim()));
+}
+
+function findHeaderIndex(rows, pattern) {
+  return rows.findIndex((cells) => cells.some((cell) => pattern.test(cell)));
+}
+
+function columnIndex(header, pattern) {
+  return header.findIndex((cell) => pattern.test(cell));
+}
+
 function checkDuplicateIds(rows, sourcePath) {
   const seen = new Set();
   for (const cells of rows) {
@@ -258,15 +275,31 @@ function checkCloseoutSsot() {
   if (!exists(closeoutPath)) return;
 
   const closeoutContent = read(closeoutPath);
-  for (const term of ["Walkthrough", "Closeout Status"]) {
+  for (const term of ["Walkthrough", "Lessons Check", "Closeout Status"]) {
     if (!closeoutContent.includes(term)) {
       fail(`${closeoutPath} missing required closeout column or section: ${term}`);
     }
   }
   checkNoGenericPlaceholders(closeoutPath);
 
+  const closeoutTable = markdownTable(closeoutContent);
+  const closeoutHeaderIndex = findHeaderIndex(closeoutTable, /^Harness ID$/i);
+  const closeoutHeader = closeoutHeaderIndex >= 0 ? closeoutTable[closeoutHeaderIndex] : [];
+  const lessonsColumn = columnIndex(closeoutHeader, /^Lessons Check$/i);
+  if (lessonsColumn < 0) {
+    fail(`${closeoutPath} missing Lessons Check column`);
+  }
+
   if (!exists("docs/Harness-Ledger.md")) return;
   const ledgerContent = read("docs/Harness-Ledger.md");
+  const lessonIds = collectLessonIds();
+  const ledgerTable = markdownTable(ledgerContent);
+  const ledgerHeaderIndex = findHeaderIndex(ledgerTable, /^ID$/i);
+  const ledgerHeader = ledgerHeaderIndex >= 0 ? ledgerTable[ledgerHeaderIndex] : [];
+  const ledgerLessonsColumn = columnIndex(ledgerHeader, /^Lessons Check$/i);
+  if (ledgerLessonsColumn < 0) {
+    fail("docs/Harness-Ledger.md missing Lessons Check column");
+  }
   const ledgerRows = markdownTableRows(ledgerContent, /^H-\d+/i);
   const closeoutTableRows = markdownTableRows(closeoutContent, /^H-\d+/i);
   checkDuplicateIds(ledgerRows, "docs/Harness-Ledger.md");
@@ -290,6 +323,100 @@ function checkCloseoutSsot() {
     if (!hasWalkthrough && !hasAllowedSkip) {
       fail(`${closeoutPath} row ${id} needs walkthrough path or allowed skipped-with-reason`);
     }
+
+    if (lessonsColumn >= 0) {
+      const lessonsCheck = closeout[lessonsColumn] || "";
+      const createdMatch = lessonsCheck.match(lessonsCreatedPattern);
+      if (!createdMatch && !lessonsNonePattern.test(lessonsCheck)) {
+        fail(`${closeoutPath} row ${id} needs Lessons Check value: checked-created:<lesson-id> or checked-none:<reason>`);
+      } else if (createdMatch && !lessonIds.has(createdMatch[1])) {
+        fail(`${closeoutPath} row ${id} references missing Lessons SSoT id: ${createdMatch[1]}`);
+      }
+    }
+
+    if (ledgerLessonsColumn >= 0) {
+      const ledgerLessonsCheck = cells[ledgerLessonsColumn] || "";
+      const ledgerCreatedMatch = ledgerLessonsCheck.match(lessonsCreatedPattern);
+      if (!ledgerCreatedMatch && !lessonsNonePattern.test(ledgerLessonsCheck)) {
+        fail(`docs/Harness-Ledger.md row ${id} needs Lessons Check value: checked-created:<lesson-id> or checked-none:<reason>`);
+      } else if (ledgerCreatedMatch && !lessonIds.has(ledgerCreatedMatch[1])) {
+        fail(`docs/Harness-Ledger.md row ${id} references missing Lessons SSoT id: ${ledgerCreatedMatch[1]}`);
+      }
+    }
+  }
+}
+
+function collectLessonIds() {
+  const lessonsPath = "docs/01-GOVERNANCE/Lessons-SSoT.md";
+  if (!exists(lessonsPath)) return new Set();
+  const table = markdownTable(read(lessonsPath));
+  const headerIndex = findHeaderIndex(table, /^ID$/i);
+  const header = headerIndex >= 0 ? table[headerIndex] : [];
+  const idColumn = columnIndex(header, /^ID$/i);
+  if (idColumn < 0) return new Set();
+  return new Set(
+    table
+      .map((cells) => cells[idColumn] || "")
+      .filter((id) => /^L-\d{4}(-\d{2}-\d{2})?-\d+/i.test(id)),
+  );
+}
+
+function checkLessonsSsot() {
+  const lessonsPath = "docs/01-GOVERNANCE/Lessons-SSoT.md";
+  if (!exists(lessonsPath)) return;
+
+  const content = read(lessonsPath);
+  if (!/Detail Doc/i.test(content)) {
+    fail(`${lessonsPath} missing Detail Doc column`);
+  }
+
+  const table = markdownTable(content);
+  const headerIndex = findHeaderIndex(table, /^ID$/i);
+  const header = headerIndex >= 0 ? table[headerIndex] : [];
+  const detailColumn = columnIndex(header, /^(Detail Doc|Detail)$/i);
+  const idColumn = columnIndex(header, /^ID$/i);
+  const statusColumn = columnIndex(header, /^Status$/i);
+  if (idColumn < 0) fail(`${lessonsPath} missing ID column`);
+  if (detailColumn < 0) fail(`${lessonsPath} missing Detail Doc column`);
+  if (statusColumn < 0) fail(`${lessonsPath} missing Status column`);
+  if (idColumn < 0 || detailColumn < 0 || statusColumn < 0) return;
+
+  const lessonRows = table.filter((cells) => /^L-\d{4}(-\d{2}-\d{2})?-\d+/i.test(cells[idColumn] || ""));
+  for (const cells of lessonRows) {
+    const id = cells[idColumn] || "";
+    const status = cells[statusColumn] || "";
+    const detail = cells[detailColumn] || "";
+    if (!/pending|approved|merged|rejected|superseded|🟡|🟢|✅|❌|🔀/i.test(status)) {
+      fail(`${lessonsPath} row ${id} has unrecognized status: ${status}`);
+    }
+    const detailMatch = detail.match(/docs\/01-GOVERNANCE\/lessons\/[^|\s`]+\.md/);
+    if (!detailMatch) {
+      fail(`${lessonsPath} row ${id} Detail Doc must point to docs/01-GOVERNANCE/lessons/*.md`);
+      continue;
+    }
+    const detailPath = detailMatch[0];
+    if (!exists(detailPath)) {
+      fail(`${lessonsPath} row ${id} Detail Doc missing file: ${detailPath}`);
+      continue;
+    }
+    const detailContent = read(detailPath);
+    if (!detailContent.includes(id)) {
+      fail(`${detailPath} does not include lesson id ${id}`);
+    }
+    for (const requiredTerm of ["背景", "冲突声明"]) {
+      if (!detailContent.includes(requiredTerm)) {
+        fail(`${detailPath} missing required lesson section: ${requiredTerm}`);
+      }
+    }
+  }
+}
+
+function checkWalkthroughTemplate() {
+  const walkthroughTemplate = "docs/10-WALKTHROUGH/_walkthrough-template.md";
+  if (!exists(walkthroughTemplate)) return;
+  const content = read(walkthroughTemplate);
+  if (!content.includes("Lessons Reflection")) {
+    fail(`${walkthroughTemplate} missing Lessons Reflection section`);
   }
 }
 
@@ -319,6 +446,8 @@ function main() {
   checkReviewTemplate();
   checkHarnessLedger();
   checkCloseoutSsot();
+  checkLessonsSsot();
+  checkWalkthroughTemplate();
   checkReferencePlaceholders();
 
   if (warnings.length > 0) {

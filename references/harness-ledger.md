@@ -30,6 +30,7 @@ Harness Ledger 记录：
 - 是否更新 Regression SSoT 或 Cadence Ledger
 - 是否创建 walkthrough
 - 是否执行 Lessons 检查，是否产生 Lessons SSoT 条目
+- 如果产生 Lessons SSoT 条目，是否已创建 `docs/01-GOVERNANCE/lessons/` 详情文档
 - 本轮触碰了哪些 harness 文档
 - 是否有 residual 或 skipped-with-reason
 
@@ -116,12 +117,14 @@ docs/01-GOVERNANCE/archive/Harness-Ledger-archive-YYYY-QN.md
 6. 回写 Regression SSoT / Cadence Ledger（如适用）
 7. 写 walkthrough
 8. 更新 Closeout SSoT
-9. 执行 Lessons 检查并更新 Lessons SSoT（如适用）
+9. 执行 Lessons 检查；如有沉淀，先写详情文档，再更新 Lessons SSoT
 10. 更新 Harness Ledger
 
 最后更新 Harness Ledger，是为了让它记录本轮所有上下文维护的最终状态。
 如果 Harness Ledger row 进入 `closed` / `closed-with-residual` / `closed-local-only`，
 必须同步在 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 登记 walkthrough 或受控 skip reason。
+同时必须登记 Lessons Check：`checked-created: L-YYYY-MM-DD-NNN` 或
+`checked-none: <reason>`。
 
 ## Harness Update 记录
 

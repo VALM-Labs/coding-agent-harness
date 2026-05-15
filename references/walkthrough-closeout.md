@@ -31,6 +31,13 @@
 - [遗留问题1]
 - [遗留问题2]
 
+## Lessons Reflection
+- 本轮有没有发现 reference / workflow / checker 不够用或有误：[有/无，写一句理由]
+- 有没有反复出现、跨页面/跨模块/跨阶段的共性问题：[有/无，写一句理由]
+- 有没有下次 agent 也可能重复踩的坑：[有/无，写一句理由]
+- Lessons 结果：[checked-created: L-YYYY-MM-DD-NNN / checked-none: 一句话原因]
+- Lessons Detail Doc：[如 checked-created，填 `docs/01-GOVERNANCE/lessons/...md`；否则写"无"]
+
 ## 相关文件
 - Task Plan: [路径]
 - SSoT 条目: [引用]
@@ -56,10 +63,11 @@ docs/10-WALKTHROUGH/Closeout-SSoT.md
 2. **Walkthrough 必须包含 residual** — 即使没有遗留问题，也要显式写“无 residual”
 3. **Walkthrough 必须引用验证结果** — 跑了什么、结果是什么
 4. **如有 review.md，Walkthrough 必须引用审查结论** — material findings、no-finding statement、accepted residual 必须可追溯
-5. **Walkthrough 不是代码注释** — 不需要逐行解释代码，重点是决策和验证
-6. **Walkthrough 完成后必须执行经验沉淀检查** — 见下方“经验沉淀检查”章节
-7. **收口后必须更新 Harness Ledger** — 记录本轮上下文回写是否完成
-8. **收口后必须更新 Closeout SSoT** — 每个 `closed` / `closed-with-residual` / `closed-local-only` 的 Harness Ledger row 必须有 Closeout SSoT row
+5. **Walkthrough 必须包含 Lessons Reflection** — 写 walkthrough 时就要反思共性问题、反复问题、下一轮 agent 可能重复踩的坑
+6. **Walkthrough 不是代码注释** — 不需要逐行解释代码，重点是决策、验证和可复用教训
+7. **Walkthrough 完成后必须执行经验沉淀检查** — 见下方“经验沉淀检查”章节
+8. **收口后必须更新 Harness Ledger** — 记录本轮上下文回写是否完成
+9. **收口后必须更新 Closeout SSoT** — 每个 `closed` / `closed-with-residual` / `closed-local-only` 的 Harness Ledger row 必须有 Closeout SSoT row
 
 ## Closeout SSoT 规则
 
@@ -89,14 +97,23 @@ docs/10-WALKTHROUGH/Closeout-SSoT.md
 3. 有没有踩坑经验值得记录，避免下次重复？
 4. 有没有架构层面的洞察，值得更新架构文档？
 
+这一步不是普通勾选。写 walkthrough 时，Agent 必须主动从“这次做了什么”切换到
+“下次怎样避免重复问题”的复盘视角，尤其检查：
+
+- 同一类问题是否跨多个文件、页面、阶段或 review round 反复出现？
+- 本轮是否暴露了 prompt、模板、checker 或 reference 没有强制到位的地方？
+- 有没有某个动作虽然已有规范，但 agent 没有主动执行？
+
 如果任何一条答案是“有”：
 
 1. 完整读一遍 `docs/01-GOVERNANCE/Lessons-SSoT.md`
 2. 按 `references/lessons-governance.md` 中的规则处理冲突
 3. 在 `docs/01-GOVERNANCE/lessons/` 下写入详细建议（使用 `templates/lessons/` 下的对应模板）
-4. 更新 Lessons SSoT 表
+4. 更新 Lessons SSoT 表，`Detail Doc` 必须指向刚写的详情文档
+5. 在 Closeout SSoT 和 Harness Ledger 中记录 `checked-created: L-YYYY-MM-DD-NNN`
 
-如果所有答案都是“没有”，跳过即可。
+如果所有答案都是“没有”，不能静默跳过；在 Closeout SSoT 和 Harness Ledger 中记录
+`checked-none: <一句话原因>`。
 
 ## Harness Ledger 回写
 

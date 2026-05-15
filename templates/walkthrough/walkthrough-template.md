@@ -26,6 +26,13 @@
 ## Residual
 - [遗留问题1，如无则写"无"]
 
+## Lessons Reflection
+- 本轮有没有发现 reference / workflow / checker 不够用或有误：[有/无，写一句理由]
+- 有没有反复出现、跨页面/跨模块/跨阶段的共性问题：[有/无，写一句理由]
+- 有没有下次 agent 也可能重复踩的坑：[有/无，写一句理由]
+- Lessons 结果：[checked-created: L-YYYY-MM-DD-NNN / checked-none: 一句话原因]
+- Lessons Detail Doc：[如 checked-created，填 `docs/01-GOVERNANCE/lessons/...md`；否则写"无"]
+
 ## 关联
 - Task Plan：[路径]
 - Review Report：[路径 / 不适用]

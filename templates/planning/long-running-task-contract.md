@@ -107,5 +107,6 @@ Pause and report if:
 - [ ] `progress.md` / `findings.md` updates
 - [ ] Harness Ledger update
 - [ ] Walkthrough
+- [ ] Lessons Reflection + Lessons Check (`checked-created` or `checked-none`)
 - [ ] PR / commit / release note
 - [ ] Residual risk summary

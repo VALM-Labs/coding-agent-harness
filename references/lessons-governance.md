@@ -2,7 +2,13 @@
 
 ## 核心思路
 
-Agent 在 Walkthrough 收口时自动识别可沉淀的经验，写入 Lessons SSoT 并将详细内容落到 `docs/01-GOVERNANCE/lessons/` 目录。人审批后决定是否合入正式 reference。
+Agent 在 Walkthrough 收口时自动识别可沉淀的经验，先将详细内容落到
+`docs/01-GOVERNANCE/lessons/` 目录，再写入 Lessons SSoT。人审批后决定是否合入正式 reference。
+
+**硬规则：Lessons SSoT 表行不能单独存在。** 每一条 pending lesson 必须有一篇
+`docs/01-GOVERNANCE/lessons/L-YYYY-MM-DD-NNN-<slug>.md` 详情文档，表里的
+`Detail Doc` 列必须指向这篇文档。如果只是填表而没有详情文档，这次 closeout
+不算完成。
 
 这是 harness 的第三条 SSoT 轨道：
 
@@ -22,7 +28,7 @@ Lessons SSoT。
 docs/01-GOVERNANCE/
 ├── Lessons-SSoT.md              ← 沉淀建议表（SSoT）
 ├── lessons/                     ← 具体沉淀内容存放
-│   ├── 2026-05-07-L001-xxx.md   ← 单条沉淀建议的详细内容
+│   ├── L-2026-05-07-001-xxx.md  ← 单条沉淀建议的详细内容
 │   └── ...
 └── archive/                     ← 已处理的历史条目归档
     └── Lessons-SSoT-archive-YYYY-QN.md
@@ -37,7 +43,29 @@ docs/01-GOVERNANCE/
 3. 有没有踩坑经验值得记录，避免下次重复？
 4. 有没有架构层面的洞察，值得更新架构文档？
 
-如果任何一条答案是"有"，就写入 Lessons SSoT。
+如果任何一条答案是"有"，必须执行“双写”：
+
+1. 选择 `templates/lessons/` 下的对应模板，先创建详情文档。
+2. 详情文档必须写清背景、现状问题、建议改动、影响范围和冲突声明。
+3. 再在 Lessons SSoT 追加表行，`Detail Doc` 指向这篇详情文档。
+4. 在 Closeout SSoT / Harness Ledger 中记录 `checked-created`，并引用 lesson ID。
+
+如果四个问题的答案全是"没有"，也不能静默跳过。必须在 Closeout SSoT 和
+Harness Ledger 中记录 `checked-none: <一句话原因>`。
+
+## Closeout 判定
+
+收口时只允许以下两种合格状态：
+
+- `checked-created: L-YYYY-MM-DD-NNN`：发现可沉淀经验，已创建详情文档并更新 Lessons SSoT。
+- `checked-none: <reason>`：已完整检查，确认本轮没有可复用的规范/流程/架构改进。
+
+以下状态不合格：
+
+- 只写 Lessons SSoT 表行，没有详情文档。
+- 只写详情文档，没有 Lessons SSoT 表行。
+- 在 walkthrough 或 progress 中说“无 lessons”，但 Closeout SSoT / Harness Ledger 没有记录。
+- 用 `n/a` 代替检查结果，除非任务是纯只读分析且没有 closed ledger row。
 
 ## 沉淀类型
 
@@ -110,7 +138,7 @@ docs/01-GOVERNANCE/archive/Lessons-SSoT-archive-YYYY-QN.md
 
 1. 打开 `Lessons-SSoT.md`，看 Active 表里有没有 🟡 pending 的条目
 2. 看 Summary 列，大部分情况一句话就能判断
-3. 需要细看就点进 Detail 路径，看完整副本和改动理由
+3. 需要细看就点进 Detail Doc 路径，看完整副本和改动理由
 4. 有冲突的条目一起审（看 Conflict 列）
 5. 批准后改状态为 🟢 approved
 6. Agent 下次看到 approved 状态就执行合入，完成后改为 ✅ merged

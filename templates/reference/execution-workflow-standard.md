@@ -30,7 +30,7 @@
 5. 确认 `review.md` 无 open P0/P1 finding（如适用）
 6. Planned task 必须按 `review-routing-standard.md` 完成 closeout reviewer 或写明 skip reason
 7. 写 walkthrough（参考 walkthrough-standard.md），引用 review report
-8. 执行 Lessons 检查
+8. 执行 Lessons 检查：写 walkthrough 时必须主动反思共性/反复问题；有沉淀则先写 `docs/01-GOVERNANCE/lessons/` 详情文档，再写 Lessons SSoT；无沉淀也要记录 `checked-none: <reason>`
 9. 更新 Harness Ledger
 10. 完成最终 commit / PR，并确认工作区 clean
 11. 如有 worktree，按规范清理

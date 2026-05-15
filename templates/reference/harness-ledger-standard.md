@@ -40,6 +40,7 @@ Regression SSoT、Walkthrough、Lessons SSoT 和 reference/template 文档。
 3. 不记录逐行 diff；逐行变化由 git history 负责
 4. 状态值必须使用固定词，避免自由文本失控
 5. 任务收口时最后更新 Harness Ledger，因为它记录本轮上下文维护的最终状态
+6. closed row 必须有 Lessons Check 值；`checked-created` 必须引用 lesson ID
 
 ## 固定状态词
 
@@ -64,7 +65,9 @@ Regression SSoT、Walkthrough、Lessons SSoT 和 reference/template 文档。
 - [ ] Regression SSoT / Cadence Ledger 已更新或标记 `n/a`
 - [ ] Walkthrough 已创建或有明确跳过原因
 - [ ] Closeout SSoT 已登记 walkthrough 路径或受控跳过原因
-- [ ] Lessons 检查已执行，结果为 `checked-none` 或 `checked-created`
+- [ ] Walkthrough 已包含 Lessons Reflection
+- [ ] Lessons 检查已执行，结果为 `checked-none: <reason>` 或 `checked-created: L-YYYY-MM-DD-NNN`
+- [ ] 如果是 `checked-created`，已创建 `docs/01-GOVERNANCE/lessons/` 详情文档，且 Lessons SSoT 的 `Detail Doc` 指向它
 - [ ] Harness Ledger row 已更新为 `closed`，或 residual 已记录
 
 ## Harness Update Checklist

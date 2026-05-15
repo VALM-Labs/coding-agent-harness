@@ -53,5 +53,5 @@ Do not leave example findings in this table. If there are no material findings, 
 - Progress: [对应 progress.md 条目]
 - Findings: [是否需要写入 findings.md]
 - Regression SSoT: [新增/调整/无]
-- Lessons SSoT: [新增/调整/无]
+- Lessons SSoT: [checked-created: L-YYYY-MM-DD-NNN / checked-none: 一句话原因]
 - Walkthrough: [收口时引用路径]

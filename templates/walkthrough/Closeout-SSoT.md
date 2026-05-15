@@ -4,8 +4,8 @@
 
 ## Active Closeouts
 
-| Harness ID | Date | Task | Task Plan | Review Report | Walkthrough | Evidence | Residual | Closeout Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Harness ID | Date | Task | Task Plan | Review Report | Walkthrough | Evidence | Residual | Lessons Check | Closeout Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Walkthrough Skip Reasons
 
@@ -24,3 +24,5 @@ Only these skip reasons are allowed:
 3. Implementation waves should write a walkthrough. Skip reasons are for constrained cases, not convenience.
 4. The Evidence column must name the checks, smoke, review, or runtime proof used for closeout.
 5. The Residual column must say `none` or route the residual to an owner, task, Regression SSoT, or Harness Ledger row.
+6. The Lessons Check column must say `checked-created: L-YYYY-MM-DD-NNN` or `checked-none: <reason>`.
+7. `checked-created` requires both a Lessons SSoT row and a detail document under `docs/01-GOVERNANCE/lessons/`.

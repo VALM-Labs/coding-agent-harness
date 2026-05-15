@@ -5,8 +5,8 @@
 
 ## Active Task Updates
 
-| ID | Date | Task | Task Plan | Review | Updates | Docs | Repo Governance / CI-CD | Evidence | Residual | Status |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ID | Date | Task | Task Plan | Review | Updates | Docs | Repo Governance / CI-CD | Lessons Check | Evidence | Residual | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Archived
 
@@ -41,3 +41,4 @@
 3. Feature / Regression / Lessons 的事实保留在对应 SSoT，不复制到本表
 4. Active 表超过 50 条时，归档 `closed` / `superseded` 条目
 5. 任意 `closed` / `closed-with-residual` / `closed-local-only` 条目必须在 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 有对应 row
+6. Lessons Check 必须是 `checked-created: L-YYYY-MM-DD-NNN` 或 `checked-none: <reason>`；不能静默空缺

@@ -2,12 +2,13 @@
 
 > 单一事实源：管理所有经验沉淀建议的生命周期。
 > Agent 在 Walkthrough 收口后写入建议；人审批后决定是否合入正式 reference。
+> **表行不能单独存在：每条 Active Lesson 必须有 `docs/01-GOVERNANCE/lessons/` 下的详情文档。**
 > **开始写新建议前，必须完整读一遍本表，了解当前所有 pending 状态的条目。**
 
 ## Active Lessons
 
-| ID | Date | Source | Type | Target | Summary | Detail | Status | Conflict |
-|----|------|--------|------|--------|---------|--------|--------|----------|
+| ID | Date | Source | Type | Target | Summary | Detail Doc | Status | Conflict |
+|----|------|--------|------|--------|---------|------------|--------|----------|
 | | | | | | | | | |
 
 ## Archived (see archive/ for full history)
@@ -33,7 +34,9 @@
 
 ## Rules
 
-1. Agent 写新建议前必须完整读本表
-2. 副本始终基于正式版本，不基于其他 pending 副本
-3. 如有冲突，以解决冲突方式编写，并在 Conflict 列互相标记
-4. Active 表超过 20 条时归档已完结条目到 `archive/`
+1. Agent 写新建议前必须完整读本表。
+2. 先写 `docs/01-GOVERNANCE/lessons/L-YYYY-MM-DD-NNN-<slug>.md` 详情文档，再追加本表行。
+3. `Detail Doc` 必须是详情文档路径，不能写散文摘要。
+4. 副本始终基于正式版本，不基于其他 pending 副本。
+5. 如有冲突，以解决冲突方式编写，并在 Conflict 列互相标记。
+6. Active 表超过 20 条时归档已完结条目到 `archive/`。

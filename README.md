@@ -67,6 +67,7 @@ coding-agent-harness/
 │   └── worktree-parallel.md          # 命名/分支/操作 SOP
 ├── scripts/
 │   └── check-harness.mjs             # 可执行 harness 完成度检查
+├── docs/plans/                       # 本仓本地 review 草稿；默认被 .gitignore 忽略
 └── templates/                        # 可直接写入项目的模板
     ├── AGENTS.md.template
     ├── CLAUDE.md.template            # Claude Code 兼容 shim，指向 AGENTS.md
@@ -163,7 +164,7 @@ node scripts/check-harness.mjs /path/to/project
 ```
 
 这个检查不是只看文件是否存在。它会检查 `AGENTS.md` 索引、delivery operating model、repo governance、
-CI/CD、PR template、workflow 或 residual、review template、Harness Ledger、Closeout SSoT，以及
+CI/CD、PR template、workflow 或 residual、review template、Harness Ledger、Closeout SSoT、Lessons 双写，以及
 reference 文档里是否还残留泛化占位符。检查失败时不能声称 harness complete。
 
 ### 让 Agent 直接执行
@@ -203,6 +204,7 @@ skills 目录。当你说"帮我搭建 harness"时，agent 会自动触发完整
 - **Delivery SSoT**：保存多人、多 agent、多仓或传统流程下的 feature block 分配、依赖和集成顺序
 - **Regression SSoT**：保存 regression surface、证据深度和 residual 的当前事实
 - **Lessons SSoT**：保存经验沉淀建议和规范演进审批状态
+- **Lesson Detail Docs**：每条 pending lesson 的完整说明，位于 `docs/01-GOVERNANCE/lessons/`
 - **Harness Ledger**：记录每轮任务是否按 SOP 维护了这些事实
 - **Closeout SSoT**：记录每个 closed 任务的 walkthrough、evidence、residual 或受控 skip reason
 - **Review Report**：保存在任务目录的 `review.md`，记录对抗性审查的 findings、no-finding 结论和残余风险
