@@ -1,0 +1,2886 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Harness Dashboard</title>
+  <link rel="icon" href="data:,">
+  <style>@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+  color-scheme: light;
+  
+  /* Backgrounds & Surfaces */
+  --bg: #f3f4f6;        /* Slate 100: Elegant silver-gray background base */
+  --paper: #ffffff;     /* Pure White: Card surface */
+  --paper-2: #e5e7eb;   /* Slate 200: Soft tab & hover tint */
+  
+  /* Typography */
+  --ink: #111827;       /* Slate 900: Deep obsidian text */
+  --muted: #4b5563;     /* Slate 600: Secondary text */
+  
+  /* Borders & Dividers */
+  --line: #d1d5db;      /* Slate 300: High-contrast thin border line */
+  
+  /* Branding Accents */
+  --accent: #d97706;    /* Amber 600: Rich golden amber for primary actions */
+  --accent-2: #ca8a04;  /* Yellow 600: Deep warm gold for gradients */
+  
+  /* Semantic Statuses */
+  --danger: #e11d48;    /* Rose 600: Blockers, failures, and errors */
+  --warn: #ea580c;      /* Orange 600: Warnings and advice */
+  --ok: #16a34a;        /* Green 600: Complete and verified */
+  
+  /* Dimensions, Shadows, & Glows */
+  --shadow: 0 10px 15px -3px rgba(17, 24, 39, 0.03), 0 4px 6px -4px rgba(17, 24, 39, 0.03), 0 1px 3px rgba(0, 0, 0, 0.01);
+  --shadow-hover: 0 20px 25px -5px rgba(17, 24, 39, 0.06), 0 10px 10px -5px rgba(17, 24, 39, 0.03);
+  --glow: 0 0 20px rgba(217, 119, 6, 0.08);
+  
+  /* Typography Scale */
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  
+  /* Backgrounds & Surfaces */
+  --bg: #121214;        /* Dark Charcoal: Obsidian dark grey */
+  --paper: #1a1a1c;     /* Elevated dark gray zinc surface */
+  --paper-2: #27272a;   /* Zinc 800: Hover tint and active tab */
+  
+  /* Typography */
+  --ink: #f4f4f5;       /* Zinc 100: Soft white contrast text */
+  --muted: #9ca3af;     /* Slate 400: Mid-tone tech gray */
+  
+  /* Borders & Dividers */
+  --line: #2b2b2e;      /* Subdued dark border line */
+  
+  /* Branding Accents */
+  --accent: #fbbf24;    /* Amber 400: Radiant warm amber */
+  --accent-2: #f59e0b;  /* Amber 500: Deep glowing amber */
+  
+  /* Semantic Statuses */
+  --danger: #fb7185;    /* Rose 400: High-visibility error rose */
+  --warn: #fbbf24;      /* Amber 400: Warm warning amber */
+  --ok: #34d399;        /* Green 400: Success mint green */
+  
+  /* Shadows & Glows */
+  --shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 25px 40px rgba(0, 0, 0, 0.45);
+  --glow: 0 0 25px rgba(251, 191, 36, 0.12);
+}
+
+/* Animations & Keyframes */
+@keyframes shimmer-flow {
+  0% { background-position: 100% 0%; }
+  100% { background-position: -100% 0%; }
+}
+
+@keyframes pulse-ok {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.15), var(--shadow); }
+  50% { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0), var(--shadow); }
+}
+
+@keyframes pulse-warn {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.15), var(--shadow); }
+  50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0), var(--shadow); }
+}
+
+@keyframes pulse-fail {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.15), var(--shadow); }
+  50% { box-shadow: 0 0 0 6px rgba(225, 29, 72, 0), var(--shadow); }
+}
+
+/* Reset & Scrollbars */
+* {
+  box-sizing: border-box;
+  outline-color: var(--accent);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  background-image: radial-gradient(ellipse at top, var(--paper-2), var(--bg));
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+button, input, select {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Base Layout Container */
+.visibility-shell {
+  width: min(1400px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 40px 0 80px;
+}
+
+/* Page Header / Hero */
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.hero-copy h1 {
+  margin: 0;
+  font-size: clamp(24px, 4.5vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-sub {
+  max-width: 800px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+  font-weight: 500;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.hero-actions a,
+.hero-actions button,
+.section-head a,
+.section-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 999px; /* Capsules */
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-actions a.active {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+.hero-actions a:hover:not(.active),
+.hero-actions button:hover,
+.section-head a:hover,
+.section-head button:hover {
+  background: var(--paper-2);
+  border-color: var(--muted);
+  transform: translateY(-1px);
+}
+
+.stack {
+  display: grid;
+  gap: 24px;
+}
+
+/* Cockpit Two-Column Layout Grid */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+    align-items: start;
+  }
+}
+
+.status-card-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.status-primary,
+.metric,
+.flow-panel,
+.migration-panel,
+.lesson-panel,
+.health-panel,
+.task-group,
+.detail-hero,
+.doc-section,
+.side-panel,
+.module-card,
+.index-toolbar {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px; /* Smoother rounding */
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.status-primary {
+  padding: 20px;
+  border-width: 1.5px;
+}
+
+.status-primary.pass {
+  border-color: rgba(22, 163, 74, 0.3);
+  animation: pulse-ok 4s infinite;
+}
+
+.status-primary.warn {
+  border-color: rgba(217, 119, 6, 0.3);
+  animation: pulse-warn 4s infinite;
+}
+
+.status-primary.fail {
+  border-color: rgba(225, 29, 72, 0.3);
+  animation: pulse-fail 4s infinite;
+}
+
+.status-primary span,
+.metric span,
+.subtle,
+.task-row small,
+.card-head p,
+.detail-hero p,
+.health-panel p {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-primary strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 6px 0;
+}
+
+.status-primary p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.metric {
+  min-height: 104px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.metric strong {
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+}
+
+/* Sections & Panel Layouts */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-head h2,
+.detail-hero h2,
+.side-panel h3,
+.module-card h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+}
+
+.flow-panel,
+.migration-panel,
+.lesson-panel,
+.health-panel {
+  padding: 24px;
+}
+
+.flow-canvas {
+  min-height: 220px;
+  overflow: auto;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.runway-breakdown,
+.group-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.runway-breakdown a,
+.group-pager {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 12px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.runway-breakdown a {
+  display: grid;
+  gap: 4px;
+  min-width: 190px;
+}
+
+.runway-breakdown a:hover {
+  border-color: var(--accent);
+  background: var(--paper-2);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.runway-breakdown a strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.runway-breakdown span,
+.group-pager span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mermaid-rendered {
+  margin: 0;
+}
+
+.mermaid-rendered figcaption,
+.mermaid-fallback figcaption {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.mermaid-rendered svg {
+  min-width: 100%;
+  height: auto;
+}
+
+.mermaid-node rect {
+  fill: var(--paper);
+  stroke: var(--line);
+  stroke-width: 1.5px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mermaid-node:hover rect {
+  stroke: var(--accent);
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.05));
+}
+
+.mermaid-node text {
+  fill: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.mermaid-edge {
+  stroke: var(--line);
+  stroke-width: 2px;
+  fill: none;
+  transition: stroke 0.25s ease;
+}
+
+.mermaid-node:hover ~ .mermaid-edge,
+.mermaid-edge:hover {
+  stroke: var(--accent);
+}
+
+.mermaid-arrow {
+  fill: var(--line);
+  transition: fill 0.25s ease;
+}
+
+/* Active Task Briefs */
+.task-briefs {
+  display: grid;
+  gap: 16px;
+}
+
+.brief-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  gap: 16px;
+}
+
+.brief-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.brief-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent);
+}
+
+.brief-card.compact {
+  box-shadow: none;
+  background: transparent;
+  border-color: var(--line);
+  padding: 16px 0;
+}
+
+.brief-card.compact:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--line);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.card-head a {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.card-head a:hover {
+  color: var(--accent);
+}
+
+.card-head p {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Beautiful Shimmering Progress Bar */
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+  margin: 14px 0;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  animation: shimmer-flow 3s infinite linear;
+}
+
+/* Translucent Tags & Status Pills */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: fit-content;
+  border-radius: 999px; /* Pill */
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--paper-2);
+  color: var(--muted);
+  white-space: nowrap;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.tag.pass {
+  color: var(--ok);
+  background: rgba(22, 163, 74, 0.08);
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.tag.warn {
+  color: var(--warn);
+  background: rgba(217, 119, 6, 0.08);
+  border-color: rgba(217, 119, 6, 0.2);
+}
+
+.tag.fail {
+  color: var(--danger);
+  background: rgba(225, 29, 72, 0.08);
+  border-color: rgba(225, 29, 72, 0.2);
+}
+
+/* Premium Typography & Markdown Rendering */
+.markdown {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.markdown h1 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+
+.markdown h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin-top: 24px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+
+.markdown h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.markdown p, .markdown ul, .markdown ol {
+  margin-bottom: 16px;
+}
+
+.markdown pre {
+  overflow: auto;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.markdown code {
+  font-family: var(--font-mono);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 12px;
+}
+
+.markdown blockquote {
+  border-left: 4px solid var(--accent);
+  padding: 8px 16px;
+  margin: 0 0 16px;
+  background: var(--paper-2);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+}
+
+.rendered-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+  margin-bottom: 16px;
+}
+
+.rendered-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.rendered-table th {
+  background: var(--paper-2);
+  font-weight: 700;
+  color: var(--ink);
+  border-bottom: 2px solid var(--line);
+  padding: 10px 12px;
+}
+
+.rendered-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.rendered-table tr:last-child td {
+  border-bottom: none;
+}
+
+.rendered-table tr:hover {
+  background: var(--paper-2);
+}
+
+.missing-brief {
+  border-left: 3px solid var(--warn);
+  padding: 12px 16px;
+  background: rgba(217, 119, 6, 0.04);
+  border-radius: 0 8px 8px 0;
+  color: var(--muted);
+}
+
+/* Linear-style Form Controls & Search bar */
+.index-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.8fr) 170px 170px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.index-toolbar input,
+.index-toolbar select,
+.warning-toolbar select {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.01);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.index-toolbar input:focus,
+.index-toolbar select:focus,
+.warning-toolbar select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  outline: none;
+}
+
+.task-group {
+  overflow: hidden;
+}
+
+.task-group .section-head {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+  background: var(--paper);
+}
+
+.task-list {
+  display: grid;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 130px 100px 140px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  background: var(--paper);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.task-row-head {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--paper-2);
+}
+
+.task-row:hover:not(.task-row-head) {
+  background: var(--paper-2);
+  transform: translateX(4px);
+}
+
+.task-row span:first-child {
+  min-width: 0;
+}
+
+.task-row strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.task-row small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.crumbs a:hover {
+  color: var(--accent);
+}
+
+/* Detail view panels */
+.detail-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.detail-score {
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.phase-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.phase-timeline h2 {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.phase-step {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.phase-step:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+.phase-step strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.phase-step p {
+  color: var(--muted);
+  min-height: 42px;
+  font-size: 12px;
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+.detail-main {
+  display: grid;
+  gap: 20px;
+}
+
+.doc-section {
+  padding: 24px;
+}
+
+.detail-side {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+.side-panel {
+  padding: 20px;
+}
+
+.side-panel a {
+  display: inline-flex;
+  margin: 6px 6px 0 0;
+  padding: 6px 12px;
+  border-radius: 999px; /* Pill */
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.side-panel a:hover {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+  transform: scale(1.03);
+}
+
+.finding {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.finding:last-child {
+  border-bottom: none;
+}
+
+.finding.open {
+  color: var(--danger);
+  border-left: 2px solid var(--danger);
+  padding-left: 8px;
+}
+
+.finding strong {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.finding span {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Module Grid */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr));
+  gap: 16px;
+}
+
+.module-card {
+  padding: 24px;
+}
+
+.module-more {
+  display: inline-flex;
+  margin-top: 14px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.module-more:hover {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+/* Migration workbench */
+.migration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.migration-grid > div,
+.migration-grid > button,
+.lesson {
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: left;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.migration-grid > button {
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.01);
+}
+
+.migration-grid > button.active,
+.migration-grid > button:hover {
+  border-color: var(--accent);
+  background: var(--paper);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+.migration-grid p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.warning-workbench {
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+.warning-toolbar,
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.warning-toolbar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pager button {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pager button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pager button:hover:not(:disabled) {
+  background: var(--paper-2);
+  border-color: var(--muted);
+}
+
+.warning-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.warning-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) auto 80px 120px 140px minmax(220px, 1.5fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  transition: all 0.2s ease;
+}
+
+.warning-row:last-child {
+  border-bottom: 0;
+}
+
+.warning-row:hover {
+  background: var(--paper-2);
+}
+
+.warning-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.warning-row strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lesson + .lesson {
+  margin-top: 10px;
+}
+
+.lesson:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.health-panel {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.health-lists {
+  display: grid;
+  gap: 10px;
+}
+
+details {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+}
+
+details[open] {
+  background: var(--paper);
+  border-color: var(--accent);
+}
+
+details summary {
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.empty {
+  color: var(--muted);
+  border: 2px dashed var(--line);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Mobile Responsiveness Rules */
+@media (max-width: 920px) {
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .metrics-grid,
+  .detail-grid,
+  .health-panel {
+    grid-template-columns: 1fr;
+  }
+  
+  .hero-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  
+  .task-row {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 8px;
+  }
+  
+  .task-row-head {
+    display: none;
+  }
+  
+  .task-row > span:not(:first-child)::before {
+    content: attr(data-label) ": ";
+    display: inline-block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+    min-width: 90px;
+  }
+  
+  .index-toolbar {
+    grid-template-columns: 1fr;
+  }
+  
+  .warning-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 16px;
+  }
+  
+  .detail-side {
+    position: static;
+  }
+}
+
+/* Slide-over Drawer Component */
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.drawer-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-drawer {
+  position: fixed;
+  top: 0;
+  right: -67vw;
+  width: 65vw;
+  max-width: 100%;
+  height: 100%;
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.task-drawer.active {
+  right: 0;
+}
+@media (max-width: 768px) {
+  .task-drawer {
+    width: 100%;
+    right: -102%;
+  }
+}
+
+.task-drawer-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--paper-2);
+}
+.task-drawer-header h2 {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.task-drawer-header button.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+.task-drawer-header button.btn-close:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.task-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* Compact brief card teaser styles */
+.brief-teaser {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+.btn-drawer-trigger {
+  padding: 6px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-drawer-trigger:hover {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+/* Compact capsules for module list tasks */
+.module-task-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.module-task-row:hover {
+  border-color: var(--accent);
+  transform: translateX(3px);
+}
+.module-task-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.module-task-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.module-task-dot.state-pass { background: #4caf50; }
+.module-task-dot.state-warn { background: #ff9800; }
+.module-task-dot.state-fail { background: #f44336; }
+
+.module-task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.module-task-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+/* Inline card pagination controls */
+.module-pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 6px 12px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.module-pager button {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.module-pager button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+.module-pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.module-pager span {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+/* Clickable lessons in sidebar */
+.lesson-panel .lesson {
+  padding: 10px 14px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.lesson-panel .lesson:hover {
+  border-color: var(--accent);
+  transform: translateX(3px);
+}
+
+/* SSoT Ledger Visual Panel */
+.ledger-panel {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 16px;
+}
+.ledger-panel h2 {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.ledger-split-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--line);
+  margin-bottom: 8px;
+}
+.ledger-split-segment {
+  height: 100%;
+}
+.ledger-split-segment.closed { background: #4caf50; }
+.ledger-split-segment.open { background: #ff9800; }
+.ledger-split-segment.blocked { background: #f44336; }
+
+.ledger-split-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.ledger-split-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ledger-split-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.ledger-split-legend-dot.closed { background: #4caf50; }
+.ledger-split-legend-dot.open { background: #ff9800; }
+.ledger-split-legend-dot.blocked { background: #f44336; }
+
+.ledger-gauge-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.ledger-gauge-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+.ledger-gauge-card span {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ledger-gauge-card strong {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+/* Scroll containment for total overview cards */
+.warning-workbench .warning-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.lesson-panel {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.health-panel .health-lists {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+/* Elegant scrollbar style matching custom amber accent */
+.warning-workbench .warning-list::-webkit-scrollbar,
+.lesson-panel::-webkit-scrollbar,
+.health-panel .health-lists::-webkit-scrollbar {
+  width: 6px;
+}
+.warning-workbench .warning-list::-webkit-scrollbar-track,
+.lesson-panel::-webkit-scrollbar-track,
+.health-panel .health-lists::-webkit-scrollbar-track {
+  background: transparent;
+}
+.warning-workbench .warning-list::-webkit-scrollbar-thumb,
+.lesson-panel::-webkit-scrollbar-thumb,
+.health-panel .health-lists::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 3px;
+  opacity: 0.5;
+}
+
+
+</style>
+</head>
+<body>
+  <div id="app" class="app-shell" aria-live="polite"></div>
+  <script>window.__HARNESS_DASHBOARD__ = {"status":{"project":{"name":"coding-agent-harness","root":"TARGET:.","docsOnly":false},"schemaVersion":2,"generatedAt":"2026-05-20T07:21:18.005Z","mode":"legacy-compat","checkState":{"status":"warn","failures":0,"warnings":2,"details":{"failures":[],"warnings":["legacy-compat mode: no .harness-capabilities.json; adoption suggestion is available","adoption-needed: legacy check failed: Harness check failed:\n- missing required file: docs/Harness-Ledger.md\n- missing required file: docs/11-REFERENCE/testing-standard.md\n- missing required file: docs/11-REFERENCE/execution-workflow-standard.md\n- missing required file: docs/11-REFERENCE/repo-governance-standard.md\n- missing required file: docs/11-REFERENCE/ci-cd-standard.md\n- missing required file: docs/11-REFERENCE/long-running-task-standard.md\n- missing required file: docs/11-REFERENCE/adversarial-review-standard.md\n- missing required file: docs/11-REFERENCE/review-routing-standard.md\n- missing required file: docs/11-REFERENCE/docs-library-standard.md\n- missing required file: docs/11-REFERENCE/harness-ledger-standard.md\n- missing required file: docs/10-WALKTHROUGH/_walkthrough-template.md\n- missing required file: docs/10-WALKTHROUGH/Closeout-SSoT.md\n- missing required file: docs/05-TEST-QA/Regression-SSoT.md\n- missing required file: docs/05-TEST-QA/Cadence-Ledger.md\n- missing required file: docs/01-GOVERNANCE/Lessons-SSoT.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/task_plan.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/findings.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/progress.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/review.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md\n- AGENTS.md does not route to repo-governance-standard.md\n- AGENTS.md does not route to ci-cd-standard.md\n- AGENTS.md does not route to execution-workflow-standard.md\n- AGENTS.md does not route to adversarial-review-standard.md\n- AGENTS.md does not route to review-routing-standard.md\n- AGENTS.md does not route to walkthrough-standard.md\n- AGENTS.md does not route to Lessons-SSoT.md\n- AGENTS.md does not route to harness-ledger-standard.md\n- AGENTS.md does not route to Closeout-SSoT.md\n- missing PR template or explicit blocked-with-owner residual"]},"legacy":{"status":"fail","code":1,"stdout":"","stderr":"Harness check failed:\n- missing required file: docs/Harness-Ledger.md\n- missing required file: docs/11-REFERENCE/testing-standard.md\n- missing required file: docs/11-REFERENCE/execution-workflow-standard.md\n- missing required file: docs/11-REFERENCE/repo-governance-standard.md\n- missing required file: docs/11-REFERENCE/ci-cd-standard.md\n- missing required file: docs/11-REFERENCE/long-running-task-standard.md\n- missing required file: docs/11-REFERENCE/adversarial-review-standard.md\n- missing required file: docs/11-REFERENCE/review-routing-standard.md\n- missing required file: docs/11-REFERENCE/docs-library-standard.md\n- missing required file: docs/11-REFERENCE/harness-ledger-standard.md\n- missing required file: docs/10-WALKTHROUGH/_walkthrough-template.md\n- missing required file: docs/10-WALKTHROUGH/Closeout-SSoT.md\n- missing required file: docs/05-TEST-QA/Regression-SSoT.md\n- missing required file: docs/05-TEST-QA/Cadence-Ledger.md\n- missing required file: docs/01-GOVERNANCE/Lessons-SSoT.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/task_plan.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/findings.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/progress.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/review.md\n- missing required file: docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md\n- AGENTS.md does not route to repo-governance-standard.md\n- AGENTS.md does not route to ci-cd-standard.md\n- AGENTS.md does not route to execution-workflow-standard.md\n- AGENTS.md does not route to adversarial-review-standard.md\n- AGENTS.md does not route to review-routing-standard.md\n- AGENTS.md does not route to walkthrough-standard.md\n- AGENTS.md does not route to Lessons-SSoT.md\n- AGENTS.md does not route to harness-ledger-standard.md\n- AGENTS.md does not route to Closeout-SSoT.md\n- missing PR template or explicit blocked-with-owner residual\n"}},"summary":{"tasks":0,"briefCoverage":{"ready":0,"missing":0,"total":0}},"capabilities":[{"name":"core","state":"configured","dependencyStatus":"valid","warnings":[]}],"tasks":[],"handoffs":[],"recentActivity":[]},"tables":{"tables":[]},"documents":{"documents":[]},"graph":{"nodes":[],"edges":[]},"adoption":{"mode":"legacy-compat","project":{"name":"coding-agent-harness","root":"TARGET:.","docsOnly":false},"summary":{"blockers":0,"advice":32,"total":32,"byCategory":{"Adoption Advice":2,"Review Finding":30},"byType":{"capability-adoption":2,"legacy-reference-gap":20,"review-finding":10},"byPriority":{"P3":30,"P1":2},"byPhase":{"baseline":2,"strict-cutover":20,"triage":10},"byFixability":{"decision":2,"template":20,"manual":10},"activeTaskWarnings":0,"strictCutoverWarnings":20},"warnings":[{"id":"AD-001","category":"Adoption Advice","type":"capability-adoption","scope":"capability","priority":"P3","phase":"baseline","fixability":"decision","status":"open","confidence":"medium","severity":"advice","title":"Legacy compatibility mode","affected":".harness-capabilities.json","affectedPaths":[".harness-capabilities.json"],"requiredAction":"Review manually; do not auto-migrate.","detail":"legacy-compat mode: no .harness-capabilities.json; adoption suggestion is available"},{"id":"AD-002","category":"Adoption Advice","type":"capability-adoption","scope":"project","priority":"P1","phase":"baseline","fixability":"decision","status":"open","confidence":"medium","severity":"advice","title":"Legacy checker finding","affected":"project","affectedPaths":[],"requiredAction":"Review manually; do not auto-migrate.","detail":"adoption-needed: legacy check failed: Harness check failed:"},{"id":"AD-003","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/Harness-Ledger.md","affectedPaths":["docs/Harness-Ledger.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/Harness-Ledger.md"},{"id":"AD-004","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/testing-standard.md","affectedPaths":["docs/11-REFERENCE/testing-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/testing-standard.md"},{"id":"AD-005","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/execution-workflow-standard.md","affectedPaths":["docs/11-REFERENCE/execution-workflow-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/execution-workflow-standard.md"},{"id":"AD-006","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/repo-governance-standard.md","affectedPaths":["docs/11-REFERENCE/repo-governance-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/repo-governance-standard.md"},{"id":"AD-007","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/ci-cd-standard.md","affectedPaths":["docs/11-REFERENCE/ci-cd-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/ci-cd-standard.md"},{"id":"AD-008","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/long-running-task-standard.md","affectedPaths":["docs/11-REFERENCE/long-running-task-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/long-running-task-standard.md"},{"id":"AD-009","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/adversarial-review-standard.md","affectedPaths":["docs/11-REFERENCE/adversarial-review-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/adversarial-review-standard.md"},{"id":"AD-010","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/review-routing-standard.md","affectedPaths":["docs/11-REFERENCE/review-routing-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/review-routing-standard.md"},{"id":"AD-011","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/docs-library-standard.md","affectedPaths":["docs/11-REFERENCE/docs-library-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/docs-library-standard.md"},{"id":"AD-012","category":"Review Finding","type":"legacy-reference-gap","scope":"reference","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/11-REFERENCE/harness-ledger-standard.md","affectedPaths":["docs/11-REFERENCE/harness-ledger-standard.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/11-REFERENCE/harness-ledger-standard.md"},{"id":"AD-013","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/10-WALKTHROUGH/_walkthrough-template.md","affectedPaths":["docs/10-WALKTHROUGH/_walkthrough-template.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/10-WALKTHROUGH/_walkthrough-template.md"},{"id":"AD-014","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/10-WALKTHROUGH/Closeout-SSoT.md","affectedPaths":["docs/10-WALKTHROUGH/Closeout-SSoT.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/10-WALKTHROUGH/Closeout-SSoT.md"},{"id":"AD-015","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/05-TEST-QA/Regression-SSoT.md","affectedPaths":["docs/05-TEST-QA/Regression-SSoT.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/05-TEST-QA/Regression-SSoT.md"},{"id":"AD-016","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/05-TEST-QA/Cadence-Ledger.md","affectedPaths":["docs/05-TEST-QA/Cadence-Ledger.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/05-TEST-QA/Cadence-Ledger.md"},{"id":"AD-017","category":"Review Finding","type":"legacy-reference-gap","scope":"project","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/01-GOVERNANCE/Lessons-SSoT.md","affectedPaths":["docs/01-GOVERNANCE/Lessons-SSoT.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/01-GOVERNANCE/Lessons-SSoT.md"},{"id":"AD-018","category":"Review Finding","type":"legacy-reference-gap","scope":"task","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/09-PLANNING/TASKS/_task-template/task_plan.md","affectedPaths":["docs/09-PLANNING/TASKS/_task-template/task_plan.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/09-PLANNING/TASKS/_task-template/task_plan.md"},{"id":"AD-019","category":"Review Finding","type":"legacy-reference-gap","scope":"task","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/09-PLANNING/TASKS/_task-template/findings.md","affectedPaths":["docs/09-PLANNING/TASKS/_task-template/findings.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/09-PLANNING/TASKS/_task-template/findings.md"},{"id":"AD-020","category":"Review Finding","type":"legacy-reference-gap","scope":"task","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/09-PLANNING/TASKS/_task-template/progress.md","affectedPaths":["docs/09-PLANNING/TASKS/_task-template/progress.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/09-PLANNING/TASKS/_task-template/progress.md"},{"id":"AD-021","category":"Review Finding","type":"legacy-reference-gap","scope":"task","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/09-PLANNING/TASKS/_task-template/review.md","affectedPaths":["docs/09-PLANNING/TASKS/_task-template/review.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/09-PLANNING/TASKS/_task-template/review.md"},{"id":"AD-022","category":"Review Finding","type":"legacy-reference-gap","scope":"task","priority":"P3","phase":"strict-cutover","fixability":"template","status":"open","confidence":"high","severity":"advice","title":"- missing required file","affected":"docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md","affectedPaths":["docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing required file: docs/09-PLANNING/TASKS/_task-template/long-running-task-contract.md"},{"id":"AD-023","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to repo-governance-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to repo-governance-standard.md"},{"id":"AD-024","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to ci-cd-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to ci-cd-standard.md"},{"id":"AD-025","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to execution-workflow-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to execution-workflow-standard.md"},{"id":"AD-026","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to adversarial-review-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to adversarial-review-standard.md"},{"id":"AD-027","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to review-routing-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to review-routing-standard.md"},{"id":"AD-028","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to walkthrough-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to walkthrough-standard.md"},{"id":"AD-029","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to Lessons-SSoT.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to Lessons-SSoT.md"},{"id":"AD-030","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to harness-ledger-standard.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to harness-ledger-standard.md"},{"id":"AD-031","category":"Review Finding","type":"review-finding","scope":"project","priority":"P3","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- AGENTS.md does not route to Closeout-SSoT.md","affected":"AGENTS.md","affectedPaths":["AGENTS.md"],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- AGENTS.md does not route to Closeout-SSoT.md"},{"id":"AD-032","category":"Review Finding","type":"review-finding","scope":"project","priority":"P1","phase":"triage","fixability":"manual","status":"open","confidence":"high","severity":"advice","title":"- missing PR template or explicit blocked-with-owner residual","affected":"project","affectedPaths":[],"requiredAction":"Inspect source document and decide whether to adopt v1 contract.","detail":"- missing PR template or explicit blocked-with-owner residual"}],"manualSteps":{"zh":["先查看升级建议，决定当前项目要采用哪些 v1.0 能力合同。","为仍在活跃的任务手工补齐 execution_strategy.md 和 visual_roadmap.md。","只有在项目明确声明 v1.0 capability 后，再把 strict check 当成阻塞门禁。"],"en":["Review adoption advice and decide which v1.0 capability contracts should be adopted.","Manually add execution_strategy.md and visual_roadmap.md for active tasks.","Treat strict check as blocking only after the project intentionally declares v1.0 capabilities."]}}};</script>
+  <script>window.HarnessI18n = {
+  en: {
+    eyebrow: "Human Visibility Dashboard",
+    projectCockpit: "Console",
+    overview: "Overview",
+    taskIndex: "Task Index",
+    moduleView: "Modules",
+    readiness: "Readiness",
+    tasks: "Tasks",
+    blockers: "Blockers",
+    advice: "Advice",
+    warnings: "Warnings",
+    failures: "Failures",
+    briefCoverage: "Brief coverage",
+    resolveBlockers: "Resolve release blockers before continuing.",
+    missingBriefs: "tasks still need human visibility briefs.",
+    reviewAdvice: "Continue, but keep adoption advice visible.",
+    noBlockers: "No blockers in this snapshot.",
+    firstLook: "First look",
+    projectFlow: "Project Flow",
+    nodes: "nodes",
+    edges: "edges",
+    noFlow: "No computable flow yet. Add brief.md Mermaid or module/task roadmaps.",
+    currentWork: "Current work",
+    activeBriefs: "Active Task Briefs",
+    openTaskIndex: "Open task index",
+    noActiveTasks: "No active task brief found.",
+    visibilityBriefMissing: "Visibility brief missing",
+    missingBriefExplain: "This task can be checked by agents, but humans still cannot understand it from the dashboard alone.",
+    noPhaseData: "No phase data.",
+    searchPlaceholder: "Search title, id, module, or state",
+    searchTasks: "Search tasks",
+    stateFilter: "Filter by state",
+    briefReady: "brief ready",
+    briefMissing: "brief missing",
+    taskNotFound: "Task not found.",
+    taskVisibility: "Task visibility",
+    phaseTimeline: "Phase Timeline",
+    taskPlan: "Task Plan",
+    brief: "Brief",
+    strategy: "Execution Strategy",
+    roadmap: "Visual Roadmap",
+    progress: "Progress",
+    review: "Review",
+    findings: "Findings",
+    references: "References",
+    artifacts: "Artifacts",
+    source: "Source",
+    rendered: "Rendered",
+    sourceDocuments: "Source Documents",
+    noDocuments: "No source documents.",
+    selectedSource: "Selected Source",
+    openFindings: "Open Findings",
+    noOpenFindings: "No open findings.",
+    evidence: "Evidence",
+    noEvidence: "No evidence logged.",
+    noModules: "No modules found.",
+    moduleBriefMissing: "Module brief missing. Add a module-level visibility brief before treating module migration as complete.",
+    moduleTasks: "Module Tasks",
+    noModuleTasks: "No module tasks.",
+    migration: "Migration",
+    migrationSummary: "Migration Attention",
+    migrationWorkbench: "Migration Workbench",
+    aggregateMigrationView: "aggregate migration view",
+    runwayBaseline: "Baseline snapshot",
+    runwayTriage: "Warning triage",
+    runwayContracts: "Active task contracts",
+    runwayModules: "Module classification",
+    runwayCutover: "Strict cutover",
+    items: "items",
+    groups: "groups",
+    warningFilter: "Filter warnings",
+    allWarnings: "All warnings",
+    noWarnings: "No warnings in this filter.",
+    showing: "Showing",
+    showingGroups: "Showing groups",
+    prevPage: "Previous",
+    nextPage: "Next",
+    confidence: "confidence",
+    addVisibilityBrief: "Add a human-readable brief before this task is treated as migrated.",
+    groupBy: "Group by",
+    group_migration: "Migration bucket",
+    group_module: "Module",
+    group_month: "Month",
+    group_state: "State",
+    inferredModule: "Module",
+    unclassifiedModule: "legacy-unclassified",
+    visibilityLayer: "Visibility Layer",
+    lessons: "Lessons",
+    lesson: "Lesson",
+    noLessons: "No lessons captured.",
+    releaseHealth: "Release Health",
+    activeCurrent: "Active / Current",
+    briefReadyGroup: "Brief-ready Tasks",
+    legacyMonth: "Legacy Tasks",
+    showMore: "Show more",
+    showingFirst: "showing first",
+    columnTask: "Task",
+    columnState: "State",
+    columnCompletion: "Completion",
+    columnBrief: "Brief",
+    none: "None",
+    dark: "Dark",
+    light: "Light",
+    system: "System",
+    state_all: "all",
+    state_pass: "pass",
+    state_warn: "warn",
+    state_fail: "fail",
+    state_in_progress: "in progress",
+    state_planned: "planned",
+    state_review: "review",
+    state_blocked: "blocked",
+    state_done: "done",
+    state_unknown: "unknown",
+    viewDetails: "View Details",
+    close: "Close",
+    fullView: "Open Full Page",
+    lessonNotFound: "Lesson record not found",
+    lessonDocMissing: "The detail Markdown documentation for this lesson was not found or is yet to be created.",
+    ssotLedger: "Change & Quality Ledger SSoT",
+    ledgerInsights: "Harness Ledger Insights",
+    taskStatusSplit: "Ledger Task Distribution",
+    lessonsCheckRate: "Lessons Review Rate",
+    evidenceAuditRate: "Evidence Audit Rate",
+    tagClosed: "Closed",
+    tagOpen: "Active",
+    tagBlocked: "Blocked",
+    date: "Date",
+    source: "Source",
+    target: "Target",
+    relation: "Relation",
+    document: "Detail Doc",
+  },
+};
+
+</script>
+  <script>window.HarnessMarkdown = {
+  render(markdown = "", mode = "rendered") {
+    if (mode === "source") return `<pre><code>${escapeHtml(markdown)}</code></pre>`;
+    return renderBlocks(markdown);
+  },
+};
+
+function renderBlocks(markdown) {
+  const lines = String(markdown || "").split(/\r?\n/);
+  const blocks = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim();
+      const code = [];
+      index += 1;
+      while (index < lines.length && !lines[index].startsWith("```")) {
+        code.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(lang === "mermaid" ? window.HarnessMermaid.render(code.join("\n")) : `<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+      continue;
+    }
+    if (/^#{1,3}\s+/.test(line)) {
+      const level = line.match(/^#+/)[0].length;
+      blocks.push(`<h${level}>${inline(line.replace(/^#{1,3}\s+/, ""))}</h${level}>`);
+      index += 1;
+      continue;
+    }
+    if (isTableStart(lines, index)) {
+      const table = [];
+      while (index < lines.length && lines[index].trim().startsWith("|")) {
+        table.push(lines[index]);
+        index += 1;
+      }
+      blocks.push(renderTable(table));
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items = [];
+      while (index < lines.length && /^[-*]\s+/.test(lines[index])) {
+        items.push(`<li>${inline(lines[index].replace(/^[-*]\s+/, ""))}</li>`);
+        index += 1;
+      }
+      blocks.push(`<ul>${items.join("")}</ul>`);
+      continue;
+    }
+    const paragraph = [];
+    while (index < lines.length && lines[index].trim() && !/^#{1,3}\s+/.test(lines[index]) && !lines[index].startsWith("```") && !isTableStart(lines, index)) {
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+    blocks.push(`<p>${inline(paragraph.join(" "))}</p>`);
+  }
+  return blocks.join("");
+}
+
+function isTableStart(lines, index) {
+  return lines[index]?.trim().startsWith("|") && /^(\s*\|?\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[index + 1] || "");
+}
+
+function renderTable(lines) {
+  const rows = lines.map(splitMarkdownRow);
+  const header = rows[0] || [];
+  const body = rows.slice(2).filter((row) => row.length === header.length);
+  return `<div class="rendered-table-wrap"><table class="rendered-table">
+    <thead><tr>${header.map((cell) => `<th>${inline(cell)}</th>`).join("")}</tr></thead>
+    <tbody>${body.map((row) => `<tr>${row.map((cell) => `<td>${inline(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table></div>`;
+}
+
+function splitMarkdownRow(line) {
+  let text = String(line || "").trim();
+  if (text.startsWith("|")) text = text.slice(1);
+  if (text.endsWith("|") && !text.endsWith("\\|")) text = text.slice(0, -1);
+  const cells = [];
+  let current = "";
+  let inCode = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "\\" && text[index + 1] === "|") {
+      current += "|";
+      index += 1;
+      continue;
+    }
+    if (char === "`") inCode = !inCode;
+    if (char === "|" && !inCode) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function inline(value) {
+  return escapeHtml(value)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+</script>
+  <script>window.HarnessMermaid = {
+  render(code = "") {
+    const parsed = parseFlowchart(code);
+    if (!parsed) {
+      return `<figure class="mermaid-fallback">
+        <figcaption>Mermaid source</figcaption>
+        <pre>${escapeMermaid(code)}</pre>
+      </figure>`;
+    }
+    return renderSvg(parsed);
+  },
+};
+
+function parseFlowchart(code) {
+  const lines = String(code || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!/^flowchart\s+(LR|TB|TD|RL|BT)/i.test(lines[0] || "")) return null;
+  const nodes = new Map();
+  const edges = [];
+  for (const line of lines.slice(1)) {
+    const edgeMatch = line.match(/^([A-Za-z0-9_-]+)(?:\["([^"]+)"\])?\s*-+>\s*([A-Za-z0-9_-]+)(?:\["([^"]+)"\])?/);
+    if (!edgeMatch) continue;
+    const [, from, fromLabel, to, toLabel] = edgeMatch;
+    nodes.set(from, fromLabel || from);
+    nodes.set(to, toLabel || to);
+    edges.push([from, to]);
+  }
+  if (nodes.size === 0) return null;
+  return { nodes: [...nodes.entries()], edges };
+}
+
+function renderSvg({ nodes, edges }) {
+  const width = Math.max(360, nodes.length * 150);
+  const height = 150;
+  const positions = new Map(nodes.map(([id], index) => [id, { x: 70 + index * 140, y: 70 }]));
+  const nodeSvg = nodes.map(([id, label]) => {
+    const pos = positions.get(id);
+    return `<g class="mermaid-node">
+      <rect x="${pos.x - 54}" y="${pos.y - 24}" width="108" height="48" rx="8"></rect>
+      <text x="${pos.x}" y="${pos.y + 4}" text-anchor="middle">${escapeMermaid(label).replaceAll("\\n", " ")}</text>
+    </g>`;
+  }).join("");
+  const edgeSvg = edges.map(([from, to]) => {
+    const a = positions.get(from);
+    const b = positions.get(to);
+    if (!a || !b) return "";
+    return `<path class="mermaid-edge" d="M ${a.x + 54} ${a.y} L ${b.x - 62} ${b.y}"></path><path class="mermaid-arrow" d="M ${b.x - 62} ${b.y} l -7 -5 v 10 z"></path>`;
+  }).join("");
+  return `<figure class="mermaid-rendered">
+    <figcaption>Mermaid</figcaption>
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Mermaid flowchart">${edgeSvg}${nodeSvg}</svg>
+  </figure>`;
+}
+
+function escapeMermaid(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+</script>
+  <script>const bundle = window.__HARNESS_DASHBOARD__ || {};
+const locale = Object.keys(window.HarnessI18n || { en: {} })[0] || "en";
+const labels = window.HarnessI18n?.[locale] || {};
+
+const state = {
+  query: "",
+  taskState: "all",
+  taskGroupMode: "migration",
+  taskPageByGroup: {},
+  taskGroupPage: 1,
+  warningFilter: "all",
+  warningPage: 1,
+  renderMode: "rendered",
+  theme: localStorage.getItem("harness.theme") || "system",
+};
+
+const taskPageSize = 25;
+const taskGroupsPerPage = 8;
+const warningPageSize = 18;
+
+const taskDocTabs = [
+  ["brief", "brief.md"],
+  ["taskPlan", "task_plan.md"],
+  ["strategy", "execution_strategy.md"],
+  ["roadmap", "visual_roadmap.md"],
+  ["progress", "progress.md"],
+  ["review", "review.md"],
+  ["findings", "findings.md"],
+  ["references", "references/INDEX.md"],
+  ["artifacts", "artifacts/INDEX.md"],
+];
+
+function t(key) {
+  return labels[key] || key;
+}
+
+function app() {
+  const systemTheme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.dataset.theme = state.theme === "system" ? systemTheme : state.theme;
+  document.documentElement.lang = locale === "zh" ? "zh-CN" : "en";
+  const root = document.getElementById("app");
+  root.innerHTML = shell();
+  bind();
+}
+
+function shell() {
+  return `<div class="visibility-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">${t("eyebrow")}</p>
+        <h1>${escapeHtml(projectName())} ${t("projectCockpit")}</h1>
+      </div>
+      <div class="hero-actions">
+        ${routeLink("#/", t("overview"), "overview")}
+        ${routeLink("#/tasks", t("taskIndex"), "tasks")}
+        ${routeLink("#/modules", t("moduleView"), "modules")}
+        <button data-theme-toggle>${themeLabel()}</button>
+      </div>
+    </header>
+    ${renderRoute()}
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <div id="task-drawer" class="task-drawer"></div>
+  </div>`;
+}
+
+function renderRoute() {
+  const route = currentRoute();
+  if (route.name === "task") return taskDetail(route);
+  if (route.name === "modules") return modulesView(route.id);
+  if (route.name === "tasks") return taskIndex();
+  return overview();
+}
+
+function currentRoute() {
+  const hash = window.location.hash || "#/";
+  const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  if (parts[0] === "tasks" && parts[1]) return { name: "task", id: parts[1], doc: parts[2] === "docs" ? parts[3] || "" : "" };
+  if (parts[0] === "modules") return { name: "modules", id: parts[1] || "" };
+  if (parts[0] === "tasks") return { name: "tasks" };
+  return { name: "overview" };
+}
+
+function routeLink(hash, text, routeName) {
+  const active = currentRoute().name === routeName;
+  return `<a class="${active ? "active" : ""}" href="${hash}">${escapeHtml(text)}</a>`;
+}
+
+function overview() {
+  return `<div class="dashboard-grid">
+    <main class="dashboard-main stack">
+      ${flowPanel()}
+      ${migrationPanel()}
+      ${activeTaskBriefs()}
+    </main>
+    <aside class="dashboard-sidebar stack">
+      ${statusStrip()}
+      ${ledgerPanel()}
+      ${healthPanel()}
+      ${lessonPanel()}
+    </aside>
+  </div>`;
+}
+
+function statusStrip() {
+  const status = bundle.status?.checkState?.status || "unknown";
+  const failures = bundle.status?.checkState?.failures || 0;
+  const warnings = bundle.status?.checkState?.warnings || 0;
+  const tasks = bundle.status?.tasks || [];
+  const withBrief = tasks.filter((task) => task.briefSource === "standalone").length;
+  return `<section class="status-card-group">
+    <div class="status-primary ${status}">
+      <span>${t("readiness")}</span>
+      <strong>${label(status)}</strong>
+      <p>${nextActionText()}</p>
+    </div>
+    <div class="metrics-grid">
+      ${metric(t("tasks"), tasks.length)}
+      ${metric(t("briefCoverage"), `${withBrief}/${tasks.length}`)}
+      ${metric(t("blockers"), failures)}
+      ${metric(t("advice"), warnings)}
+    </div>
+  </section>`;
+}
+
+function metric(labelText, value) {
+  return `<div class="metric"><span>${escapeHtml(labelText)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function nextActionText() {
+  const failures = bundle.status?.checkState?.failures || 0;
+  if (failures > 0) return t("resolveBlockers");
+  const missingBriefs = (bundle.status?.tasks || []).filter((task) => task.briefSource !== "standalone").length;
+  if (missingBriefs > 0) return `${missingBriefs} ${t("missingBriefs")}`;
+  const warnings = bundle.status?.checkState?.warnings || 0;
+  if (warnings > 0) return t("reviewAdvice");
+  return t("noBlockers");
+}
+
+function flowPanel() {
+  const mermaid = projectMermaid();
+  return `<section class="flow-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">${t("firstLook")}</p>
+        <h2>${t("projectFlow")}</h2>
+      </div>
+      <span class="subtle">${graphSummary()}</span>
+    </div>
+    <div class="flow-canvas">${mermaid ? window.HarnessMermaid.render(mermaid) : emptyState(t("noFlow"))}</div>
+    ${usesAggregateFlow() ? migrationRunwayBreakdown() : ""}
+  </section>`;
+}
+
+function projectMermaid() {
+  if (usesAggregateFlow()) return migrationAggregateMermaid();
+  const graph = bundle.graph || { nodes: [], edges: [] };
+  const preferredTypes = graph.nodes?.some((node) => node.type === "module") ? ["module", "step"] : ["task", "phase"];
+  const nodes = (graph.nodes || [])
+    .filter((node) => preferredTypes.includes(node.type))
+    .filter((node) => node.type !== "phase" || ["in_progress", "review", "blocked", "done"].includes(node.state))
+    .slice(0, 28);
+  if (nodes.length < 2) return mermaidFromBriefs();
+  const nodeIds = new Set(nodes.map((node) => node.id));
+  const lines = ["flowchart LR"];
+  let edgeCount = 0;
+  for (const edge of graph.edges || []) {
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) continue;
+    lines.push(`  ${mermaidId(edge.from)}["${mermaidLabel(edge.from)}"] --> ${mermaidId(edge.to)}["${mermaidLabel(edge.to)}"]`);
+    edgeCount += 1;
+    if (edgeCount >= 34) break;
+  }
+  if (edgeCount === 0) {
+    for (let index = 1; index < nodes.length; index += 1) {
+      lines.push(`  ${mermaidId(nodes[index - 1].id)}["${mermaidLabel(nodes[index - 1].id)}"] --> ${mermaidId(nodes[index].id)}["${mermaidLabel(nodes[index].id)}"]`);
+    }
+  }
+  return lines.join("\n");
+}
+
+function usesAggregateFlow() {
+  const graph = bundle.graph || { nodes: [], edges: [] };
+  const taskCount = (bundle.status?.tasks || []).length;
+  const taskNodes = (graph.nodes || []).filter((node) => node.type === "task").length;
+  const usefulEdges = (graph.edges || []).filter((edge) => ["depends_on", "current_step"].includes(edge.type)).length;
+  return taskCount > 80 || taskNodes > 80 || ((graph.nodes || []).length > 80 && usefulEdges < 6);
+}
+
+function migrationAggregateMermaid() {
+  const tasks = bundle.status?.tasks || [];
+  const warnings = warningQueue();
+  const activeContracts = warnings.filter((warning) => warning.phase === "active-task-contracts").length;
+  const moduleCount = new Set(tasks.map(taskModuleKey)).size;
+  const reviewWarnings = warnings.filter((warning) => ["review-evidence", "strict-cutover"].includes(warning.phase)).length;
+  const lines = [
+    "flowchart LR",
+    `  baseline["${t("runwayBaseline")}\\n${tasks.length} ${t("tasks")}"] --> triage["${t("runwayTriage")}\\n${warnings.length} ${t("warnings")}"]`,
+    `  triage --> contracts["${t("runwayContracts")}\\n${activeContracts} ${t("items")}"]`,
+    `  contracts --> modules["${t("runwayModules")}\\n${moduleCount} ${t("groups")}"]`,
+    `  modules --> cutover["${t("runwayCutover")}\\n${reviewWarnings} ${t("items")}"]`,
+  ];
+  return lines.join("\n");
+}
+
+function migrationRunwayBreakdown() {
+  const tasks = bundle.status?.tasks || [];
+  const warnings = warningQueue();
+  const phases = [
+    ["baseline", t("runwayBaseline"), tasks.length, t("tasks"), "#/tasks"],
+    ["triage", t("runwayTriage"), warnings.length, t("warnings"), "#/"],
+    ["active-task-contracts", t("runwayContracts"), warnings.filter((warning) => warning.phase === "active-task-contracts").length, t("items"), "#/"],
+    ["module-classification", t("runwayModules"), new Set(tasks.map(taskModuleKey)).size, t("groups"), "#/tasks"],
+    ["strict-cutover", t("runwayCutover"), warnings.filter((warning) => warning.phase === "strict-cutover").length, t("items"), "#/"],
+  ];
+  return `<div class="runway-breakdown">
+    ${phases.map(([phase, title, count, unit, href]) => `<a href="${href}" data-runway-phase="${escapeAttr(phase)}"><strong>${escapeHtml(title)}</strong><span>${count} ${escapeHtml(unit)}</span></a>`).join("")}
+  </div>`;
+}
+
+function mermaidFromBriefs() {
+  const brief = activeTasks().map((task) => taskDocument(task, "brief.md")).find((doc) => doc?.content?.includes("```mermaid"));
+  const match = brief?.content.match(/```mermaid\s*([\s\S]*?)```/i);
+  return match ? match[1].trim() : "";
+}
+
+function graphSummary() {
+  const graph = bundle.graph || { nodes: [], edges: [] };
+  if (usesAggregateFlow()) return `${t("aggregateMigrationView")} · ${(bundle.status?.tasks || []).length} ${t("tasks")}`;
+  return `${graph.nodes?.length || 0} ${t("nodes")} · ${graph.edges?.length || 0} ${t("edges")}`;
+}
+
+function activeTaskBriefs() {
+  const tasks = activeTasks().slice(0, 8);
+  return `<section class="task-briefs">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">${t("currentWork")}</p>
+        <h2>${t("activeBriefs")}</h2>
+      </div>
+      <a href="#/tasks">${t("openTaskIndex")}</a>
+    </div>
+    <div class="brief-grid">${tasks.map((task) => taskBriefCard(task, { compact: false })).join("") || emptyState(t("noActiveTasks"))}</div>
+  </section>`;
+}
+
+function activeTasks() {
+  const tasks = bundle.status?.tasks || [];
+  const active = tasks.filter((task) => ["in_progress", "review", "blocked", "planned", "not_started"].includes(task.state));
+  if (active.length > 0) return active;
+  return tasks.filter((task) => task.briefSource === "standalone").slice(0, 6);
+}
+
+function taskBriefCard(task, { compact = true } = {}) {
+  const doc = taskDocument(task, "brief.md");
+  const summaryText = doc ? getBriefSummary(doc.content) : t("missingBriefExplain");
+  return `<article class="brief-card ${compact ? "compact" : ""}">
+    <div class="card-head">
+      <div>
+        <a href="#/tasks/${encodeURIComponent(task.id)}">${escapeHtml(task.title)}</a>
+        <p>${escapeHtml(task.id)}</p>
+      </div>
+      ${tag(task.state)}
+    </div>
+    ${progressBar(task.completion)}
+    <div class="brief-content">
+      <p class="brief-teaser">${escapeHtml(summaryText)}</p>
+    </div>
+    <div class="card-actions">
+      <button class="btn-drawer-trigger" data-open-drawer="${escapeAttr(task.id)}">${t("viewDetails")}</button>
+    </div>
+  </article>`;
+}
+
+function getBriefSummary(content) {
+  if (!content) return "";
+  let text = content
+    .replace(/#+\s+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/-\s+/g, "")
+    .replace(/>\s+/g, "")
+    .replaceAll("\n", " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length > 140) text = text.slice(0, 137) + "...";
+  return text;
+}
+
+function generatedBrief(task) {
+  const phaseText = (task.phases || []).slice(0, 6).map((phase) => `<li><strong>${escapeHtml(phase.id)}</strong> ${escapeHtml(phase.output || phase.state)} · ${phase.completion}%</li>`).join("");
+  return `<div class="missing-brief">
+    <strong>${t("visibilityBriefMissing")}</strong>
+    <p>${t("missingBriefExplain")}</p>
+    <ul>${phaseText || `<li>${t("noPhaseData")}</li>`}</ul>
+  </div>`;
+}
+
+function taskIndex() {
+  const tasks = filteredTasks();
+  const groups = taskGroups(tasks);
+  const orderedGroups = orderedTaskGroups(groups);
+  const groupPageCount = Math.max(1, Math.ceil(orderedGroups.length / taskGroupsPerPage));
+  const groupPage = Math.min(Math.max(1, Number(state.taskGroupPage) || 1), groupPageCount);
+  const visibleGroups = orderedGroups.slice((groupPage - 1) * taskGroupsPerPage, groupPage * taskGroupsPerPage);
+  return `<main class="stack">
+    <section class="index-toolbar">
+      <input data-search value="${escapeAttr(state.query)}" placeholder="${t("searchPlaceholder")}" aria-label="${t("searchTasks")}">
+      <select data-state-filter aria-label="${t("stateFilter")}">
+        ${["all", "in_progress", "review", "blocked", "planned", "done", "unknown"].map((value) => `<option value="${value}" ${state.taskState === value ? "selected" : ""}>${label(value)}</option>`).join("")}
+      </select>
+      <select data-group-mode aria-label="${t("groupBy")}">
+        ${["migration", "module", "month", "state"].map((value) => `<option value="${value}" ${state.taskGroupMode === value ? "selected" : ""}>${t(`group_${value}`)}</option>`).join("")}
+      </select>
+      <span>${tasks.length} / ${(bundle.status?.tasks || []).length}</span>
+    </section>
+    <section class="group-pager">
+      <span>${t("showingGroups")} ${visibleGroups.length ? (groupPage - 1) * taskGroupsPerPage + 1 : 0}-${Math.min(groupPage * taskGroupsPerPage, orderedGroups.length)} / ${orderedGroups.length}</span>
+      ${pager("task-groups", groupPage, groupPageCount)}
+    </section>
+    ${visibleGroups.map(([group, groupTasks]) => taskGroup(group, groupTasks)).join("")}
+  </main>`;
+}
+
+function orderedTaskGroups(groups) {
+  const rank = (group) => {
+    if (group.startsWith("module:")) return 2;
+    if (group.startsWith("state:")) return 2;
+    if (group.startsWith("month:")) return 2;
+    if (group === "active") return 0;
+    if (group === "brief-ready") return 1;
+    if (group.startsWith("legacy:")) return 2;
+    if (group === "unknown") return 3;
+    return 4;
+  };
+  return Object.entries(groups).sort(([left], [right]) => rank(left) - rank(right) || left.localeCompare(right));
+}
+
+function taskGroups(tasks) {
+  if (state.taskGroupMode === "module") {
+    return groupBy(tasks, (task) => `module:${taskModuleKey(task)}`);
+  }
+  if (state.taskGroupMode === "month") {
+    return groupBy(tasks, (task) => {
+      const match = task.shortId?.match(/^(\d{4}-\d{2})/);
+      return match ? `month:${match[1]}` : "month:unknown";
+    });
+  }
+  if (state.taskGroupMode === "state") {
+    return groupBy(tasks, (task) => `state:${task.state || "unknown"}`);
+  }
+  return groupBy(tasks, (task) => {
+    if (["in_progress", "review", "blocked", "planned", "not_started"].includes(task.state)) return "active";
+    if (task.briefSource === "standalone") return "brief-ready";
+    const match = task.shortId?.match(/^(\d{4}-\d{2})/);
+    return match ? `legacy:${match[1]}` : task.state || "unknown";
+  });
+}
+
+function taskGroup(group, tasks) {
+  const pageCount = Math.max(1, Math.ceil(tasks.length / taskPageSize));
+  const page = Math.min(Math.max(1, Number(state.taskPageByGroup[group]) || 1), pageCount);
+  const start = (page - 1) * taskPageSize;
+  const visibleTasks = tasks.slice(start, start + taskPageSize);
+  return `<section class="task-group">
+      <div class="section-head">
+        <div>
+          <h2>${taskGroupLabel(group)}</h2>
+          <p class="subtle">${t("showing")} ${Math.min(start + 1, tasks.length)}-${Math.min(start + visibleTasks.length, tasks.length)} / ${tasks.length}</p>
+        </div>
+        ${pager("task", page, pageCount, group)}
+      </div>
+      <div class="task-list">
+        <div class="task-row task-row-head"><span>${t("columnTask")}</span><span>${t("columnState")}</span><span>${t("columnCompletion")}</span><span>${t("columnBrief")}</span></div>
+        ${visibleTasks.map(taskRow).join("")}
+      </div>
+    </section>`;
+}
+
+function taskGroupLabel(group) {
+  if (group === "active") return t("activeCurrent");
+  if (group === "brief-ready") return t("briefReadyGroup");
+  if (group.startsWith("legacy:")) return `${t("legacyMonth")} ${group.slice("legacy:".length)}`;
+  if (group.startsWith("module:")) return `${t("inferredModule")} · ${group.slice("module:".length)}`;
+  if (group.startsWith("month:")) return `${t("legacyMonth")} ${group.slice("month:".length)}`;
+  if (group.startsWith("state:")) return `${t("columnState")} · ${label(group.slice("state:".length))}`;
+  return label(group);
+}
+
+function filteredTasks() {
+  const query = state.query.trim().toLowerCase();
+  return (bundle.status?.tasks || []).filter((task) => {
+    const stateMatch = state.taskState === "all" || task.state === state.taskState;
+    if (!stateMatch) return false;
+    if (!query) return true;
+    return [task.id, task.shortId, task.title, task.module, task.inferredModule, task.classificationSource, task.classificationBucket, task.state].some((value) => String(value || "").toLowerCase().includes(query));
+  });
+}
+
+function taskModuleKey(task) {
+  return task.module || task.inferredModule || "legacy-unclassified";
+}
+
+function taskRow(task) {
+  return `<a class="task-row" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}">
+    <span data-label="${escapeAttr(t("columnTask"))}"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(task.id)} · ${escapeHtml(taskModuleKey(task))}</small></span>
+    <span data-label="${escapeAttr(t("columnState"))}">${tag(task.state)}</span>
+    <span data-label="${escapeAttr(t("columnCompletion"))}">${task.completion}%</span>
+    <span data-label="${escapeAttr(t("columnBrief"))}">${escapeHtml(task.briefSource === "standalone" ? t("briefReady") : t("briefMissing"))}</span>
+  </a>`;
+}
+
+function taskDetail(route) {
+  const taskId = route.id;
+  const task = (bundle.status?.tasks || []).find((item) => item.id === taskId);
+  if (!task) return `<main>${emptyState(t("taskNotFound"))}</main>`;
+  return `<main class="task-detail">
+    <nav class="crumbs"><a href="#/tasks">${t("taskIndex")}</a><span>/</span><span>${escapeHtml(task.id)}</span></nav>
+    <section class="detail-hero">
+      <div>
+        <p class="eyebrow">${t("taskVisibility")}</p>
+        <h2>${escapeHtml(task.title)}</h2>
+        <p>${escapeHtml(task.path)}</p>
+      </div>
+      <div class="detail-score">${task.completion}%</div>
+    </section>
+    ${phaseTimeline(task)}
+    <section class="detail-grid">
+      <article class="detail-main">
+        ${taskDocSection(task, "brief.md", t("brief"), true)}
+        ${!taskDocument(task, "brief.md") ? taskDocSection(task, "task_plan.md", t("taskPlan"), false) : ""}
+        ${taskDocSection(task, "execution_strategy.md", t("strategy"), false)}
+        ${taskDocSection(task, "visual_roadmap.md", t("roadmap"), false)}
+        ${selectedSourceDocument(task, route.doc)}
+      </article>
+      <aside class="detail-side">
+        ${openFindings(task)}
+        ${evidenceList(task)}
+        ${documentTabs(task)}
+      </aside>
+    </section>
+  </main>`;
+}
+
+function phaseTimeline(task) {
+  return `<section class="phase-timeline">
+    <h2>${t("phaseTimeline")}</h2>
+    ${(task.phases || []).map((phase) => `<div class="phase-step ${phase.state}">
+      <strong>${escapeHtml(phase.id)}</strong>
+      <span>${phase.completion}%</span>
+      <p>${escapeHtml(phase.output || phase.blockingRisk || phase.state)}</p>
+      ${progressBar(phase.completion)}
+    </div>`).join("") || emptyState(t("noPhaseData"))}
+  </section>`;
+}
+
+function taskDocSection(task, fileName, title, required) {
+  const doc = taskDocument(task, fileName);
+  if (!doc && !required) return "";
+  return `<section class="doc-section">
+    <div class="section-head"><h2>${escapeHtml(title)}</h2>${doc ? `<button data-render-toggle>${state.renderMode === "rendered" ? t("source") : t("rendered")}</button>` : ""}</div>
+    <div class="markdown">${doc ? window.HarnessMarkdown.render(doc.content, state.renderMode) : generatedBrief(task)}</div>
+  </section>`;
+}
+
+function documentTabs(task) {
+  const docs = taskDocTabs
+    .map(([tab, file]) => [tab, taskDocument(task, file)])
+    .filter(([, doc]) => doc);
+  return `<section class="side-panel">
+    <h3>${t("sourceDocuments")}</h3>
+    ${docs.map(([tab, doc]) => `<a href="#/tasks/${encodeURIComponent(task.id)}/docs/${encodeURIComponent(tab)}" title="${escapeAttr(doc.path)}">${escapeHtml(t(tab))}</a>`).join("") || `<p>${t("noDocuments")}</p>`}
+  </section>`;
+}
+
+function selectedSourceDocument(task, tab) {
+  if (!tab) return "";
+  const match = taskDocTabs.find(([key]) => key === tab);
+  if (!match) return "";
+  const doc = taskDocument(task, match[1]);
+  if (!doc) return "";
+  return `<section class="doc-section selected-source">
+    <div class="section-head"><h2>${t("selectedSource")} · ${t(match[0])}</h2><button data-render-toggle>${state.renderMode === "rendered" ? t("source") : t("rendered")}</button></div>
+    <div class="markdown">${window.HarnessMarkdown.render(doc.content, state.renderMode)}</div>
+  </section>`;
+}
+
+function openFindings(task) {
+  const risks = task.risks || [];
+  return `<section class="side-panel">
+    <h3>${t("openFindings")}</h3>
+    ${risks.map((risk) => `<div class="finding ${risk.open || risk.blocksRelease ? "open" : ""}"><strong>${escapeHtml(risk.severity)}</strong><span>${escapeHtml(risk.summary)}</span></div>`).join("") || `<p>${t("noOpenFindings")}</p>`}
+  </section>`;
+}
+
+function evidenceList(task) {
+  const evidence = task.evidence || [];
+  return `<section class="side-panel">
+    <h3>${t("evidence")}</h3>
+    ${evidence.map((item) => `<p><strong>${escapeHtml(item.type || "evidence")}</strong> ${escapeHtml(item.summary || "")}</p>`).join("") || `<p>${t("noEvidence")}</p>`}
+  </section>`;
+}
+
+function modulesView(moduleId = "") {
+  const graph = bundle.graph || { nodes: [], edges: [] };
+  const explicitModules = (graph.nodes || []).filter((node) => node.type === "module");
+  const moduleMap = new Map(explicitModules.map((module) => [module.id.replace(/^module:/, ""), module]));
+  for (const task of bundle.status?.tasks || []) {
+    const key = taskModuleKey(task);
+    if (!moduleMap.has(key)) moduleMap.set(key, { id: `module:${key}`, type: "module", label: key, state: task.classificationSource || "inferred" });
+  }
+  const modules = [...moduleMap.values()];
+  return `<main class="stack">
+    ${flowPanel()}
+    <section class="module-grid">
+      ${modules.map((module) => moduleCard(module)).join("") || emptyState(t("noModules"))}
+    </section>
+  </main>`;
+}
+
+function moduleTaskRow(task) {
+  const dotClass = /fail|blocked|open/i.test(task.state) ? "state-fail" : /warn|advice|planned|missing|unknown/i.test(task.state) ? "state-warn" : "state-pass";
+  return `<a class="module-task-row" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}">
+    <div class="module-task-left">
+      <i class="module-task-dot ${dotClass}" title="${escapeAttr(task.state)}"></i>
+      <span class="module-task-title">${escapeHtml(task.title)}</span>
+    </div>
+    <span class="module-task-pct">${task.completion}%</span>
+  </a>`;
+}
+
+function moduleCard(module) {
+  const moduleKey = module.id.replace(/^module:/, "");
+  const tasks = (bundle.status?.tasks || []).filter((task) => taskModuleKey(task) === moduleKey);
+  
+  // Inline Pagination
+  state.modulePages = state.modulePages || {};
+  const currentPage = state.modulePages[moduleKey] || 1;
+  const pageCount = Math.ceil(tasks.length / 8) || 1;
+  const visibleTasks = tasks.slice((currentPage - 1) * 8, currentPage * 8);
+  
+  const brief = findDocument(`TARGET:docs/09-PLANNING/MODULES/${moduleKey}/brief.md`);
+  
+  let pagerHtml = "";
+  if (tasks.length > 8) {
+    pagerHtml = `<div class="module-pager">
+      <button ${currentPage <= 1 ? "disabled" : ""} onclick="window.setModulePage('${escapeAttr(moduleKey)}', ${currentPage - 1})">${t("prevPage")}</button>
+      <span>${currentPage} / ${pageCount}</span>
+      <button ${currentPage >= pageCount ? "disabled" : ""} onclick="window.setModulePage('${escapeAttr(moduleKey)}', ${currentPage + 1})">${t("nextPage")}</button>
+    </div>`;
+  }
+  
+  return `<article class="module-card">
+    <div class="card-head"><h2>${escapeHtml(module.label || moduleKey)}</h2>${tag(module.state || "unknown")}</div>
+    <div class="markdown">${brief ? window.HarnessMarkdown.render(brief.content, "rendered") : `<p>${t("moduleBriefMissing")}</p>`}</div>
+    <h3>${t("moduleTasks")} · ${tasks.length}</h3>
+    <div class="module-task-list">
+      ${visibleTasks.map(moduleTaskRow).join("") || `<p>${t("noModuleTasks")}</p>`}
+    </div>
+    ${pagerHtml}
+  </article>`;
+}
+
+function migrationPanel() {
+  const advice = warningQueue();
+  const missingBriefs = advice.filter((warning) => warning.type === "missing-brief").length;
+  if (advice.length === 0 && missingBriefs === 0) return "";
+  const groups = groupBy(advice, (item) => item.category || "Advice");
+  const filters = ["all", ...Object.keys(groups).sort(), ...new Set(advice.map((item) => item.type).filter(Boolean)), "active-task-contracts", "strict-cutover"];
+  const filtered = state.warningFilter === "all" ? advice : advice.filter((item) => (item.category || "Advice") === state.warningFilter || item.phase === state.warningFilter || item.type === state.warningFilter);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / warningPageSize));
+  const page = Math.min(Math.max(1, Number(state.warningPage) || 1), pageCount);
+  const visible = filtered.slice((page - 1) * warningPageSize, page * warningPageSize);
+  return `<section class="migration-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">${t("migration")}</p>
+        <h2>${t("migrationWorkbench")}</h2>
+      </div>
+      <span>${advice.length} ${t("advice")} · ${missingBriefs} ${t("briefMissing")}</span>
+    </div>
+    <div class="migration-grid">
+      ${Object.entries(groups).slice(0, 6).map(([category, items]) => `<button data-warning-filter="${escapeAttr(category)}" class="${state.warningFilter === category ? "active" : ""}"><strong>${escapeHtml(category)}</strong><p>${items.length} ${t("items")}</p></button>`).join("")}
+      ${missingBriefs > 0 ? `<div><strong>${t("visibilityLayer")}</strong><p>${missingBriefs} ${t("missingBriefs")}</p></div>` : ""}
+    </div>
+    <div class="warning-workbench">
+      <div class="warning-toolbar">
+        <select data-warning-filter-select aria-label="${t("warningFilter")}">
+          ${filters.map((filter) => `<option value="${escapeAttr(filter)}" ${state.warningFilter === filter ? "selected" : ""}>${filter === "all" ? t("allWarnings") : escapeHtml(filter)}</option>`).join("")}
+        </select>
+        <span>${t("showing")} ${visible.length ? (page - 1) * warningPageSize + 1 : 0}-${Math.min(page * warningPageSize, filtered.length)} / ${filtered.length}</span>
+        ${pager("warning", page, pageCount)}
+      </div>
+      <div class="warning-list">
+        ${visible.map(warningRow).join("") || emptyState(t("noWarnings"))}
+      </div>
+    </div>
+  </section>`;
+}
+
+function warningRow(warning) {
+  const affected = warning.affectedPaths?.length ? warning.affectedPaths.join(", ") : warning.affected;
+  return `<article class="warning-row">
+    <div>
+      <strong>${escapeHtml(warning.id)} · ${escapeHtml(warning.title)}</strong>
+      <p>${escapeHtml(affected || "project")}</p>
+    </div>
+    <span>${tag(warning.priority || warning.severity)}</span>
+    <span>${escapeHtml(warning.status || "open")}</span>
+    <span>${escapeHtml(warning.fixability || "manual")}</span>
+    <span>${escapeHtml(warning.phase || "triage")}</span>
+    <p>${escapeHtml(warning.requiredAction || warning.detail || "")} · ${t("confidence")}: ${escapeHtml(warning.confidence || "medium")}</p>
+  </article>`;
+}
+
+function warningQueue() {
+  const adoptionWarnings = (bundle.adoption?.warnings || []).map((warning) => ({ ...warning }));
+  const existingBriefPaths = new Set(adoptionWarnings.filter((warning) => warning.type === "missing-brief").map((warning) => warning.affected));
+  const briefWarnings = (bundle.status?.tasks || [])
+    .filter((task) => task.briefSource !== "standalone")
+    .filter((task) => !existingBriefPaths.has(task.path))
+    .map((task, index) => ({
+      id: `VB-${String(index + 1).padStart(3, "0")}`,
+      category: "Visibility Layer",
+      type: "missing-brief",
+      scope: "task",
+      priority: ["in_progress", "review", "blocked", "planned", "not_started"].includes(task.state) ? "P2" : "P3",
+      phase: "active-task-contracts",
+      fixability: "guided",
+      status: "open",
+      confidence: task.state === "unknown" ? "medium" : "high",
+      severity: "advice",
+      title: t("visibilityBriefMissing"),
+      affected: task.path,
+      affectedPaths: [task.path],
+      requiredAction: t("addVisibilityBrief"),
+      detail: `${task.id} ${task.title}`,
+    }));
+  return [...adoptionWarnings, ...briefWarnings].sort(warningSort);
+}
+
+function warningSort(left, right) {
+  const priorityRank = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  const fixRank = { template: 0, guided: 1, "human-evidence": 2, decision: 3, manual: 4 };
+  return (priorityRank[left.priority] ?? 9) - (priorityRank[right.priority] ?? 9)
+    || (fixRank[left.fixability] ?? 9) - (fixRank[right.fixability] ?? 9)
+    || String(left.phase || "").localeCompare(String(right.phase || ""))
+    || String(left.id || "").localeCompare(String(right.id || ""));
+}
+
+function pager(kind, page, pageCount, group = "") {
+  if (pageCount <= 1) return `<span class="pager muted">${page}/${pageCount}</span>`;
+  const groupAttr = group ? ` data-page-group="${escapeAttr(group)}"` : "";
+  return `<div class="pager">
+    <button data-page-kind="${kind}" data-page="${page - 1}"${groupAttr} ${page <= 1 ? "disabled" : ""}>${t("prevPage")}</button>
+    <span>${page}/${pageCount}</span>
+    <button data-page-kind="${kind}" data-page="${page + 1}"${groupAttr} ${page >= pageCount ? "disabled" : ""}>${t("nextPage")}</button>
+  </div>`;
+}
+
+function lessonPanel() {
+  const lessons = (bundle.tables?.tables || [])
+    .filter((table) => table.kind === "lessons-ssot")
+    .flatMap((table) => table.rows);
+  return `<section class="lesson-panel">
+    <div class="section-head"><h2>${t("lessons")}</h2><span>${lessons.length}</span></div>
+    <div class="lesson-list" style="padding-top: 10px;">
+      ${lessons.map((row) => {
+        const cells = row.cells || {};
+        const lessonId = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
+        const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
+        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lessonId)}">
+          <strong>${escapeHtml(lessonId)}</strong>
+          <p>${escapeHtml(summary)}</p>
+        </div>`;
+      }).join("") || emptyState(t("noLessons"))}
+    </div>
+  </section>`;
+}
+
+function healthPanel() {
+  const details = bundle.status?.checkState?.details || { failures: [], warnings: [] };
+  return `<section class="health-panel">
+    <div><h2>${t("releaseHealth")}</h2><p>${escapeHtml(bundle.status?.mode || "unknown")} · schema ${escapeHtml(bundle.status?.schemaVersion || "n/a")}</p></div>
+    <div class="health-lists">
+      <details ${details.failures?.length ? "open" : ""}><summary>${t("failures")} (${details.failures?.length || 0})</summary>${list(details.failures)}</details>
+      <details><summary>${t("warnings")} (${details.warnings?.length || 0})</summary>${list(details.warnings?.slice(0, 40))}</details>
+    </div>
+  </section>`;
+}
+
+function taskDocument(task, fileName) {
+  return findDocument(`${task.path}/${fileName}`);
+}
+
+function findDocument(pathSuffix) {
+  return (bundle.documents?.documents || []).find((doc) => doc.path.endsWith(pathSuffix) || doc.path === pathSuffix);
+}
+
+function mermaidLabel(id) {
+  const node = (bundle.graph?.nodes || []).find((item) => item.id === id);
+  return String(node?.label || id).replaceAll('"', "'").slice(0, 48);
+}
+
+function mermaidId(value) {
+  return `N_${String(value).replace(/[^A-Za-z0-9_]/g, "_")}`;
+}
+
+function progressBar(value) {
+  const score = Math.max(0, Math.min(100, Number(value) || 0));
+  return `<div class="progress" aria-label="${score}%"><i style="width:${score}%"></i></div>`;
+}
+
+function tag(value) {
+  const raw = String(value || "unknown");
+  const klass = /fail|blocked|open/i.test(raw) ? "fail" : /warn|advice|planned|missing|unknown/i.test(raw) ? "warn" : /pass|done|present|verified|review|in_progress/i.test(raw) ? "pass" : "";
+  return `<span class="tag ${klass}">${escapeHtml(label(raw))}</span>`;
+}
+
+function label(value) {
+  return t(`state_${value}`) || String(value || "unknown").replaceAll("_", " ");
+}
+
+function list(items = []) {
+  return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || `<li>${t("none")}</li>`}</ul>`;
+}
+
+function emptyState(text) {
+  return `<div class="empty">${escapeHtml(text)}</div>`;
+}
+
+function projectName() {
+  return bundle.status?.project?.name || "Harness";
+}
+
+function themeLabel() {
+  return state.theme === "dark" ? t("light") : state.theme === "light" ? t("system") : t("dark");
+}
+
+function groupBy(items, fn) {
+  return items.reduce((acc, item) => {
+    const key = fn(item);
+    acc[key] ||= [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+}
+
+window.setModulePage = function(moduleKey, page) {
+  state.modulePages = state.modulePages || {};
+  state.modulePages[moduleKey] = page;
+  app();
+};
+
+function bind() {
+  document.querySelectorAll("[data-search]").forEach((input) => input.addEventListener("input", () => {
+    state.query = input.value;
+    state.taskPageByGroup = {};
+    state.taskGroupPage = 1;
+    app();
+  }));
+  document.querySelectorAll("[data-state-filter]").forEach((select) => select.addEventListener("change", () => {
+    state.taskState = select.value;
+    state.taskPageByGroup = {};
+    state.taskGroupPage = 1;
+    app();
+  }));
+  document.querySelectorAll("[data-group-mode]").forEach((select) => select.addEventListener("change", () => {
+    state.taskGroupMode = select.value;
+    state.taskPageByGroup = {};
+    state.taskGroupPage = 1;
+    app();
+  }));
+  document.querySelectorAll("[data-render-toggle]").forEach((button) => button.addEventListener("click", () => {
+    state.renderMode = state.renderMode === "rendered" ? "source" : "rendered";
+    app();
+  }));
+  document.querySelectorAll("[data-warning-filter]").forEach((button) => button.addEventListener("click", () => {
+    state.warningFilter = button.dataset.warningFilter || "all";
+    state.warningPage = 1;
+    app();
+  }));
+  document.querySelectorAll("[data-warning-filter-select]").forEach((select) => select.addEventListener("change", () => {
+    state.warningFilter = select.value;
+    state.warningPage = 1;
+    app();
+  }));
+  document.querySelectorAll("[data-page-kind]").forEach((button) => button.addEventListener("click", () => {
+    const page = Math.max(1, Number(button.dataset.page) || 1);
+    if (button.dataset.pageKind === "warning") state.warningPage = page;
+    if (button.dataset.pageKind === "task-groups") state.taskGroupPage = page;
+    if (button.dataset.pageKind === "task") state.taskPageByGroup[button.dataset.pageGroup || ""] = page;
+    app();
+  }));
+  document.querySelectorAll("[data-runway-phase]").forEach((link) => link.addEventListener("click", () => {
+    const phase = link.dataset.runwayPhase || "all";
+    if (phase === "module-classification") state.taskGroupMode = "module";
+    if (["triage", "active-task-contracts", "strict-cutover"].includes(phase)) state.warningFilter = phase === "triage" ? "all" : phase;
+    state.warningPage = 1;
+    state.taskGroupPage = 1;
+    if (link.getAttribute("href") === "#/") app();
+  }));
+  document.querySelectorAll("[data-theme-toggle]").forEach((button) => button.addEventListener("click", () => {
+    state.theme = state.theme === "dark" ? "light" : state.theme === "light" ? "system" : "dark";
+    localStorage.setItem("harness.theme", state.theme);
+    app();
+  }));
+  document.querySelectorAll("[data-open-drawer]").forEach((el) => el.addEventListener("click", (e) => {
+    e.preventDefault();
+    const taskId = el.dataset.openDrawer;
+    openDrawer(taskId);
+  }));
+  document.querySelectorAll("[data-open-lesson-drawer]").forEach((el) => el.addEventListener("click", (e) => {
+    e.preventDefault();
+    const lessonId = el.dataset.openLessonDrawer;
+    openLessonDrawer(lessonId);
+  }));
+  const overlay = document.getElementById("drawer-overlay");
+  if (overlay) overlay.addEventListener("click", closeDrawer);
+}
+
+function renderDrawerContent(taskId) {
+  const task = (bundle.status?.tasks || []).find((item) => item.id === taskId);
+  if (!task) return `<div class="empty">${t("taskNotFound")}</div>`;
+  
+  const header = `
+    <div class="task-drawer-header">
+      <div>
+        <h2>${escapeHtml(task.title)}</h2>
+        <p style="font-family: var(--font-mono); font-size: 11px; margin: 4px 0 0; color: var(--muted);">${escapeHtml(task.id)}</p>
+      </div>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+  `;
+
+  const timeline = phaseTimeline(task);
+  const brief = taskDocSection(task, "brief.md", t("brief"), true);
+  const plan = taskDocument(task, "brief.md") ? "" : taskDocSection(task, "task_plan.md", t("taskPlan"), false);
+  const strategy = taskDocSection(task, "execution_strategy.md", t("strategy"), false);
+  const roadmap = taskDocSection(task, "visual_roadmap.md", t("roadmap"), false);
+  const findings = openFindings(task);
+  const evidence = evidenceList(task);
+
+  const body = `
+    <div class="task-drawer-body stack">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--paper-2); padding: 12px 16px; border-radius: 8px;">
+        <div style="font-size: 24px; font-weight: 800; color: var(--accent);">${task.completion}%</div>
+        <a href="#/tasks/${encodeURIComponent(task.id)}" class="btn-drawer-trigger" style="text-decoration: none;">${t("fullView")}</a>
+      </div>
+      ${timeline}
+      ${brief}
+      ${plan}
+      ${strategy}
+      ${roadmap}
+      ${findings}
+      ${evidence}
+    </div>
+  `;
+
+  return header + body;
+}
+
+function openDrawer(taskId) {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (!drawer || !overlay) return;
+  drawer.innerHTML = renderDrawerContent(taskId);
+  drawer.classList.add("active");
+  overlay.classList.add("active");
+
+  drawer.querySelector("[data-close-drawer]").addEventListener("click", closeDrawer);
+  drawer.querySelectorAll("[data-render-toggle]").forEach((button) => button.addEventListener("click", () => {
+    state.renderMode = state.renderMode === "rendered" ? "source" : "rendered";
+    openDrawer(taskId);
+  }));
+}
+
+function renderLessonDrawerContent(lessonId) {
+  const lessonTable = (bundle.tables?.tables || []).find((table) => table.kind === "lessons-ssot");
+  const row = (lessonTable?.rows || []).find((r) => {
+    const cells = r.cells || {};
+    const id = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
+    return id === lessonId;
+  });
+  
+  if (!row) {
+    return `<div class="task-drawer-header">
+      <h2>${escapeHtml(lessonId)}</h2>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+    <div class="task-drawer-body">
+      <div class="empty">${t("lessonNotFound")}</div>
+    </div>`;
+  }
+  
+  const cells = row.cells || {};
+  const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
+  const docPath = cells["\u8be6\u60c5\u6587\u6863"] || cells.Document || cells.document || "";
+  
+  let doc = null;
+  if (docPath) {
+    doc = findDocument(docPath);
+  }
+  if (!doc) {
+    doc = (bundle.documents?.documents || []).find((d) => d.path.includes(lessonId) || d.path.endsWith(`${lessonId}.md`));
+  }
+  
+  const header = `
+    <div class="task-drawer-header">
+      <div>
+        <h2>${escapeHtml(lessonId)}</h2>
+        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(summary)}</p>
+      </div>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+  `;
+  
+  let markdownBody = "";
+  if (doc && doc.content) {
+    markdownBody = `<div class="markdown">${window.HarnessMarkdown.render(doc.content, "rendered")}</div>`;
+  } else {
+    const rowsHtml = Object.entries(cells)
+      .map(([key, val]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(val)}</td></tr>`)
+      .join("");
+    markdownBody = `
+      <div style="margin-bottom: 20px; background: var(--paper-2); padding: 16px; border-radius: 8px; border: 1px dashed var(--line);">
+        <p style="margin: 0; font-size: 13px; color: var(--muted);">${t("lessonDocMissing")}</p>
+      </div>
+      <table class="rendered-table" style="width: 100%;">
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+  }
+  
+  const body = `
+    <div class="task-drawer-body stack">
+      ${markdownBody}
+    </div>
+  `;
+  
+  return header + body;
+}
+
+function openLessonDrawer(lessonId) {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (!drawer || !overlay) return;
+  drawer.innerHTML = renderLessonDrawerContent(lessonId);
+  drawer.classList.add("active");
+  overlay.classList.add("active");
+  
+  drawer.querySelector("[data-close-drawer]").addEventListener("click", closeDrawer);
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (drawer) drawer.classList.remove("active");
+  if (overlay) overlay.classList.remove("active");
+}
+
+function ledgerPanel() {
+  const ledgerTable = (bundle.tables?.tables || []).find((table) => table.kind === "harness-ledger");
+  const rows = ledgerTable?.rows || [];
+  
+  let closedCount = 0;
+  let openCount = 0;
+  let blockedCount = 0;
+  
+  let lessonsReviewed = 0;
+  let lessonsTotal = 0;
+  
+  let evidenceAudited = 0;
+  let evidenceTotal = 0;
+  
+  for (const row of rows) {
+    const cells = row.cells || {};
+    const status = String(cells.Status || cells["\u72b6\u6001"] || "").toLowerCase();
+    if (status.includes("close") || status.includes("done") || status.includes("\u7ed3") || status.includes("\u5b8c")) {
+      closedCount++;
+    } else if (status.includes("block") || status.includes("\u963b")) {
+      blockedCount++;
+    } else {
+      openCount++;
+    }
+    
+    const lesson = String(cells.Lessons || cells["\u7ecf\u9a8c"] || cells["\u7ecf\u9a8c\u5ba1\u67e5"] || cells["Lesson"] || "");
+    if (lesson) {
+      lessonsTotal++;
+      if (lesson.toLowerCase().includes("pass") || lesson.includes("\u901a\u8fc7") || lesson.includes("\u5c31\u7eea") || lesson.toLowerCase().includes("checked") || lesson.toLowerCase().includes("done")) {
+        lessonsReviewed++;
+      }
+    }
+    
+    const evidence = String(cells.Evidence || cells["\u8bc1\u636e"] || cells["\u9a8c\u8bc1\u8bc1\u636e"] || cells["Evidence Checked"] || "");
+    if (evidence) {
+      evidenceTotal++;
+      if (evidence.toLowerCase().includes("pass") || evidence.includes("\u901a\u8fc7") || evidence.toLowerCase().includes("present") || evidence.toLowerCase().includes("verified") || evidence.toLowerCase().includes("done")) {
+        evidenceAudited++;
+      }
+    }
+  }
+  
+  const total = closedCount + openCount + blockedCount || 1;
+  const closedPct = Math.round((closedCount / total) * 100);
+  const openPct = Math.round((openCount / total) * 100);
+  const blockedPct = total - closedPct - openPct;
+  
+  const lessonsPct = lessonsTotal ? Math.round((lessonsReviewed / lessonsTotal) * 100) : 0;
+  const evidencePct = evidenceTotal ? Math.round((evidenceAudited / evidenceTotal) * 100) : 0;
+  
+  if (rows.length === 0) return "";
+  
+  return `<section class="ledger-panel">
+    <h2>${t("ssotLedger")}</h2>
+    <div class="ledger-split-bar" title="${t("tagClosed")}: ${closedCount}, ${t("tagOpen")}: ${openCount}, ${t("tagBlocked")}: ${blockedCount}">
+      <div class="ledger-split-segment closed" style="width: ${closedPct}%"></div>
+      <div class="ledger-split-segment open" style="width: ${openPct}%"></div>
+      <div class="ledger-split-segment blocked" style="width: ${Math.max(0, blockedPct)}%"></div>
+    </div>
+    <div class="ledger-split-legend">
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot closed"></i>${t("tagClosed")} (${closedCount})</span>
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot open"></i>${t("tagOpen")} (${openCount})</span>
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot blocked"></i>${t("tagBlocked")} (${blockedCount})</span>
+    </div>
+    <div class="ledger-gauge-row">
+      <div class="ledger-gauge-card">
+        <span>${t("lessonsCheckRate")}</span>
+        <strong>${lessonsPct}%</strong>
+      </div>
+      <div class="ledger-gauge-card">
+        <span>${t("evidenceAuditRate")}</span>
+        <strong>${evidencePct}%</strong>
+      </div>
+    </div>
+  </section>`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replaceAll("'", "&#39;");
+}
+
+window.addEventListener("hashchange", app);
+app();
+</script>
+</body>
+</html>

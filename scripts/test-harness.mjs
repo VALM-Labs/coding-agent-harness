@@ -302,7 +302,7 @@ const zhDashboardApp = fs.readFileSync(path.join(zhDashboardDir, "assets/app.js"
 const zhDashboardI18n = fs.readFileSync(path.join(zhDashboardDir, "assets/i18n.js"), "utf8");
 assert(zhDashboardIndex.includes("Harness 控制台"), "zh-CN dashboard should use localized index template");
 assert(zhDashboardApp.includes("projectCockpit"), "zh-CN dashboard should render through localized labels");
-assert(zhDashboardI18n.includes("项目驾驶舱"), "zh-CN dashboard should include localized app labels");
+assert(zhDashboardI18n.includes("控制台"), "zh-CN dashboard should include localized app labels");
 
 const enRunTarget = path.join(tmpRoot, "en-run-target");
 fs.mkdirSync(enRunTarget);

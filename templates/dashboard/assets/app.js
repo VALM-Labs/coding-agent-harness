@@ -49,7 +49,6 @@ function shell() {
       <div class="hero-copy">
         <p class="eyebrow">${t("eyebrow")}</p>
         <h1>${escapeHtml(projectName())} ${t("projectCockpit")}</h1>
-        <p class="hero-sub">${t("dashboardPromise")}</p>
       </div>
       <div class="hero-actions">
         ${routeLink("#/", t("overview"), "overview")}
@@ -59,6 +58,8 @@ function shell() {
       </div>
     </header>
     ${renderRoute()}
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <div id="task-drawer" class="task-drawer"></div>
   </div>`;
 }
 
@@ -85,14 +86,19 @@ function routeLink(hash, text, routeName) {
 }
 
 function overview() {
-  return `<main class="stack">
-    ${statusStrip()}
-    ${flowPanel()}
-    ${migrationPanel()}
-    ${activeTaskBriefs()}
-    ${lessonPanel()}
-    ${healthPanel()}
-  </main>`;
+  return `<div class="dashboard-grid">
+    <main class="dashboard-main stack">
+      ${flowPanel()}
+      ${migrationPanel()}
+      ${activeTaskBriefs()}
+    </main>
+    <aside class="dashboard-sidebar stack">
+      ${statusStrip()}
+      ${ledgerPanel()}
+      ${healthPanel()}
+      ${lessonPanel()}
+    </aside>
+  </div>`;
 }
 
 function statusStrip() {
@@ -101,16 +107,18 @@ function statusStrip() {
   const warnings = bundle.status?.checkState?.warnings || 0;
   const tasks = bundle.status?.tasks || [];
   const withBrief = tasks.filter((task) => task.briefSource === "standalone").length;
-  return `<section class="status-strip">
+  return `<section class="status-card-group">
     <div class="status-primary ${status}">
       <span>${t("readiness")}</span>
       <strong>${label(status)}</strong>
       <p>${nextActionText()}</p>
     </div>
-    ${metric(t("tasks"), tasks.length)}
-    ${metric(t("briefCoverage"), `${withBrief}/${tasks.length}`)}
-    ${metric(t("blockers"), failures)}
-    ${metric(t("advice"), warnings)}
+    <div class="metrics-grid">
+      ${metric(t("tasks"), tasks.length)}
+      ${metric(t("briefCoverage"), `${withBrief}/${tasks.length}`)}
+      ${metric(t("blockers"), failures)}
+      ${metric(t("advice"), warnings)}
+    </div>
   </section>`;
 }
 
@@ -243,6 +251,7 @@ function activeTasks() {
 
 function taskBriefCard(task, { compact = true } = {}) {
   const doc = taskDocument(task, "brief.md");
+  const summaryText = doc ? getBriefSummary(doc.content) : t("missingBriefExplain");
   return `<article class="brief-card ${compact ? "compact" : ""}">
     <div class="card-head">
       <div>
@@ -252,8 +261,28 @@ function taskBriefCard(task, { compact = true } = {}) {
       ${tag(task.state)}
     </div>
     ${progressBar(task.completion)}
-    <div class="brief-content">${doc ? window.HarnessMarkdown.render(doc.content, "rendered") : generatedBrief(task)}</div>
+    <div class="brief-content">
+      <p class="brief-teaser">${escapeHtml(summaryText)}</p>
+    </div>
+    <div class="card-actions">
+      <button class="btn-drawer-trigger" data-open-drawer="${escapeAttr(task.id)}">${t("viewDetails")}</button>
+    </div>
   </article>`;
+}
+
+function getBriefSummary(content) {
+  if (!content) return "";
+  let text = content
+    .replace(/#+\s+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[*_`]/g, "")
+    .replace(/-\s+/g, "")
+    .replace(/>\s+/g, "")
+    .replaceAll("\n", " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length > 140) text = text.slice(0, 137) + "...";
+  return text;
 }
 
 function generatedBrief(task) {
@@ -371,7 +400,7 @@ function taskModuleKey(task) {
 }
 
 function taskRow(task) {
-  return `<a class="task-row" href="#/tasks/${encodeURIComponent(task.id)}">
+  return `<a class="task-row" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}">
     <span data-label="${escapeAttr(t("columnTask"))}"><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(task.id)} · ${escapeHtml(taskModuleKey(task))}</small></span>
     <span data-label="${escapeAttr(t("columnState"))}">${tag(task.state)}</span>
     <span data-label="${escapeAttr(t("columnCompletion"))}">${task.completion}%</span>
@@ -487,17 +516,46 @@ function modulesView(moduleId = "") {
   </main>`;
 }
 
+function moduleTaskRow(task) {
+  const dotClass = /fail|blocked|open/i.test(task.state) ? "state-fail" : /warn|advice|planned|missing|unknown/i.test(task.state) ? "state-warn" : "state-pass";
+  return `<a class="module-task-row" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}">
+    <div class="module-task-left">
+      <i class="module-task-dot ${dotClass}" title="${escapeAttr(task.state)}"></i>
+      <span class="module-task-title">${escapeHtml(task.title)}</span>
+    </div>
+    <span class="module-task-pct">${task.completion}%</span>
+  </a>`;
+}
+
 function moduleCard(module) {
   const moduleKey = module.id.replace(/^module:/, "");
   const tasks = (bundle.status?.tasks || []).filter((task) => taskModuleKey(task) === moduleKey);
-  const visibleTasks = tasks.slice(0, taskPageSize);
+  
+  // Inline Pagination
+  state.modulePages = state.modulePages || {};
+  const currentPage = state.modulePages[moduleKey] || 1;
+  const pageCount = Math.ceil(tasks.length / 8) || 1;
+  const visibleTasks = tasks.slice((currentPage - 1) * 8, currentPage * 8);
+  
   const brief = findDocument(`TARGET:docs/09-PLANNING/MODULES/${moduleKey}/brief.md`);
+  
+  let pagerHtml = "";
+  if (tasks.length > 8) {
+    pagerHtml = `<div class="module-pager">
+      <button ${currentPage <= 1 ? "disabled" : ""} onclick="window.setModulePage('${escapeAttr(moduleKey)}', ${currentPage - 1})">${t("prevPage")}</button>
+      <span>${currentPage} / ${pageCount}</span>
+      <button ${currentPage >= pageCount ? "disabled" : ""} onclick="window.setModulePage('${escapeAttr(moduleKey)}', ${currentPage + 1})">${t("nextPage")}</button>
+    </div>`;
+  }
+  
   return `<article class="module-card">
     <div class="card-head"><h2>${escapeHtml(module.label || moduleKey)}</h2>${tag(module.state || "unknown")}</div>
     <div class="markdown">${brief ? window.HarnessMarkdown.render(brief.content, "rendered") : `<p>${t("moduleBriefMissing")}</p>`}</div>
     <h3>${t("moduleTasks")} · ${tasks.length}</h3>
-    ${visibleTasks.map(taskRow).join("") || `<p>${t("noModuleTasks")}</p>`}
-    ${tasks.length > visibleTasks.length ? `<a class="module-more" href="#/tasks" data-runway-phase="module-classification">${t("openTaskIndex")} · ${tasks.length - visibleTasks.length}</a>` : ""}
+    <div class="module-task-list">
+      ${visibleTasks.map(moduleTaskRow).join("") || `<p>${t("noModuleTasks")}</p>`}
+    </div>
+    ${pagerHtml}
   </article>`;
 }
 
@@ -601,14 +659,20 @@ function pager(kind, page, pageCount, group = "") {
 function lessonPanel() {
   const lessons = (bundle.tables?.tables || [])
     .filter((table) => table.kind === "lessons-ssot")
-    .flatMap((table) => table.rows)
-    .slice(0, 6);
+    .flatMap((table) => table.rows);
   return `<section class="lesson-panel">
     <div class="section-head"><h2>${t("lessons")}</h2><span>${lessons.length}</span></div>
-    ${lessons.map((row) => {
-      const cells = row.cells || {};
-      return `<div class="lesson"><strong>${escapeHtml(cells.ID || cells.Lesson || cells.Title || t("lesson"))}</strong><p>${escapeHtml(cells.Summary || cells.Pattern || cells.Status || "")}</p></div>`;
-    }).join("") || emptyState(t("noLessons"))}
+    <div class="lesson-list" style="padding-top: 10px;">
+      ${lessons.map((row) => {
+        const cells = row.cells || {};
+        const lessonId = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
+        const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
+        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lessonId)}">
+          <strong>${escapeHtml(lessonId)}</strong>
+          <p>${escapeHtml(summary)}</p>
+        </div>`;
+      }).join("") || emptyState(t("noLessons"))}
+    </div>
   </section>`;
 }
 
@@ -680,6 +744,12 @@ function groupBy(items, fn) {
   }, {});
 }
 
+window.setModulePage = function(moduleKey, page) {
+  state.modulePages = state.modulePages || {};
+  state.modulePages[moduleKey] = page;
+  app();
+};
+
 function bind() {
   document.querySelectorAll("[data-search]").forEach((input) => input.addEventListener("input", () => {
     state.query = input.value;
@@ -733,6 +803,235 @@ function bind() {
     localStorage.setItem("harness.theme", state.theme);
     app();
   }));
+  document.querySelectorAll("[data-open-drawer]").forEach((el) => el.addEventListener("click", (e) => {
+    e.preventDefault();
+    const taskId = el.dataset.openDrawer;
+    openDrawer(taskId);
+  }));
+  document.querySelectorAll("[data-open-lesson-drawer]").forEach((el) => el.addEventListener("click", (e) => {
+    e.preventDefault();
+    const lessonId = el.dataset.openLessonDrawer;
+    openLessonDrawer(lessonId);
+  }));
+  const overlay = document.getElementById("drawer-overlay");
+  if (overlay) overlay.addEventListener("click", closeDrawer);
+}
+
+function renderDrawerContent(taskId) {
+  const task = (bundle.status?.tasks || []).find((item) => item.id === taskId);
+  if (!task) return `<div class="empty">${t("taskNotFound")}</div>`;
+  
+  const header = `
+    <div class="task-drawer-header">
+      <div>
+        <h2>${escapeHtml(task.title)}</h2>
+        <p style="font-family: var(--font-mono); font-size: 11px; margin: 4px 0 0; color: var(--muted);">${escapeHtml(task.id)}</p>
+      </div>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+  `;
+
+  const timeline = phaseTimeline(task);
+  const brief = taskDocSection(task, "brief.md", t("brief"), true);
+  const plan = taskDocument(task, "brief.md") ? "" : taskDocSection(task, "task_plan.md", t("taskPlan"), false);
+  const strategy = taskDocSection(task, "execution_strategy.md", t("strategy"), false);
+  const roadmap = taskDocSection(task, "visual_roadmap.md", t("roadmap"), false);
+  const findings = openFindings(task);
+  const evidence = evidenceList(task);
+
+  const body = `
+    <div class="task-drawer-body stack">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--paper-2); padding: 12px 16px; border-radius: 8px;">
+        <div style="font-size: 24px; font-weight: 800; color: var(--accent);">${task.completion}%</div>
+        <a href="#/tasks/${encodeURIComponent(task.id)}" class="btn-drawer-trigger" style="text-decoration: none;">${t("fullView")}</a>
+      </div>
+      ${timeline}
+      ${brief}
+      ${plan}
+      ${strategy}
+      ${roadmap}
+      ${findings}
+      ${evidence}
+    </div>
+  `;
+
+  return header + body;
+}
+
+function openDrawer(taskId) {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (!drawer || !overlay) return;
+  drawer.innerHTML = renderDrawerContent(taskId);
+  drawer.classList.add("active");
+  overlay.classList.add("active");
+
+  drawer.querySelector("[data-close-drawer]").addEventListener("click", closeDrawer);
+  drawer.querySelectorAll("[data-render-toggle]").forEach((button) => button.addEventListener("click", () => {
+    state.renderMode = state.renderMode === "rendered" ? "source" : "rendered";
+    openDrawer(taskId);
+  }));
+}
+
+function renderLessonDrawerContent(lessonId) {
+  const lessonTable = (bundle.tables?.tables || []).find((table) => table.kind === "lessons-ssot");
+  const row = (lessonTable?.rows || []).find((r) => {
+    const cells = r.cells || {};
+    const id = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
+    return id === lessonId;
+  });
+  
+  if (!row) {
+    return `<div class="task-drawer-header">
+      <h2>${escapeHtml(lessonId)}</h2>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+    <div class="task-drawer-body">
+      <div class="empty">${t("lessonNotFound")}</div>
+    </div>`;
+  }
+  
+  const cells = row.cells || {};
+  const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
+  const docPath = cells["\u8be6\u60c5\u6587\u6863"] || cells.Document || cells.document || "";
+  
+  let doc = null;
+  if (docPath) {
+    doc = findDocument(docPath);
+  }
+  if (!doc) {
+    doc = (bundle.documents?.documents || []).find((d) => d.path.includes(lessonId) || d.path.endsWith(`${lessonId}.md`));
+  }
+  
+  const header = `
+    <div class="task-drawer-header">
+      <div>
+        <h2>${escapeHtml(lessonId)}</h2>
+        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(summary)}</p>
+      </div>
+      <button class="btn-close" data-close-drawer>×</button>
+    </div>
+  `;
+  
+  let markdownBody = "";
+  if (doc && doc.content) {
+    markdownBody = `<div class="markdown">${window.HarnessMarkdown.render(doc.content, "rendered")}</div>`;
+  } else {
+    const rowsHtml = Object.entries(cells)
+      .map(([key, val]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(val)}</td></tr>`)
+      .join("");
+    markdownBody = `
+      <div style="margin-bottom: 20px; background: var(--paper-2); padding: 16px; border-radius: 8px; border: 1px dashed var(--line);">
+        <p style="margin: 0; font-size: 13px; color: var(--muted);">${t("lessonDocMissing")}</p>
+      </div>
+      <table class="rendered-table" style="width: 100%;">
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    `;
+  }
+  
+  const body = `
+    <div class="task-drawer-body stack">
+      ${markdownBody}
+    </div>
+  `;
+  
+  return header + body;
+}
+
+function openLessonDrawer(lessonId) {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (!drawer || !overlay) return;
+  drawer.innerHTML = renderLessonDrawerContent(lessonId);
+  drawer.classList.add("active");
+  overlay.classList.add("active");
+  
+  drawer.querySelector("[data-close-drawer]").addEventListener("click", closeDrawer);
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById("task-drawer");
+  const overlay = document.getElementById("drawer-overlay");
+  if (drawer) drawer.classList.remove("active");
+  if (overlay) overlay.classList.remove("active");
+}
+
+function ledgerPanel() {
+  const ledgerTable = (bundle.tables?.tables || []).find((table) => table.kind === "harness-ledger");
+  const rows = ledgerTable?.rows || [];
+  
+  let closedCount = 0;
+  let openCount = 0;
+  let blockedCount = 0;
+  
+  let lessonsReviewed = 0;
+  let lessonsTotal = 0;
+  
+  let evidenceAudited = 0;
+  let evidenceTotal = 0;
+  
+  for (const row of rows) {
+    const cells = row.cells || {};
+    const status = String(cells.Status || cells["\u72b6\u6001"] || "").toLowerCase();
+    if (status.includes("close") || status.includes("done") || status.includes("\u7ed3") || status.includes("\u5b8c")) {
+      closedCount++;
+    } else if (status.includes("block") || status.includes("\u963b")) {
+      blockedCount++;
+    } else {
+      openCount++;
+    }
+    
+    const lesson = String(cells.Lessons || cells["\u7ecf\u9a8c"] || cells["\u7ecf\u9a8c\u5ba1\u67e5"] || cells["Lesson"] || "");
+    if (lesson) {
+      lessonsTotal++;
+      if (lesson.toLowerCase().includes("pass") || lesson.includes("\u901a\u8fc7") || lesson.includes("\u5c31\u7eea") || lesson.toLowerCase().includes("checked") || lesson.toLowerCase().includes("done")) {
+        lessonsReviewed++;
+      }
+    }
+    
+    const evidence = String(cells.Evidence || cells["\u8bc1\u636e"] || cells["\u9a8c\u8bc1\u8bc1\u636e"] || cells["Evidence Checked"] || "");
+    if (evidence) {
+      evidenceTotal++;
+      if (evidence.toLowerCase().includes("pass") || evidence.includes("\u901a\u8fc7") || evidence.toLowerCase().includes("present") || evidence.toLowerCase().includes("verified") || evidence.toLowerCase().includes("done")) {
+        evidenceAudited++;
+      }
+    }
+  }
+  
+  const total = closedCount + openCount + blockedCount || 1;
+  const closedPct = Math.round((closedCount / total) * 100);
+  const openPct = Math.round((openCount / total) * 100);
+  const blockedPct = total - closedPct - openPct;
+  
+  const lessonsPct = lessonsTotal ? Math.round((lessonsReviewed / lessonsTotal) * 100) : 0;
+  const evidencePct = evidenceTotal ? Math.round((evidenceAudited / evidenceTotal) * 100) : 0;
+  
+  if (rows.length === 0) return "";
+  
+  return `<section class="ledger-panel">
+    <h2>${t("ssotLedger")}</h2>
+    <div class="ledger-split-bar" title="${t("tagClosed")}: ${closedCount}, ${t("tagOpen")}: ${openCount}, ${t("tagBlocked")}: ${blockedCount}">
+      <div class="ledger-split-segment closed" style="width: ${closedPct}%"></div>
+      <div class="ledger-split-segment open" style="width: ${openPct}%"></div>
+      <div class="ledger-split-segment blocked" style="width: ${Math.max(0, blockedPct)}%"></div>
+    </div>
+    <div class="ledger-split-legend">
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot closed"></i>${t("tagClosed")} (${closedCount})</span>
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot open"></i>${t("tagOpen")} (${openCount})</span>
+      <span class="ledger-split-legend-item"><i class="ledger-split-legend-dot blocked"></i>${t("tagBlocked")} (${blockedCount})</span>
+    </div>
+    <div class="ledger-gauge-row">
+      <div class="ledger-gauge-card">
+        <span>${t("lessonsCheckRate")}</span>
+        <strong>${lessonsPct}%</strong>
+      </div>
+      <div class="ledger-gauge-card">
+        <span>${t("evidenceAuditRate")}</span>
+        <strong>${evidencePct}%</strong>
+      </div>
+    </div>
+  </section>`;
 }
 
 function escapeHtml(value) {
