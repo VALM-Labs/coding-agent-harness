@@ -577,6 +577,14 @@ function getColumn(header, name) {
   return header.findIndex((cell) => cell.toLowerCase() === name.toLowerCase());
 }
 
+function getColumnAny(header, names) {
+  return header.findIndex((cell) => names.some((name) => cell.toLowerCase() === name.toLowerCase()));
+}
+
+function contentHasAny(content, terms) {
+  return terms.some((term) => (term instanceof RegExp ? term.test(content) : content.includes(term)));
+}
+
 function getCell(cells, names, fallback = "") {
   for (const name of names) {
     if (cells[name] !== undefined) return cells[name];
@@ -1960,13 +1968,19 @@ export function validateReviewSchema(target, { strict = true } = {}) {
   for (const reviewPath of reviewPaths) {
     const relative = toPosix(path.relative(target.projectRoot, reviewPath));
     const content = readFileSafe(reviewPath);
-    for (const required of ["Reviewer Identity", "Confidence Challenge", "Evidence Checked", "Final Confidence Basis"]) {
-      if (!content.includes(required)) {
-        if (strict) failures.push(`${relative} missing ${required}`);
-        else warnings.push(`${relative} missing ${required}`);
+    const requiredSections = [
+      ["Reviewer Identity", "Reviewer 身份", "审查者身份"],
+      ["Confidence Challenge", "信心挑战"],
+      ["Evidence Checked", "已检查 Evidence", "已检查证据"],
+      ["Final Confidence Basis", "最终信心依据"],
+    ];
+    for (const [label, ...aliases] of requiredSections) {
+      if (!contentHasAny(content, [label, ...aliases])) {
+        if (strict) failures.push(`${relative} missing ${label}`);
+        else warnings.push(`${relative} missing ${label}`);
       }
     }
-    const evidenceTable = tableAfterHeading(content, /^Evidence ID$/i);
+    const evidenceTable = tableAfterHeading(content, /^(Evidence ID|证据 ID)$/i);
     if (strict && evidenceTable.rows.length === 0) {
       failures.push(`${relative} Evidence Checked table needs at least one evidence row`);
     }
@@ -1981,12 +1995,12 @@ export function validateReviewSchema(target, { strict = true } = {}) {
     }
     const { header, rows } = tableAfterHeading(content, /^ID$/i);
     if (rows.length === 0) continue;
-    const severityIndex = getColumn(header, "Severity");
-    const openIndex = getColumn(header, "Open");
-    const dispositionIndex = getColumn(header, "Disposition");
-    const blocksIndex = getColumn(header, "Blocks Release");
-    const followUpIndex = getColumn(header, "Follow-up");
-    const evidenceCheckedIndex = getColumn(header, "Evidence Checked");
+    const severityIndex = getColumnAny(header, ["Severity", "严重级别"]);
+    const openIndex = getColumnAny(header, ["Open", "是否开放"]);
+    const dispositionIndex = getColumnAny(header, ["Disposition", "处置"]);
+    const blocksIndex = getColumnAny(header, ["Blocks Release", "是否阻塞发布"]);
+    const followUpIndex = getColumnAny(header, ["Follow-up", "跟进"]);
+    const evidenceCheckedIndex = getColumnAny(header, ["Evidence Checked", "已检查证据"]);
     if ([severityIndex, openIndex, dispositionIndex, blocksIndex].some((index) => index < 0)) {
       report(`${relative} findings table missing Severity/Open/Disposition/Blocks Release columns`);
       continue;
