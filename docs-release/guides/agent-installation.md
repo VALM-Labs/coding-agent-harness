@@ -1,5 +1,7 @@
 # Agent 安装指南
 
+English mirror: `docs-release/guides/agent-installation.en-US.md`
+
 这份指南写给在目标项目里执行安装或升级的 coding agent。README 只保留给人看的定位、
 快速开始和最小命令；安装细则放在这里和 `SKILL.md`。
 
@@ -117,8 +119,10 @@ harness migrate-verify \
 - 历史合同缺口在普通模式下进入 `adoption-needed` warning。
 - `--strict` 必须仍然能因为旧 checker 失败或历史合同缺口而失败。
 - `migrate-verify` 必须通过，才能报告迁移输出可用；dashboard 路径必须是 HTML。
-- 详细迁移策略见 `docs-release/guides/migration-playbook.md`。如果用户要求证明旧项目已经完整迁移，
-  还必须读取 `docs-release/guides/full-legacy-migration-subagent-strategy.md`。Agent 应读取
+- 详细迁移策略见 `docs-release/guides/migration-playbook.md` 或英文镜像
+  `docs-release/guides/migration-playbook.en-US.md`。如果用户要求证明旧项目已经完整迁移，
+  还必须读取 `docs-release/guides/full-legacy-migration-subagent-strategy.md` 或中文镜像
+  `docs-release/guides/full-legacy-migration-subagent-strategy.zh-CN.md`。Agent 应读取
   `session.json` 和 `migrate-plan.json`，再逐步迁移活跃任务、当前 review、真实采用的 capability，
   并用 subagent 审查证明 dashboard brief 覆盖、strict check 和 final session 全部通过。
 

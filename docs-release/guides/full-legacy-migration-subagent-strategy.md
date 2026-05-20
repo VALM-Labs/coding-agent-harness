@@ -1,5 +1,7 @@
 # Full Legacy Migration Subagent Strategy
 
+Chinese mirror: `docs-release/guides/full-legacy-migration-subagent-strategy.zh-CN.md`
+
 This guide is for agents migrating a large pre-v1 Harness project all the way to a readable v1 cutover.
 
 Use it when the user needs proof that another agent can migrate an old project, not just a baseline safe-adoption report.

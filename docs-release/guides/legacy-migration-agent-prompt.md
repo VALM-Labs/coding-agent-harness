@@ -1,5 +1,7 @@
 # Legacy Harness Migration Agent Prompt
 
+Chinese mirror: `docs-release/guides/legacy-migration-agent-prompt.zh-CN.md`
+
 Use this prompt when an agent must migrate an older Harness project into the v1.0 document kernel without destroying historical evidence.
 
 ## Mission
@@ -11,6 +13,7 @@ Your job is not to rewrite the whole `docs/` tree. Your job is to preserve histo
 If the user asks for proof that a legacy project is fully migrated, also follow:
 
 - `docs-release/guides/full-legacy-migration-subagent-strategy.md`
+- `docs-release/guides/full-legacy-migration-subagent-strategy.zh-CN.md`
 
 This prompt alone is enough for baseline safe-adoption. Full readable cutover has stricter gates.
 

@@ -1,11 +1,15 @@
 # 旧 Harness 平滑迁移 Playbook
 
+English mirror: `docs-release/guides/migration-playbook.en-US.md`
+
 这份 playbook 写给目标项目里的 agent。目标不是把历史文档全部机械改写，而是让旧项目逐步进入 v1.0 的可检查合同。
 
 如果要把迁移任务交给另一个 agent 执行，先给它读：
 
 - `docs-release/guides/legacy-migration-agent-prompt.md`
+- `docs-release/guides/legacy-migration-agent-prompt.zh-CN.md`
 - `docs-release/guides/full-legacy-migration-subagent-strategy.md`
+- `docs-release/guides/full-legacy-migration-subagent-strategy.zh-CN.md`
 
 本文默认使用已安装的 `harness` 命令。维护者在本源码仓调试时，可以把同一命令替换为
 `node scripts/harness.mjs`。
