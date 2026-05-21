@@ -1,5 +1,7 @@
 # [任务名称]
 
+Task Contract: harness-task/v1
+
 ## 目标
 
 [用一句话说明本任务完成后应达到的状态。]
@@ -49,6 +51,7 @@
 | --- | --- | --- |
 | `execution_strategy.md` | yes | 执行模式、subagent 使用、冲突控制、证据深度、交接规则 |
 | `visual_map.md` | yes | 图表集合：阶段图、可选架构/时序/数据流/状态图、完成度、证据状态、阻塞风险 |
+| `lesson_candidates.md` | standard/complex 必需 | 任务本地教训候选队列。人工审查确认前必须接受无候选、拒绝候选，或排队 promotion |
 | `review.md` | 按需 | 对抗性审查、release review、外部 reviewer 结论 |
 
 旧任务可以保留历史嵌入式段落作为 fallback；新任务必须使用独立文件。

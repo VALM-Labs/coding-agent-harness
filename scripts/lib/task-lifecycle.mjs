@@ -4,6 +4,8 @@ import {
   repoRoot,
   visualMapFile,
   legacyVisualRoadmapFile,
+  lessonCandidatesFile,
+  longRunningTaskContractFile,
   allowedTaskStates,
   allowedTaskBudgets,
   allowedPhaseStates,
@@ -26,6 +28,8 @@ import {
   isBlockingReviewRisk,
   listTaskPlanPaths,
   parseTaskBudget,
+  parseLessonCandidateStatus,
+  isLessonCandidateDecisionComplete,
   parseReviewConfirmation,
   taskIdForDirectory,
 } from "./task-scanner.mjs";
@@ -42,7 +46,7 @@ function taskTemplateFiles({ locale = "en-US" } = {}) {
     ["execution_strategy.md", "templates/planning/execution_strategy.md"],
     [visualMapFile, "templates/planning/visual_map.md"],
     ["findings.md", "templates/planning/findings.md"],
-    ["lesson_candidates.md", "templates/planning/lesson_candidates.md"],
+    [lessonCandidatesFile, "templates/planning/lesson_candidates.md"],
     ["progress.md", "templates/planning/progress.md"],
     ["review.md", "templates/planning/review.md"],
   ].map(([destination, source]) => [destination, localizedTemplateSource(source, locale)]);
@@ -133,6 +137,11 @@ function taskFilesForBudget({ budget, locale }) {
   return taskTemplateFiles({ locale });
 }
 
+function appendLongRunningContractFile(files, { locale, longRunning }) {
+  if (!longRunning) return files;
+  return [...files, [longRunningTaskContractFile, localizedTemplateSource("templates/planning/long-running-task-contract.md", locale)]];
+}
+
 function validateLifecycleTransition({ event, currentState, budget, reviewContent = "" }) {
   if (event === "task-review" && currentState !== "in_progress") {
     throw new Error(`task-review requires current state in_progress; current state is ${currentState || "unknown"}`);
@@ -152,6 +161,14 @@ function validateLifecycleTransition({ event, currentState, budget, reviewConten
   }
 }
 
+function validateReviewEntryGate(taskDir, budget) {
+  if (budget === "simple") return;
+  const candidatePath = path.join(taskDir, lessonCandidatesFile);
+  if (!fs.existsSync(candidatePath)) {
+    throw new Error(`task-review requires ${lessonCandidatesFile} before entering human review.`);
+  }
+}
+
 function validateHumanReviewConfirmation({ task, budget }) {
   if (budget === "simple") return;
   const state = task?.state || "unknown";
@@ -161,6 +178,10 @@ function validateHumanReviewConfirmation({ task, budget }) {
   }
   if (!task?.walkthroughPath) {
     throw new Error("Human review confirmation requires a walkthrough linked from Closeout SSoT before review-confirm.");
+  }
+  if (!task?.lessonCandidateDecisionComplete) {
+    const status = task?.lessonCandidateStatus || "missing";
+    throw new Error(`Human review confirmation requires lesson candidate decision complete; current status is ${status}.`);
   }
 }
 
@@ -191,7 +212,7 @@ function appendProgressLog(content, { event, message, evidence, actor = "coordin
   return `${content.trimEnd()}\n\n## Log\n\n| Time | Actor | Action | Evidence | Next |\n| --- | --- | --- | --- | --- |\n| ${timestamp} | ${actor} | ${event}: ${safeMessage} | ${safeEvidence} | ${event === "task-complete" ? "done" : "continue"} |\n`;
 }
 
-export function createTask(targetInput, taskId, { title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard" } = {}) {
+export function createTask(targetInput, taskId, { title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard", longRunning = false } = {}) {
   const target = normalizeTarget(targetInput);
   const normalizedTaskId = normalizeTaskId(taskId);
   if (!normalizedTaskId) throw new Error("Missing task id");
@@ -226,7 +247,10 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
       );
     }
   }
-  const files = taskFilesForBudget({ budget: normalizedBudget, locale: normalizedLocale });
+  const files = appendLongRunningContractFile(taskFilesForBudget({ budget: normalizedBudget, locale: normalizedLocale }), {
+    locale: normalizedLocale,
+    longRunning,
+  });
   for (const [destination, source] of files) {
     const destinationPath = path.join(directory, destination);
     const sourcePath = path.join(repoRoot, source);
@@ -257,6 +281,7 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
       path: `TARGET:${toPosix(path.relative(target.projectRoot, directory))}`,
       locale: normalizedLocale,
       budget: normalizedBudget,
+      longRunning,
     },
     changes,
   };
@@ -277,6 +302,7 @@ export function updateTaskLifecycle(targetInput, taskId, { event = "task-log", s
     budget,
     reviewContent: readFileSafe(path.join(taskDir, "review.md")),
   });
+  if (event === "task-review") validateReviewEntryGate(taskDir, budget);
   let content = readFileSafe(progressPath);
   if (normalizedState) content = updateProgressState(content, normalizedState, registry.locale);
   content = appendProgressLog(content, { event, message, evidence });
@@ -301,6 +327,8 @@ export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Revie
   const reviewPath = path.join(taskDir, "review.md");
   const progressPath = path.join(taskDir, "progress.md");
   const reviewContent = readFileSafe(reviewPath);
+  const budget = parseTaskBudget(readFileSafe(path.join(taskDir, "task_plan.md")));
+  const candidateStatus = parseLessonCandidateStatus(readFileSafe(path.join(taskDir, lessonCandidatesFile)));
   const blockingRisks = collectReviewRisks(reviewContent).filter(isBlockingReviewRisk);
   if (blockingRisks.length > 0) {
     const ids = blockingRisks.map((risk) => risk.id || risk.severity).join(", ");
@@ -308,8 +336,11 @@ export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Revie
   }
   validateHumanReviewConfirmation({
     task: findTaskByDirectory(target, taskDir),
-    budget: parseTaskBudget(readFileSafe(path.join(taskDir, "task_plan.md"))),
+    budget,
   });
+  if (budget !== "simple" && !isLessonCandidateDecisionComplete(candidateStatus)) {
+    throw new Error(`Human review confirmation requires lesson candidate decision complete; current status is ${candidateStatus.status}.`);
+  }
 
   const timestamp = nowTimestamp();
   const safeReviewer = markdownCell(reviewer || "Human Reviewer");

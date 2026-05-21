@@ -8,6 +8,8 @@ export const legacyChecker = path.join(repoRoot, "scripts/check-harness.mjs");
 export const visualMapFile = "visual_map.md";
 export const legacyVisualRoadmapFile = "visual_roadmap.md";
 export const lessonCandidatesFile = "lesson_candidates.md";
+export const longRunningTaskContractFile = "long-running-task-contract.md";
+export const taskContractMarker = "Task Contract: harness-task/v1";
 
 
 export const supportedLocales = new Set(["zh-CN", "en-US"]);

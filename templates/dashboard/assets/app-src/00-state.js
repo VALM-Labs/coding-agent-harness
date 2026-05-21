@@ -30,6 +30,8 @@ const taskDocTabs = [
   ["strategy", "execution_strategy.md"],
   ["visualMap", "visual_map.md"],
   ["legacyRoadmap", "visual_roadmap.md"],
+  ["lessonCandidates", "lesson_candidates.md"],
+  ["longRunningContract", "long-running-task-contract.md"],
   ["progress", "progress.md"],
   ["review", "review.md"],
   ["findings", "findings.md"],

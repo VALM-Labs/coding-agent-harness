@@ -14,6 +14,7 @@ import {
   installUserSkill,
   listLifecycleTasks,
   normalizeLocale,
+  promoteLessonCandidate,
   runMigration,
   serveDashboardWorkbench,
   validateSourcePackageBoundary,
@@ -95,13 +96,14 @@ Usage:
   harness migrate-plan [--json] [--limit n] [target]
   harness migrate-run [--locale zh-CN|en-US] [--assume-locale] [--allow-dirty] [--plan-only] [--out-dir folder] [--session-dir folder] [target]
   harness migrate-verify [--json] [--full-cutover] <session.json>
-  harness new-task <task-id> [--module key] [--budget simple|standard|complex] [--title title] [--locale zh-CN|en-US] [--dry-run] [target]
+  harness new-task <task-id> [--module key] [--budget simple|standard|complex] [--long-running] [--title title] [--locale zh-CN|en-US] [--dry-run] [target]
   harness task-start <task-id> [--message text] [target]
   harness task-phase <task-id> <phase-id> [--state done] [--completion 100] [--evidence present] [target]
   harness task-log <task-id> --message text [--evidence type:PATH:summary] [target]
   harness task-block <task-id> [--message text] [target]
   harness task-review <task-id> [--message text] [target]
   harness review-confirm <task-id> --confirm task-id [--reviewer name] [--message text] [target]
+  harness lesson-promote <task-id> <candidate-id> [--dry-run] [target]
   harness task-complete <task-id> [--message text] [target]
   harness task-list [--json] [--state state] [--module key] [target]
   harness module-step <module-key> <step-id> [--state done|in-progress|blocked] [target]
@@ -342,13 +344,14 @@ if (command === "help" || command === "--help" || command === "-h") {
   const title = takeOption("--title", "");
   const moduleKey = takeOption("--module", "");
   const budget = takeOption("--budget", "standard");
+  const longRunning = takeFlag("--long-running");
   const taskId = args.shift();
   if (!taskId) {
     console.error("Missing task id");
     process.exit(2);
   }
   try {
-    console.log(JSON.stringify(createTask(targetArg(), taskId, { title, locale, dryRun, moduleKey, budget }), null, 2));
+    console.log(JSON.stringify(createTask(targetArg(), taskId, { title, locale, dryRun, moduleKey, budget, longRunning }), null, 2));
   } catch (error) {
     console.error(error.message);
     process.exit(1);
@@ -402,6 +405,20 @@ if (command === "help" || command === "--help" || command === "-h") {
   }
   try {
     console.log(JSON.stringify(confirmTaskReview(targetArg(), taskId, { reviewer, message, evidence, confirmText }), null, 2));
+  } catch (error) {
+    console.error(error.message);
+    process.exit(1);
+  }
+} else if (command === "lesson-promote") {
+  const dryRun = takeFlag("--dry-run");
+  const taskId = args.shift();
+  const candidateId = args.shift();
+  if (!taskId || !candidateId) {
+    console.error("Missing task id or candidate id");
+    process.exit(2);
+  }
+  try {
+    console.log(JSON.stringify(promoteLessonCandidate(targetArg(), taskId, candidateId, { dryRun }), null, 2));
   } catch (error) {
     console.error(error.message);
     process.exit(1);

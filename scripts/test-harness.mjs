@@ -124,6 +124,21 @@ function tclWord(value) {
   return `{${String(value).replace(/\\/g, "\\\\").replace(/}/g, "\\}")}}`;
 }
 
+function acceptNoLessonCandidate(taskDir) {
+  const candidatePath = path.join(taskDir, "lesson_candidates.md");
+  let content = fs.readFileSync(candidatePath, "utf8");
+  content = content
+    .replace("| Task-level status | pending-review |", "| Task-level status | no-candidate-accepted |")
+    .replace("| Review decision | pending-human-review |", "| Review decision | accepted-no-candidate |")
+    .replace("| Closeout token | pending |", "| Closeout token | checked-candidate:LC-TEST-000 |")
+    .replace(
+      "Not decided yet. Fill this only when review accepts that the task produced no reusable lesson candidate.",
+      "Human review accepted that this fixture produced no reusable lesson candidate.",
+    )
+    .replace("尚未判定。只有人工审查接受本任务没有可复用候选时，才填写这里。", "人工审查已接受该测试夹具没有可复用教训候选。");
+  fs.writeFileSync(candidatePath, content);
+}
+
 const skillContent = fs.readFileSync(path.join(repoRoot, "SKILL.md"), "utf8");
 assert(!skillContent.includes("Historical 12-Phase Bootstrap"), "SKILL.md should not carry the legacy 12-phase reference body");
 assert(
@@ -256,6 +271,7 @@ assert(documents.documents.some((doc) => doc.path.endsWith("/brief.md")), "docum
 assert(documents.documents.some((doc) => doc.path.endsWith("/task_plan.md")), "documents should include task plan fallback");
 assert(documents.documents.some((doc) => doc.path.endsWith("execution_strategy.md")), "documents missing execution strategy");
 assert(documents.documents.some((doc) => doc.path.endsWith("visual_map.md")), "documents missing visual map");
+assert(documents.documents.some((doc) => doc.path.endsWith("lesson_candidates.md")), "documents missing lesson candidates");
 const tables = JSON.parse(fs.readFileSync(path.join(dashboardDir, "data/tables.json"), "utf8"));
 assert(tables.tables.some((table) => table.kind === "harness-ledger"), "documents missing harness ledger table");
 assert(JSON.stringify(tables).includes("alpha|beta"), "markdown table parser should preserve escaped pipes");
@@ -276,6 +292,8 @@ assert(dashboardApp.includes("fullCutoverEligible"), "dashboard missing full cut
 assert(dashboardApp.includes("legacyVisualOnlyCount"), "dashboard missing legacy visual-only summary field");
 assert(dashboardApp.includes("weakBriefCount"), "dashboard missing weak brief summary field");
 assert(dashboardApp.includes("warningQueue()"), "dashboard missing warning queue workbench");
+assert(dashboardApp.includes("reviewWorkspace("), "dashboard missing review workspace route implementation");
+assert(dashboardApp.includes("[\"lessonCandidates\", \"lesson_candidates.md\"]"), "dashboard should expose lesson candidate documents");
 assert(dashboardApp.includes("migrationRunwayBreakdown"), "dashboard missing aggregate migration runway drilldown");
 assert(dashboardApp.includes("[\"brief\", \"brief.md\"]"), "dashboard should make brief.md the first task detail tab");
 assert(dashboardApp.includes("[\"visualMap\", \"visual_map.md\"]"), "dashboard should expose canonical visual_map.md tab");
@@ -283,6 +301,10 @@ assert(dashboardApp.includes("projectMermaid"), "dashboard should render project
 assert(dashboardApp.includes("escapeHtml(projectName())"), "dashboard project title must be escaped");
 assert(dashboardMarkdown.includes("rendered-table"), "dashboard missing rendered markdown table support");
 assert(dashboardMermaid.includes("mermaid-rendered"), "dashboard missing rendered mermaid output");
+const dashboardCss = fs.readFileSync(path.join(dashboardDir, "assets/app.css"), "utf8");
+assert(dashboardCss.includes(".runtime-banner"), "dashboard missing static read-only banner styling");
+assert(dashboardCss.includes("max-height: min(68vh, 620px)"), "dashboard missing mermaid viewport containment");
+assert(dashboardCss.includes(".review-workspace-grid"), "dashboard missing review workspace layout");
 for (const generated of ["data/status.json", "data/tables.json", "data/documents.json", "data/graph.json", "data/adoption.json", "assets/dashboard-data.js"]) {
   const content = fs.readFileSync(path.join(dashboardDir, generated), "utf8");
   assert(!content.includes(repoRoot), `${generated} leaked absolute repo path`);
@@ -302,6 +324,10 @@ expectPass(["dashboard", "--out-dir", staticWorkbenchFlagDir, "examples/minimal-
 assert(
   fs.readFileSync(path.join(staticWorkbenchFlagDir, "index.html"), "utf8").includes("__HARNESS_WORKBENCH__ = false"),
   "static dashboard folder should not enable workbench runtime",
+);
+assert(
+  fs.readFileSync(path.join(staticWorkbenchFlagDir, "assets/app.js"), "utf8").includes("staticReadOnly"),
+  "static dashboard app should render a visible read-only runtime boundary",
 );
 const helpOutput = expectPass(["help"]).stdout;
 assert(helpOutput.includes("harness dev"), "help should advertise harness dev as the daily dynamic workbench entry");
@@ -441,7 +467,7 @@ assert(!fs.existsSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/phase-2
 const lifecycleCreate = expectJson(["new-task", "phase-2-lifecycle", "--title", "阶段二任务生命周期", "--locale", "zh-CN", lifecycleTarget]);
 assert(lifecycleCreate.task?.shortId === "phase-2-lifecycle", "new-task should report normalized short task id");
 assert(lifecycleCreate.task?.id === "TASKS/phase-2-lifecycle", "new-task should report relative task id");
-for (const required of ["brief.md", "task_plan.md", "execution_strategy.md", "visual_map.md", "findings.md", "progress.md", "review.md"]) {
+for (const required of ["brief.md", "task_plan.md", "execution_strategy.md", "visual_map.md", "findings.md", "lesson_candidates.md", "progress.md", "review.md"]) {
   assert(
     fs.existsSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/phase-2-lifecycle", required)),
     `new-task should create ${required}`,
@@ -450,6 +476,10 @@ for (const required of ["brief.md", "task_plan.md", "execution_strategy.md", "vi
 assert(
   fs.readFileSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/phase-2-lifecycle/brief.md"), "utf8").includes("阶段二任务生命周期"),
   "new-task should render the requested title into brief.md",
+);
+assert(
+  fs.readFileSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/phase-2-lifecycle/task_plan.md"), "utf8").includes("Task Contract: harness-task/v1"),
+  "new-task should render the durable task contract marker",
 );
 const duplicateLifecycle = run(["new-task", "phase-2-lifecycle", "--title", "duplicate", lifecycleTarget]);
 assert(duplicateLifecycle.status !== 0, "new-task should refuse to overwrite an existing task directory");
@@ -461,7 +491,7 @@ for (const required of ["brief.md", "task_plan.md", "visual_map.md", "progress.m
     `simple task should create ${required}`,
   );
 }
-for (const omitted of ["execution_strategy.md", "findings.md", "review.md"]) {
+for (const omitted of ["execution_strategy.md", "findings.md", "review.md", "lesson_candidates.md"]) {
   assert(
     !fs.existsSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/simple-lifecycle", omitted)),
     `simple task should not create ${omitted}`,
@@ -469,6 +499,40 @@ for (const omitted of ["execution_strategy.md", "findings.md", "review.md"]) {
 }
 const simpleTaskPlan = fs.readFileSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/simple-lifecycle/task_plan.md"), "utf8");
 assert(/Selected budget\s*:\s*simple/i.test(simpleTaskPlan) || /选择预算\s*[:：]\s*simple/i.test(simpleTaskPlan), "simple task should persist selected budget");
+const longRunningLifecycle = expectJson(["new-task", "long-running-lifecycle", "--long-running", "--title", "长程任务", "--locale", "zh-CN", lifecycleTarget]);
+assert(longRunningLifecycle.task?.longRunning === true, "new-task --long-running should report longRunning true");
+assert(
+  fs.existsSync(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/long-running-lifecycle/long-running-task-contract.md")),
+  "new-task --long-running should create long-running-task-contract.md",
+);
+const promotableCandidatePath = path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/long-running-lifecycle/lesson_candidates.md");
+fs.writeFileSync(
+  promotableCandidatePath,
+  fs.readFileSync(promotableCandidatePath, "utf8")
+    .replace("| Task-level status | pending-review |", "| Task-level status | needs-promotion |")
+    .replace("| Review decision | pending-human-review |", "| Review decision | accepted-for-promotion |")
+    .replace("| Promotion state | not-promoted |", "| Promotion state | queued |")
+    .replace("| Closeout token | pending |", "| Closeout token | queued-promotion:LC-20260521-001 |")
+    .replace(
+      "| --- | --- | --- | --- | --- | --- |",
+      "| --- | --- | --- | --- | --- | --- |\n| LC-20260521-001 | needs-promotion | Commit contract must be explicit | Agents forget proactive commits when contracts are implicit | accepted-for-promotion | references/execution-workflow-standard.md |",
+    ),
+);
+const promoteDryRun = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", "--dry-run", lifecycleTarget]);
+assert(promoteDryRun.dryRun === true && promoteDryRun.lessonId === "L-2026-05-21-001", "lesson-promote --dry-run should derive the lesson id");
+const promoteRun = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", lifecycleTarget]);
+assert(promoteRun.lessonId === "L-2026-05-21-001", "lesson-promote should return the created lesson id");
+assert(
+  fs.existsSync(path.join(lifecycleTarget, "docs/01-GOVERNANCE/lessons/L-2026-05-21-001-commit-contract-must-be-explicit.md")),
+  "lesson-promote should create a detail document",
+);
+assert(
+  fs.readFileSync(path.join(lifecycleTarget, "docs/01-GOVERNANCE/Lessons-SSoT.md"), "utf8").includes("L-2026-05-21-001"),
+  "lesson-promote should append Lessons SSoT",
+);
+assert(fs.readFileSync(promotableCandidatePath, "utf8").includes("| LC-20260521-001 | promoted |"), "lesson-promote should mark the candidate row promoted");
+const promoteAgain = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", lifecycleTarget]);
+assert(promoteAgain.changes.length === 0, "lesson-promote should be idempotent after promotion");
 expectPass(["check", "--profile", "target-project", lifecycleTarget]);
 expectJson(["task-start", "simple-lifecycle", "--message", "开始简单任务", lifecycleTarget]);
 const simpleComplete = expectJson(["task-complete", "simple-lifecycle", "--message", "简单任务完成", lifecycleTarget]);
@@ -533,6 +597,7 @@ fs.appendFileSync(
   path.join(lifecycleTarget, "docs/10-WALKTHROUGH/Closeout-SSoT.md"),
   "\n| CL-PHASE-2-LIFECYCLE | 2026-05-21 | Phase 2 lifecycle | `docs/09-PLANNING/TASKS/phase-2-lifecycle/task_plan.md` | `docs/09-PLANNING/TASKS/phase-2-lifecycle/review.md` | `docs/10-WALKTHROUGH/phase-2-lifecycle-walkthrough.md` | pending human review | none | checked-none | pending |\n",
 );
+acceptNoLessonCandidate(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/phase-2-lifecycle"));
 const preCompleteStatus = expectJson(["status", "--json", lifecycleTarget]);
 const preCompleteTask = preCompleteStatus.tasks.find((task) => task.id === "TASKS/phase-2-lifecycle");
 assert(preCompleteTask?.walkthroughPath?.endsWith("docs/10-WALKTHROUGH/phase-2-lifecycle-walkthrough.md"), "status should expose walkthrough before human review confirmation");
@@ -597,6 +662,7 @@ fs.appendFileSync(
   path.join(lifecycleTarget, "docs/10-WALKTHROUGH/Closeout-SSoT.md"),
   "\n| CL-MODULE-LIFECYCLE | 2026-05-21 | Module lifecycle | `docs/09-PLANNING/MODULES/auth/module-lifecycle/task_plan.md` | `docs/09-PLANNING/MODULES/auth/module-lifecycle/review.md` | `docs/10-WALKTHROUGH/module-lifecycle-walkthrough.md` | pending human review | none | checked-none | pending |\n",
 );
+acceptNoLessonCandidate(path.join(lifecycleTarget, "docs/09-PLANNING/MODULES/auth/module-lifecycle"));
 const moduleConfirm = expectJson(["review-confirm", "MODULES/auth/module-lifecycle", "--reviewer", "Human Reviewer", "--confirm", "module-lifecycle", lifecycleTarget]);
 assert(moduleConfirm.task?.id === "MODULES/auth/module-lifecycle", "review-confirm should accept full module task ids");
 const workbenchReviewTask = expectJson(["new-task", "workbench-review", "--title", "Workbench review gate", "--locale", "zh-CN", lifecycleTarget]);
@@ -673,6 +739,7 @@ try {
     path.join(lifecycleTarget, "docs/10-WALKTHROUGH/Closeout-SSoT.md"),
     "\n| CL-WORKBENCH-REVIEW | 2026-05-21 | Workbench review gate | `docs/09-PLANNING/TASKS/workbench-review/task_plan.md` | `docs/09-PLANNING/TASKS/workbench-review/review.md` | `docs/10-WALKTHROUGH/workbench-review-walkthrough.md` | pending human review | none | checked-none | pending |\n",
   );
+  acceptNoLessonCandidate(path.join(lifecycleTarget, "docs/09-PLANNING/TASKS/workbench-review"));
   const okResponse = await fetch(new URL("api/tasks/review-complete", runtime.url), {
     method: "POST",
     headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: runtime.url.replace(/\/$/, "") },

@@ -177,7 +177,7 @@ function renderDrawerContent(taskId) {
         <a href="#/tasks/${encodeURIComponent(task.id)}" class="btn-drawer-trigger" style="text-decoration: none;">${t("fullView")}</a>
       </div>
       ${taskStateSummary(task)}
-      ${reviewActionPanel(task)}
+      ${reviewActionPanel(task, { mode: "summary" })}
       ${timeline}
       ${documents}
       ${findings}

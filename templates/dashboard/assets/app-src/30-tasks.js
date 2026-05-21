@@ -349,7 +349,7 @@ function taskDetail(route) {
         ${taskDocumentLibrary(task, route.doc)}
       </article>
       <aside class="detail-side">
-        ${reviewActionPanel(task)}
+        ${reviewActionPanel(task, { mode: "summary" })}
         ${openFindings(task)}
         ${evidenceList(task)}
         ${documentTabs(task)}
@@ -436,7 +436,7 @@ function taskDocumentPriority(task) {
   const stateName = task?.state || "";
   const lifecycle = task?.lifecycleState || "";
   if (stateName === "review" || ["in_review", "review-blocked"].includes(lifecycle)) {
-    return ["walkthrough", "review", "findings", "visualMap", "progress", "brief", "taskPlan", "strategy", "legacyRoadmap", "references", "artifacts"];
+    return ["walkthrough", "lessonCandidates", "review", "findings", "visualMap", "progress", "brief", "taskPlan", "strategy", "longRunningContract", "legacyRoadmap", "references", "artifacts"];
   }
   if (stateName === "in_progress" || lifecycle === "active" || stateName === "blocked") {
     return ["progress", "visualMap", "brief", "taskPlan", "strategy", "findings", "review", "walkthrough", "references", "artifacts", "legacyRoadmap"];
@@ -490,11 +490,26 @@ function openFindings(task) {
   </section>`;
 }
 
-function reviewActionPanel(task) {
-  if (!canUseWorkbenchAction("review-complete")) return "";
+function reviewActionPanel(task, { mode = "summary" } = {}) {
   if (!isTaskInReviewStage(task)) return "";
   const blocking = task.reviewStatus === "blocked-open-findings" || (task.risks || []).some((risk) => /^P[0-2]$/i.test(risk.severity || "") && (risk.open || risk.blocksRelease));
   const confirmed = task.reviewStatus === "confirmed";
+  const candidateBlocked = task.budget !== "simple" && !task.lessonCandidateDecisionComplete;
+  const candidateStatus = task.lessonCandidateStatus || "missing";
+  if (mode !== "workspace") {
+    return `<section class="side-panel review-actions">
+      <h3>${t("reviewActions")}</h3>
+      <p>${escapeHtml(confirmed ? t("reviewAlreadyConfirmed") : t("reviewOpenInWorkspace"))}</p>
+      <p>${escapeHtml(t("lessonCandidateStatus"))}: ${tag(candidateStatus)}</p>
+      <a href="#/review/${encodeURIComponent(task.id)}">${t("openReviewWorkspace")}</a>
+    </section>`;
+  }
+  if (!canUseWorkbenchAction("review-complete")) {
+    return `<section class="side-panel review-actions">
+      <h3>${t("reviewActions")}</h3>
+      <p>${escapeHtml(t("staticReadOnlyDetail"))}</p>
+    </section>`;
+  }
   if (confirmed) {
     return `<section class="side-panel review-actions">
       <h3>${t("reviewActions")}</h3>
@@ -502,11 +517,12 @@ function reviewActionPanel(task) {
     </section>`;
   }
   const missingWalkthrough = task.budget !== "simple" && !task.walkthroughPath;
-  const disabled = blocking || missingWalkthrough;
-  const message = missingWalkthrough ? t("reviewWalkthroughRequired") : blocking ? t("reviewBlocked") : t("reviewWorkbenchReady");
+  const disabled = blocking || missingWalkthrough || candidateBlocked;
+  const message = missingWalkthrough ? t("reviewWalkthroughRequired") : blocking ? t("reviewBlocked") : candidateBlocked ? t("reviewCandidateDecisionRequired") : t("reviewWorkbenchReady");
   return `<section class="side-panel review-actions">
     <h3>${t("reviewActions")}</h3>
     <p>${escapeHtml(message)}</p>
+    <p>${escapeHtml(t("lessonCandidateStatus"))}: ${tag(candidateStatus)}</p>
     <label class="review-check">
       <input type="checkbox" data-review-confirm-check="${escapeAttr(task.id)}" ${disabled ? "disabled" : ""}>
       <span>${t("reviewConfirmChecklist")}</span>

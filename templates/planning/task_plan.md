@@ -1,5 +1,7 @@
 # [Task Name]
 
+Task Contract: harness-task/v1
+
 ## Goal
 
 [State the outcome this task must deliver in one sentence.]
@@ -33,6 +35,7 @@ Selected budget: {{TASK_BUDGET}}
 | `visual_map.md` | yes | Diagram collection: phase map, optional architecture/sequence/data-flow/state diagrams, completion state, evidence state, and blocking risk |
 | `progress.md` | yes | Execution log, decisions, and handoff |
 | `findings.md` | yes | Findings, research notes, and unresolved risks |
+| `lesson_candidates.md` | yes for standard/complex | Task-local lesson candidate queue. Human review must accept no-candidate, reject candidates, or queue promotion before review confirmation |
 | `review.md` | if needed | Adversarial or specialist review report |
 | `long-running-task-contract.md` | if needed | Continuous execution permission, loop rules, and stop conditions |
 

@@ -474,7 +474,35 @@ button, input, select {
 .mermaid-rendered {
   margin: 0;
   max-width: 100%;
-  overflow-x: auto;
+  max-height: min(68vh, 620px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+  padding: 12px;
+}
+
+.mermaid-fallback {
+  margin: 0;
+  max-width: 100%;
+  max-height: min(68vh, 620px);
+  overflow: auto;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--paper-2);
+  padding: 12px;
+}
+
+.task-drawer .mermaid-rendered,
+.task-drawer .mermaid-fallback,
+.review-workspace .mermaid-rendered,
+.review-workspace .mermaid-fallback {
+  max-height: 420px;
+}
+
+.mermaid-fallback pre {
+  margin: 0;
+  white-space: pre;
 }
 
 .mermaid-rendered figcaption,
@@ -1578,6 +1606,58 @@ button, input, select {
   border-color: var(--accent);
 }
 
+.runtime-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.08);
+  color: var(--ink);
+}
+
+.runtime-banner span {
+  color: var(--muted);
+}
+
+.runtime-banner code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.review-workspace {
+  display: grid;
+  gap: 20px;
+}
+
+.review-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (min-width: 1180px) {
+  .review-workspace-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 420px);
+    align-items: start;
+  }
+}
+
+.review-workspace-side {
+  position: sticky;
+  top: 16px;
+}
+
+.review-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Beautiful Group Header styling */
 .task-group {
   background: var(--paper);
@@ -1675,6 +1755,15 @@ button, input, select {
   gap: 18px;
   padding: 24px;
   margin-bottom: 20px;
+}
+
+.detail-hero > div {
+  min-width: 0;
+}
+
+.crumbs,
+.eyebrow {
+  overflow-wrap: anywhere;
 }
 
 .detail-score {
@@ -2550,6 +2639,25 @@ details summary {
 }
 
 @media (max-width: 760px) {
+  .visibility-shell {
+    overflow-x: hidden;
+  }
+  .detail-hero {
+    flex-direction: column;
+  }
+  .detail-hero h2,
+  .detail-hero p {
+    overflow-wrap: anywhere;
+  }
+  .review-hero-tags {
+    justify-content: flex-start;
+  }
+  .review-workspace,
+  .review-workspace-grid,
+  .review-workspace-main,
+  .review-workspace-side {
+    min-width: 0;
+  }
   .task-state-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

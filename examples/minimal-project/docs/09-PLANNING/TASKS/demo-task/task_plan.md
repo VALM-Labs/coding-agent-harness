@@ -1,5 +1,7 @@
 # Demo Task
 
+Task Contract: harness-task/v1
+
 ## Goal
 
 Show the v1.0 visual map contract.

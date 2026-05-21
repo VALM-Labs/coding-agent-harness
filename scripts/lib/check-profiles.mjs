@@ -6,6 +6,7 @@ import {
   legacyChecker,
   visualMapFile,
   legacyVisualRoadmapFile,
+  lessonCandidatesFile,
   allowedReviewDispositions,
   allowedPhaseStates,
   allowedEvidenceStatus,
@@ -30,6 +31,7 @@ import {
   collectTasks,
   listTaskPlanPaths,
   parseTaskBudget,
+  parseTaskContractInfo,
   readVisualMapContractFile,
   parsePhases,
   taskCutoverCounters,
@@ -104,8 +106,8 @@ export function validateReviewSchema(target, { strict = true } = {}) {
     }
     for (const row of rows) {
       const id = row[0] || "";
-      if (!/^(R|SR)-\d+/i.test(id)) continue;
       const severity = row[severityIndex] || "";
+      if (!/^P[0-3]$/.test(severity) && !/^(R|SR)-\d+/i.test(id)) continue;
       const open = (row[openIndex] || "").toLowerCase();
       const disposition = (row[dispositionIndex] || "").toLowerCase();
       const blocks = (row[blocksIndex] || "").toLowerCase();
@@ -185,11 +187,17 @@ export function validatePlanContracts(target, { strict = true } = {}) {
   for (const taskPlanPath of listTaskPlanPaths(target)) {
     const taskDir = path.dirname(taskPlanPath);
     const relativeDir = toPosix(path.relative(target.projectRoot, taskDir));
-    const budget = parseTaskBudget(readFileSafe(taskPlanPath));
-    const requiredFiles = budget === "simple" ? [visualMapFile] : ["execution_strategy.md", visualMapFile];
+    const taskPlanContent = readFileSafe(taskPlanPath);
+    const budget = parseTaskBudget(taskPlanContent);
+    const taskContract = parseTaskContractInfo(taskPlanContent);
+    if (!taskContract.generated) {
+      warnings.push(`adoption-needed: ${relativeDir} missing Task Contract: harness-task/v1 marker`);
+    }
+    const requiredFiles = budget === "simple" ? [visualMapFile] : ["execution_strategy.md", visualMapFile, lessonCandidatesFile];
     for (const fileName of requiredFiles) {
       if (!fs.existsSync(path.join(taskDir, fileName))) {
-        report(`${relativeDir} missing ${fileName}`);
+        if (taskContract.generated) failures.push(`${relativeDir} missing ${fileName}`);
+        else report(`${relativeDir} missing ${fileName}`);
       }
     }
   }

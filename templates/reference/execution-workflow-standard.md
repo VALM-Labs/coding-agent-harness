@@ -13,7 +13,7 @@ Define the standard lifecycle for non-trivial work from intake through planning,
 5. Run checks that match the risk surface before claiming completion.
 6. Route material findings through review and do not bury unresolved issues in summaries.
 7. Proactively commit each verified, meaningful slice. A completed slice should not remain only as unstaged or staged working-tree state unless the user explicitly asked to defer commits or a documented blocker prevents a clean commit.
-8. Close the loop by updating walkthrough, SSoT, regression, ledger, or docs artifacts when the work changes durable project knowledge.
+8. Close the loop by updating walkthrough, SSoT, regression, ledger, or docs artifacts when the work changes durable project knowledge. New non-simple tasks should keep `lesson_candidates.md` reviewable before human review confirmation.
 
 ## Required Checklist
 

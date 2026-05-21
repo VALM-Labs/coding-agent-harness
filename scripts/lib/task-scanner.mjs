@@ -6,6 +6,8 @@ import {
   visualMapFile,
   legacyVisualRoadmapFile,
   lessonCandidatesFile,
+  longRunningTaskContractFile,
+  taskContractMarker,
   toPosix,
   readFileSafe,
   walkFiles,
@@ -35,6 +37,13 @@ export const allowedLessonCandidateRowStatuses = new Set([
   "rejected",
 ]);
 
+export const reviewCompleteLessonCandidateStatuses = new Set([
+  "no-candidate-accepted",
+  "needs-promotion",
+  "promoted",
+  "rejected",
+]);
+
 export function parseTaskState(progressContent) {
   return parseTaskStateInfo(progressContent).state;
 }
@@ -49,6 +58,18 @@ export function parseTaskBudget(taskPlanContent) {
   if (allowedTaskBudgets.has(normalized)) return normalized;
   if (["long-running", "longrunning", "module-parallel"].includes(normalized)) return "complex";
   return "standard";
+}
+
+export function parseTaskContractInfo(taskPlanContent) {
+  const content = String(taskPlanContent || "");
+  const explicit =
+    content.match(/^Task Contract\s*[:：]\s*`?([^`\n]+)`?\s*$/im) ||
+    content.match(/^任务合同\s*[:：]\s*`?([^`\n]+)`?\s*$/im);
+  const version = explicit ? explicit[1].trim() : "";
+  return {
+    version,
+    generated: version === "harness-task/v1" || content.includes(taskContractMarker),
+  };
 }
 
 export function parseTaskStateInfo(progressContent) {
@@ -242,6 +263,7 @@ export function collectTasks(target) {
     const reviewPath = path.join(taskDir, "review.md");
     const findingsPath = path.join(taskDir, "findings.md");
     const lessonCandidatesPath = path.join(taskDir, lessonCandidatesFile);
+    const longRunningContractPath = path.join(taskDir, longRunningTaskContractFile);
     const visualMap = readVisualMapContractFile(taskDir, taskPlan);
     const progress = readFileSafe(progressPath);
     const review = readFileSafe(reviewPath);
@@ -259,6 +281,7 @@ export function collectTasks(target) {
     const title = titleFromMarkdown(brief.content || taskPlan, path.basename(taskDir));
     const stateInfo = parseTaskStateInfo(progress);
     const budget = parseTaskBudget(taskPlan);
+    const taskContract = parseTaskContractInfo(taskPlan);
     const explicitModule = id.startsWith("MODULES/") ? id.split("/")[1] : null;
     const legacyCandidate = brief.source !== "standalone" || visualMap.status === "legacy-only" || !fs.existsSync(executionStrategyPath);
     const classification = inferTaskClassification({ id, title, relative, explicitModule, legacyCandidate });
@@ -295,6 +318,8 @@ export function collectTasks(target) {
       roadmapSource: visualMap.source,
       state: stateInfo.state,
       budget,
+      taskContractVersion: taskContract.version,
+      taskContractGenerated: taskContract.generated,
       stateSource: stateInfo.source,
       stateRaw: stateInfo.raw,
       lifecycleState,
@@ -312,6 +337,11 @@ export function collectTasks(target) {
       lessonCandidateRowCount: lessonCandidates.rows.length,
       lessonCandidateOpenCount: lessonCandidates.openCount,
       lessonCandidateIssues: lessonCandidates.issues,
+      lessonCandidateDecisionComplete: isLessonCandidateDecisionComplete(lessonCandidates),
+      longRunningContractPath: fs.existsSync(longRunningContractPath)
+        ? `TARGET:${toPosix(path.relative(target.projectRoot, longRunningContractPath))}`
+        : "",
+      longRunningContractStatus: fs.existsSync(longRunningContractPath) ? "present" : "missing",
       stateConflicts,
       completion,
       phases,
@@ -363,6 +393,11 @@ export function parseLessonCandidateStatus(content) {
     openCount: rows.filter((row) => ["ready-for-review", "needs-promotion"].includes(row.status)).length,
     issues,
   };
+}
+
+export function isLessonCandidateDecisionComplete(candidateStatus) {
+  if (!candidateStatus || candidateStatus.issues?.length) return false;
+  return reviewCompleteLessonCandidateStatuses.has(candidateStatus.status);
 }
 
 function emptyLessonCandidateStatus(status, issues = []) {
@@ -431,13 +466,20 @@ function aggregateLessonCandidateStatus(rows, declaredStatus) {
   if (statuses.includes("needs-promotion")) return "needs-promotion";
   if (statuses.every((status) => status === "promoted")) return "promoted";
   if (statuses.every((status) => status === "rejected")) return "rejected";
+  if (statuses.every((status) => ["promoted", "rejected"].includes(status))) return "promoted";
   return declaredStatus;
 }
 
 function noCandidateReason(content) {
-  const match = String(content || "").match(/^##\s*No-Candidate Reason\s*$([\s\S]*?)(?=^##\s+|\s*$)/im);
-  if (!match) return "";
-  return match[1].replace(/`/g, "").trim();
+  const lines = String(content || "").split(/\r?\n/);
+  const start = lines.findIndex((line) => /^##\s*No-Candidate Reason\s*$/i.test(line.trim()));
+  if (start < 0) return "";
+  const body = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^##\s+/.test(line)) break;
+    body.push(line);
+  }
+  return body.join("\n").replace(/`/g, "").trim();
 }
 
 

@@ -70,7 +70,7 @@
 13. 每完成一个已验证的、有意义的切片，就只 stage 范围内文件并主动提交；无关 dirty 文件保留原样并在交接中说明。
 14. 收口前按 `review-routing-standard.md` 触发所需审查，处理所有阻塞发现。
 15. 写 walkthrough，并引用任务计划、证据、审查结论和残余风险。
-16. 执行 Lessons 检查：有可复用经验则写入 `docs/01-GOVERNANCE/lessons/` 并更新 Lessons SSoT；无经验也要记录 `checked-none: <原因>`。
+16. 执行 Lessons 检查：非 simple 任务保持 `lesson_candidates.md` 可审；人工判定后记录 `checked-candidate`、`queued-promotion`、`checked-created`，或旧任务兼容的 `checked-none`。
 17. 更新 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 与 `docs/Harness-Ledger.md`。
 18. 清理已完成并合并的 worktree。
 

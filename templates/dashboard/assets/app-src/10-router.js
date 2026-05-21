@@ -33,15 +33,26 @@ function shell() {
         <button data-theme-toggle>${themeLabel()}</button>
       </div>
     </header>
+    ${runtimeModeBanner()}
     ${renderRoute()}
     <div id="drawer-overlay" class="drawer-overlay"></div>
     <div id="task-drawer" class="task-drawer"></div>
   </div>`;
 }
 
+function runtimeModeBanner() {
+  if (window.__HARNESS_WORKBENCH__ === true) return "";
+  return `<section class="runtime-banner">
+    <strong>${t("staticReadOnly")}</strong>
+    <span>${t("staticReadOnlyDetail")}</span>
+    <code>harness dev</code>
+  </section>`;
+}
+
 function renderRoute() {
   const route = currentRoute();
   if (route.name === "task") return taskDetail(route);
+  if (route.name === "reviewTask") return reviewWorkspace(route);
   if (route.name === "review") return reviewQueue();
   if (route.name === "modules") return modulesView(route.id);
   if (route.name === "tasks") return taskIndex();
@@ -52,6 +63,7 @@ function currentRoute() {
   const hash = window.location.hash || "#/";
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "tasks" && parts[1]) return { name: "task", id: parts[1], doc: parts[2] === "docs" ? parts[3] || "" : "" };
+  if (parts[0] === "review" && parts[1]) return { name: "reviewTask", id: parts[1] };
   if (parts[0] === "review") return { name: "review" };
   if (parts[0] === "modules") return { name: "modules", id: parts[1] || "" };
   if (parts[0] === "tasks") return { name: "tasks" };

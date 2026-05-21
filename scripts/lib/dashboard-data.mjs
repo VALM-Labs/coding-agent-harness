@@ -13,6 +13,8 @@ import {
   walkFiles,
   visualMapFile,
   legacyVisualRoadmapFile,
+  lessonCandidatesFile,
+  longRunningTaskContractFile,
 } from "./core-shared.mjs";
 import {
   parseAllMarkdownTables,
@@ -71,8 +73,8 @@ function collectDashboardDocumentPaths(target) {
     const state = parseTaskState(progress);
     const active = isActiveTaskState(state);
     const documentNames = active
-      ? ["brief.md", "task_plan.md", "execution_strategy.md", visualMapFile, legacyVisualRoadmapFile, "progress.md", "review.md", "findings.md"]
-      : ["brief.md", "task_plan.md", "execution_strategy.md", visualMapFile, legacyVisualRoadmapFile, "progress.md", "review.md", "findings.md"];
+      ? ["brief.md", "task_plan.md", "execution_strategy.md", visualMapFile, legacyVisualRoadmapFile, lessonCandidatesFile, longRunningTaskContractFile, "progress.md", "review.md", "findings.md"]
+      : ["brief.md", "task_plan.md", "execution_strategy.md", visualMapFile, legacyVisualRoadmapFile, lessonCandidatesFile, longRunningTaskContractFile, "progress.md", "review.md", "findings.md"];
     for (const fileName of documentNames) {
       const file = path.join(taskDir, fileName);
       if (fs.existsSync(file)) selected.add(file);
@@ -106,6 +108,8 @@ function documentKind(source) {
   if (lower.endsWith("/progress.md")) return "task-progress";
   if (lower.endsWith("/brief.md")) return "task-brief";
   if (lower.endsWith("/review.md")) return "task-review";
+  if (lower.endsWith("/lesson_candidates.md")) return "lesson-candidates";
+  if (lower.endsWith("/long-running-task-contract.md")) return "long-running-contract";
   if (lower.endsWith("/references/index.md")) return "task-references";
   if (lower.endsWith("/artifacts/index.md")) return "task-artifacts";
   if (lower.endsWith("/execution_strategy.md")) return "execution-strategy";

@@ -68,7 +68,7 @@ This file is the operating contract for agents working in this repository. Keep 
 14. Commit each verified, meaningful slice with only in-scope files staged; leave unrelated dirty files untouched and mention them in the handoff.
 15. Before closeout, route required reviews through `review-routing-standard.md` and close blocking findings.
 16. Write the walkthrough with task plan, evidence, review result, and residual risk.
-17. Run Lessons reflection: create a lesson and update Lessons SSoT when reusable, or record `checked-none: <reason>`.
+17. Run Lessons reflection: keep `lesson_candidates.md` reviewable for non-simple tasks; record `checked-candidate`, `queued-promotion`, `checked-created`, or legacy `checked-none` at closeout.
 18. Update Closeout SSoT and Harness Ledger.
 19. Clean up worktrees after integration.
 

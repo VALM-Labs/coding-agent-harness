@@ -62,10 +62,10 @@ function reviewQueueCard(task) {
     </div>
     <p class="subtle">${escapeHtml(firstUsefulLine(task.summary || task.briefText || ""))}</p>
     <div class="review-queue-actions">
+      <a href="#/review/${encodeURIComponent(task.id)}">${t("openReviewWorkspace")}</a>
       <a href="#/tasks/${encodeURIComponent(task.id)}">${t("fullView")}</a>
       <button data-open-drawer="${escapeAttr(task.id)}">${t("viewDetails")}</button>
     </div>
-    ${reviewActionPanel(task)}
   </article>`;
 }
 
@@ -74,4 +74,55 @@ function firstUsefulLine(text) {
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)[0] || "";
+}
+
+function reviewWorkspace(route) {
+  const task = (bundle.status?.tasks || []).find((item) => item.id === route.id);
+  if (!task) return `<main>${emptyState(t("taskNotFound"))}</main>`;
+  const walkthroughDoc = taskDocument(task, "__walkthrough__");
+  const candidateDoc = taskDocument(task, "lesson_candidates.md");
+  const reviewDoc = taskDocument(task, "review.md");
+  const findingsDoc = taskDocument(task, "findings.md");
+  return `<main class="review-workspace">
+    <nav class="crumbs"><a href="#/review">${t("reviewQueue")}</a><span>/</span><span>${escapeHtml(task.id)}</span></nav>
+    <section class="detail-hero review-hero">
+      <div>
+        <p class="eyebrow">${t("reviewWorkspace")}</p>
+        <h2>${escapeHtml(task.title)}</h2>
+        <p>${escapeHtml(task.path)}</p>
+      </div>
+      <div class="review-hero-tags">
+        ${tag(task.lifecycleState || "unknown")}
+        ${tag(task.reviewStatus || "missing")}
+        ${tag(task.lessonCandidateStatus || "missing")}
+      </div>
+    </section>
+    <section class="review-workspace-grid">
+      <article class="review-workspace-main stack">
+        ${reviewDocPanel("walkthrough", walkthroughDoc, task.walkthroughPath)}
+        ${reviewDocPanel("lessonCandidates", candidateDoc, task.lessonCandidatePath)}
+        ${reviewDocPanel("review", reviewDoc, task.reviewPath)}
+        ${reviewDocPanel("findings", findingsDoc, task.findingsPath)}
+      </article>
+      <aside class="review-workspace-side stack">
+        ${reviewActionPanel(task, { mode: "workspace" })}
+        ${taskStateSummary(task)}
+        ${openFindings(task)}
+        ${evidenceList(task)}
+      </aside>
+    </section>
+  </main>`;
+}
+
+function reviewDocPanel(key, doc, fallbackPath = "") {
+  return `<section class="doc-section review-doc-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">${escapeHtml(fallbackPath || "")}</p>
+        <h2>${t(key)}</h2>
+      </div>
+      ${doc ? `<button data-render-toggle>${state.renderMode === "rendered" ? t("source") : t("rendered")}</button>` : ""}
+    </div>
+    <div class="markdown">${doc ? window.HarnessMarkdown.render(doc.content, state.renderMode) : emptyState(t("documentMissing"))}</div>
+  </section>`;
 }

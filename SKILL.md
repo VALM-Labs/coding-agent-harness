@@ -45,8 +45,9 @@ coding-agent-harness"，不要重新 bootstrap 覆盖整个项目。先执行增
    task progress、Feature SSoT、Regression SSoT 或 Lessons SSoT。
 5. 对已有文档采用 merge / append / residual-with-reason；只有全新缺失文件才从模板创建。
 6. 如果引入 Lessons SSoT、Harness Ledger 或新的 reference/template，同步更新入口索引。
-7. 收口时写 walkthrough，必须包含 Lessons Reflection；如发现可复用教训，先写
-   `docs/01-GOVERNANCE/lessons/` 详情文档，再写 Lessons SSoT；最后在
+7. 收口时写 walkthrough，必须包含 Lessons Reflection；新任务先写并审查
+   `lesson_candidates.md`。如人工标记值得沉淀，维护命令再写
+   `docs/01-GOVERNANCE/lessons/` 详情文档和 Lessons SSoT；最后在
    `docs/Harness-Ledger.md` 与 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 记录本次 harness update 的 delta 和 Lessons Check。
 
 一句话：harness update 是 delta merge，不是重新搭一遍。
@@ -271,7 +272,7 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 11. **Merge + 自动回归** — Cadence Ledger 触发对应回归面；coordinator 只集成 worker commit，不混合多个 worker 的未提交改动
 12. **Walkthrough 收口** — 写收口记录并引用 review report
 13. **Closeout SSoT 回写** — 每个 closed 任务必须记录 walkthrough 路径或受控 skip reason
-14. **Lessons Reflection** — 写 walkthrough 时主动反思共性/反复问题；`checked-created` 必须有详情文档和 SSoT 表行，`checked-none` 必须写明原因
+14. **Lessons Reflection** — 写 walkthrough 时主动反思共性/反复问题；新任务用 `lesson_candidates.md` 承载人工判定，`queued-promotion` 进入维护队列，`checked-created` 必须有详情文档和 SSoT 表行，旧任务兼容的 `checked-none` 必须写明原因
 15. **Harness Ledger 回写** — 记录本轮上下文维护是否完成
 16. **Worktree 清理** — 删除已 merge 的 worktree
 
