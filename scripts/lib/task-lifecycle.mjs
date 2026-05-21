@@ -17,6 +17,8 @@ import {
   readBundledTemplate,
   localizedTemplateSource,
   todayDate,
+  localDate,
+  datePrefix,
   nowTimestamp,
   normalizeTaskId,
   renderTaskTemplate,
@@ -96,12 +98,27 @@ function resolveTaskDirectory(target, taskRef) {
     .map((taskPlanPath) => path.dirname(taskPlanPath))
     .filter((taskDir) => {
       const id = taskIdForDirectory(target, taskDir);
-      return id === raw || id.endsWith(`/${raw}`) || path.basename(taskDir) === normalized;
+      const dirName = path.basename(taskDir);
+      return id === raw || id.endsWith(`/${raw}`) || dirName === normalized;
     });
   if (candidates.length === 1) return candidates[0];
   if (candidates.length > 1) {
     const options = candidates.map((taskDir) => `- ${taskIdForDirectory(target, taskDir)}`).join("\n");
     throw new Error(`Ambiguous task reference: ${taskRef}\n${options}`);
+  }
+  // Try bare slug resolution: match normalized slug against dated directories
+  if (!datePrefix.test(normalized)) {
+    const datedCandidates = listTaskPlanPaths(target)
+      .map((taskPlanPath) => path.dirname(taskPlanPath))
+      .filter((taskDir) => {
+        const dirName = path.basename(taskDir);
+        return datePrefix.test(dirName) && dirName.replace(datePrefix, "") === normalized;
+      });
+    if (datedCandidates.length === 1) return datedCandidates[0];
+    if (datedCandidates.length > 1) {
+      const options = datedCandidates.map((taskDir) => `- ${taskIdForDirectory(target, taskDir)}`).join("\n");
+      throw new Error(`Ambiguous task reference: ${taskRef}\n${options}`);
+    }
   }
   const legacy = taskRoot(target, normalized);
   if (fs.existsSync(path.join(legacy, "task_plan.md"))) return legacy;
@@ -225,14 +242,26 @@ function appendProgressLog(content, { event, message, evidence, actor = "coordin
   return `${content.trimEnd()}\n\n## Log\n\n| Time | Actor | Action | Evidence | Next |\n| --- | --- | --- | --- | --- |\n| ${timestamp} | ${actor} | ${event}: ${safeMessage} | ${safeEvidence} | ${event === "task-complete" ? "done" : "continue"} |\n`;
 }
 
+function ensureDatePrefix(slug) {
+  if (datePrefix.test(slug)) return slug;
+  return `${localDate()}-${slug}`;
+}
+
+function bareSlug(datedId) {
+  if (datePrefix.test(datedId)) return datedId.replace(datePrefix, "");
+  return datedId;
+}
+
 export function createTask(targetInput, taskId, { title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard", longRunning = false } = {}) {
   const target = normalizeTarget(targetInput);
-  const normalizedTaskId = normalizeTaskId(taskId);
+  const rawNormalized = normalizeTaskId(taskId);
+  const normalizedTaskId = ensureDatePrefix(rawNormalized);
   if (!normalizedTaskId) throw new Error("Missing task id");
+  const semanticSlug = bareSlug(normalizedTaskId);
   const normalizedModuleKey = moduleKey ? normalizeTaskId(moduleKey) : "";
   const normalizedLocale = normalizeLocale(locale || readCapabilityRegistry(target).locale);
   const normalizedBudget = normalizeTaskBudgetInput(budget);
-  const taskTitle = title || normalizedTaskId;
+  const taskTitle = title || semanticSlug;
   const directory = taskRoot(target, normalizedTaskId, { moduleKey: normalizedModuleKey });
   if (fs.existsSync(directory)) throw new Error(`Task already exists: ${normalizedTaskId}`);
   const changes = [];

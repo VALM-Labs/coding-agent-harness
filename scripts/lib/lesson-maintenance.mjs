@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  datePrefix,
   lessonCandidatesFile,
   normalizeTarget,
   readFileSafe,
@@ -14,7 +15,20 @@ import {
 
 export function promoteLessonCandidate(targetInput, taskId, candidateId, { dryRun = false } = {}) {
   const target = normalizeTarget(targetInput);
-  const task = collectTasks(target).find((item) => item.id === taskId || item.shortId === taskId || item.id.endsWith(`/${taskId}`));
+  const normalizedRef = slug(taskId);
+  const matchesBareSlug = (item) => {
+    if (!datePrefix.test(normalizedRef)) {
+      const shortBase = datePrefix.test(item.shortId) ? item.shortId.replace(datePrefix, "") : item.shortId;
+      if (shortBase === normalizedRef) return true;
+    }
+    return false;
+  };
+  const candidates = collectTasks(target).filter((item) => item.id === taskId || item.shortId === taskId || item.id.endsWith(`/${taskId}`) || matchesBareSlug(item));
+  if (candidates.length > 1) {
+    const options = candidates.map((item) => `- ${item.id}`).join("\n");
+    throw new Error(`Ambiguous task reference: ${taskId}\n${options}`);
+  }
+  const task = candidates[0];
   if (!task) throw new Error(`Task not found: ${taskId}`);
   if (!candidateId) throw new Error("Missing lesson candidate id");
   const taskDir = path.join(target.projectRoot, task.path.replace(/^TARGET:/, ""));
