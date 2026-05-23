@@ -19,3 +19,14 @@ assert(fs.existsSync(path.join(repoRoot, "tests/source-package-boundary.mjs")), 
 const cliEntrypoint = fs.readFileSync(path.join(repoRoot, "scripts/harness.mjs"), "utf8");
 assert(cliEntrypoint.split(/\r?\n/).length <= 520, "scripts/harness.mjs should stay below 520 lines by routing command handlers out");
 assert(fs.existsSync(path.join(repoRoot, "scripts/commands/dashboard-command.mjs")), "dashboard command handler should live outside scripts/harness.mjs");
+
+const cssManifestPath = path.join(repoRoot, "templates/dashboard/assets/app.css.manifest.json");
+assert(fs.existsSync(cssManifestPath), "dashboard CSS should be assembled from a manifest of css-src files");
+const cssManifest = JSON.parse(fs.readFileSync(cssManifestPath, "utf8"));
+assert(Array.isArray(cssManifest) && cssManifest.length > 1, "dashboard CSS manifest should contain multiple source slices");
+for (const relativePath of cssManifest) {
+  const sourcePath = path.join(repoRoot, "templates/dashboard/assets", relativePath);
+  assert(sourcePath.includes(`${path.sep}css-src${path.sep}`), `dashboard CSS source should live under css-src/: ${relativePath}`);
+  const lineCount = fs.readFileSync(sourcePath, "utf8").split(/\r?\n/).length;
+  assert(lineCount <= 900, `dashboard CSS source slice is too large (${lineCount} lines): ${relativePath}`);
+}

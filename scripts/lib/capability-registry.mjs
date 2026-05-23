@@ -132,36 +132,42 @@ export function validateSourcePackageBoundary(targetInput = ".") {
   const internalScripts = ["scripts/test-harness.mjs", "scripts/smoke-dashboard.mjs"]
     .filter((file) => fs.existsSync(path.join(root, file)));
   const dashboardAppDrift = validateDashboardAppAssembly(root);
+  const dashboardCssDrift = validateDashboardAssetAssembly(root, "app.css.manifest.json", "app.css", "dashboard assets/app.css does not match css-src manifest assembly");
   return {
     failures: [
       ...localOnly.map((file) => `private local-only file staged: ${file}`),
       ...generatedRootDashboard.map((file) => `generated dashboard file tracked in source root: ${file}`),
       ...internalScripts.map((file) => `internal test/smoke file in publishable scripts directory: ${file}`),
       ...dashboardAppDrift,
+      ...dashboardCssDrift,
     ],
     warnings: tracked.status === 0 ? [] : [`could not inspect tracked generated dashboard files: ${tracked.stderr.trim() || tracked.status}`],
   };
 }
 
 function validateDashboardAppAssembly(root) {
+  return validateDashboardAssetAssembly(root, "app.manifest.json", "app.js", "dashboard assets/app.js does not match app-src manifest assembly");
+}
+
+function validateDashboardAssetAssembly(root, manifestName, assetName, driftMessage) {
   const assetsDir = path.join(root, "templates/dashboard/assets");
-  const manifestPath = path.join(assetsDir, "app.manifest.json");
-  const appPath = path.join(assetsDir, "app.js");
-  if (!fs.existsSync(manifestPath) || !fs.existsSync(appPath)) return [];
+  const manifestPath = path.join(assetsDir, manifestName);
+  const assetPath = path.join(assetsDir, assetName);
+  if (!fs.existsSync(manifestPath) || !fs.existsSync(assetPath)) return [];
   try {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     if (!Array.isArray(manifest) || manifest.length === 0) {
-      return ["dashboard app manifest must list app-src files"];
+      return [`dashboard asset manifest must list source files: ${manifestName}`];
     }
     const assembled = `${manifest.map((relativePath) => {
       const source = path.join(assetsDir, relativePath);
       if (!fs.existsSync(source)) throw new Error(`missing ${relativePath}`);
       return fs.readFileSync(source, "utf8").trimEnd();
     }).join("\n\n")}\n`;
-    const trackedApp = fs.readFileSync(appPath, "utf8");
-    return trackedApp === assembled ? [] : ["dashboard assets/app.js does not match app-src manifest assembly"];
+    const trackedAsset = fs.readFileSync(assetPath, "utf8");
+    return trackedAsset === assembled ? [] : [driftMessage];
   } catch (error) {
-    return [`could not validate dashboard app assembly: ${error.message}`];
+    return [`could not validate dashboard asset assembly (${assetName}): ${error.message}`];
   }
 }
 

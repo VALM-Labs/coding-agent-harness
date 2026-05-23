@@ -1,0 +1,8 @@
+[
+  "css-src/00-foundation.css",
+  "css-src/10-panels-flow.css",
+  "css-src/20-briefs-controls.css",
+  "css-src/30-task-index.css",
+  "css-src/40-detail-modules-migration.css",
+  "css-src/50-responsive-overrides.css"
+]

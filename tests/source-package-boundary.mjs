@@ -85,5 +85,9 @@ assert(
   fs.readFileSync(path.join(dashboardAssetsDir, "app.js"), "utf8") === readManifestBundle(dashboardAssetsDir, "app.manifest.json"),
   "tracked dashboard assets/app.js must match app-src manifest assembly",
 );
+assert(
+  fs.readFileSync(path.join(dashboardAssetsDir, "app.css"), "utf8") === readManifestBundle(dashboardAssetsDir, "app.css.manifest.json"),
+  "tracked dashboard assets/app.css must match css-src manifest assembly",
+);
 
 console.log("Source/package boundary tests passed");
