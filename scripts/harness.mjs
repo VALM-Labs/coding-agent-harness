@@ -6,29 +6,20 @@ import path from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
   addCapability,
-  buildMigrationPlan,
   buildStatus,
-  confirmTaskReview,
-  createTask,
   doctorUserSkill,
   installUserSkill,
-  listLifecycleTasks,
   checkPresetPackage,
   inspectPresetPackage,
   listPresetPackages,
   normalizeLocale,
-  promoteLessonCandidate,
-  runMigration,
   serveDashboardWorkbench,
   validateSourcePackageBoundary,
-  updateModuleStep,
-  updateTaskPhase,
-  updateTaskLifecycle,
-  verifyMigrationSession,
-  writeDashboardFolder,
-  writeDashboardSingleFile,
   writeInitFiles,
 } from "./lib/harness-core.mjs";
+import { runDashboardCommand } from "./commands/dashboard-command.mjs";
+import { runMigrationCommand } from "./commands/migration-command.mjs";
+import { runTaskCommand } from "./commands/task-command.mjs";
 
 const args = process.argv.slice(2);
 const command = args.shift() || "help";
@@ -181,63 +172,7 @@ if (command === "help" || command === "--help" || command === "-h") {
     process.exit(1);
   }
 } else if (command === "dashboard") {
-  const watch = takeFlag("--watch");
-  const workbench = takeFlag("--workbench");
-  const out = takeOption("--out", "harness-dashboard.html");
-  const outDir = takeOption("--out-dir", "");
-  const host = takeOption("--host", "127.0.0.1");
-  const port = takeOption("--port", "0");
-  const localeOverride = takeOption("--locale", "");
-  const opts = localeOverride ? { localeOverride } : {};
-  if (workbench) {
-    if (!outDir) {
-      console.error("dashboard --workbench requires --out-dir so regenerated data has a stable folder");
-      process.exit(2);
-    }
-    try {
-      await serveDashboardWorkbench(outDir, targetArg(), { ...opts, host, port });
-    } catch (error) {
-      console.error(error.message);
-      process.exit(1);
-    }
-  }
-  if (watch) {
-    if (!outDir) {
-      console.error("dashboard --watch requires --out-dir so updates are written to a stable folder");
-      process.exit(2);
-    }
-    const target = targetArg();
-    const docsRoot = path.basename(path.resolve(target)) === "docs" ? path.resolve(target) : path.join(path.resolve(target), "docs");
-    const regenerate = () => {
-      try {
-        console.log(writeDashboardFolder(outDir, target, opts));
-        console.log(`dashboard regenerated: ${new Date().toISOString()}`);
-      } catch (error) {
-        console.error(`dashboard regeneration failed: ${error.message}`);
-      }
-    };
-    regenerate();
-    let timer = null;
-    const watcher = fs.watch(docsRoot, { recursive: true }, () => {
-      clearTimeout(timer);
-      timer = setTimeout(regenerate, 300);
-    });
-    const close = () => {
-      watcher.close();
-      clearTimeout(timer);
-      process.exit(0);
-    };
-    process.on("SIGINT", close);
-    process.on("SIGTERM", close);
-    console.log(`watching ${docsRoot}`);
-    await new Promise(() => {});
-  }
-  if (outDir) {
-    console.log(writeDashboardFolder(outDir, targetArg(), opts));
-  } else {
-    console.log(writeDashboardSingleFile(out, targetArg(), opts));
-  }
-  process.exit(0);
+  await runDashboardCommand({ takeFlag, takeOption, targetArg });
 } else if (command === "init") {
   const dryRun = takeFlag("--dry-run");
   const addNpmScripts = takeFlag("--add-npm-scripts");
@@ -265,85 +200,8 @@ if (command === "help" || command === "--help" || command === "-h") {
     console.error(error.message);
     process.exit(1);
   }
-} else if (command === "migrate-plan") {
-  const json = takeFlag("--json");
-  const limit = Number.parseInt(takeOption("--limit", "20"), 10) || 20;
-  try {
-    const plan = buildMigrationPlan(targetArg(), { limit });
-    if (json) {
-      console.log(JSON.stringify(plan, null, 2));
-    } else {
-      console.log(`Migration Plan: ${plan.target}`);
-      console.log(`mode: ${plan.mode}`);
-      console.log(`warnings: ${plan.summary.warnings}`);
-      console.log(`task actions: ${plan.summary.taskActions}`);
-      console.log(`visual map actions: ${plan.summary.visualMapActions}`);
-      console.log(`legacy visual-only tasks: ${plan.summary.legacyVisualOnly}`);
-      console.log(`weak briefs: ${plan.summary.weakBrief}`);
-      console.log(`unknown classifications: ${plan.summary.unknownClassification}`);
-      console.log(`full cutover eligible: ${plan.summary.fullCutoverEligible ? "yes" : "no"}`);
-      console.log(`review actions: ${plan.summary.reviewSchemaGaps}`);
-      console.log(`legacy actions: ${plan.summary.legacyReferenceGaps}`);
-      console.log(`legacy residuals: ${plan.summary.legacyResiduals}`);
-      console.log(`recommended capabilities: ${plan.summary.recommendedCapabilities.join(", ") || "none"}`);
-      console.log("\nPhases:");
-      for (const phase of plan.phases) console.log(`- ${phase.id}: ${phase.title}`);
-      console.log("\nTop task actions:");
-      for (const action of plan.taskActions) console.log(`- ${action.taskId}: add ${action.files.join(", ")}`);
-      console.log("\nTop review actions:");
-      for (const action of plan.reviewActions) console.log(`- ${action.path}: add ${action.missing.join(", ")}`);
-      console.log("\nTop legacy residuals:");
-      for (const action of plan.legacyResiduals) console.log(`- ${action.taskId}: ${action.missing} (${action.reason})`);
-      console.log("\nNext commands:");
-      for (const next of plan.nextCommands) console.log(`- ${next}`);
-    }
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "migrate-run") {
-  const locale = takeOption("--locale", "");
-  const assumeLocale = takeFlag("--assume-locale");
-  const allowDirty = takeFlag("--allow-dirty");
-  const planOnly = takeFlag("--plan-only");
-  const outDir = takeOption("--out-dir", "");
-  const sessionDir = takeOption("--session-dir", "");
-  try {
-    console.log(
-      JSON.stringify(
-        runMigration(targetArg(), {
-          locale,
-          assumeLocale,
-          allowDirty,
-          planOnly,
-          outDir,
-          sessionDir,
-        }),
-        null,
-        2,
-      ),
-    );
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "migrate-verify") {
-  const json = takeFlag("--json");
-  const fullCutover = takeFlag("--full-cutover");
-  const sessionPath = args.shift();
-  if (!sessionPath) {
-    console.error("Missing session.json path");
-    process.exit(2);
-  }
-  const result = verifyMigrationSession(sessionPath, { fullCutover });
-  if (json) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    for (const failure of result.failures) console.error(`Failure: ${failure}`);
-    for (const warning of result.warnings) console.log(`Warning: ${warning}`);
-    console.log(`Migration verify ${result.status}: ${result.sessionPath}`);
-  }
-  process.exit(result.status === "pass" ? 0 : 1);
+} else if (["migrate-plan", "migrate-run", "migrate-verify"].includes(command)) {
+  runMigrationCommand(command, { args, takeFlag, takeOption, targetArg });
 } else if (command === "preset") {
   const subcommand = args.shift() || "list";
   const json = takeFlag("--json");
@@ -382,120 +240,8 @@ if (command === "help" || command === "--help" || command === "-h") {
     console.error(error.message);
     process.exit(1);
   }
-} else if (command === "new-task") {
-  const dryRun = takeFlag("--dry-run");
-  const locale = takeOption("--locale", "");
-  const title = takeOption("--title", "");
-  const moduleKey = takeOption("--module", "");
-  const budget = takeOption("--budget", "standard");
-  const preset = takeOption("--preset", "");
-  const fromSession = takeOption("--from-session", "");
-  const longRunning = takeFlag("--long-running");
-  const shouldDeriveTaskId = fromSession && args.length === 0;
-  const taskId = shouldDeriveTaskId ? "harness-v1-migration" : args.shift();
-  if (!taskId) {
-    console.error("Missing task id");
-    process.exit(2);
-  }
-  try {
-    console.log(JSON.stringify(createTask(targetArg(), taskId, { title, locale, dryRun, moduleKey, budget, longRunning, preset, fromSession }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "task-phase") {
-  const state = takeOption("--state", "");
-  const completion = takeOption("--completion", "");
-  const evidenceStatus = takeOption("--evidence", "");
-  const taskId = args.shift();
-  const phaseId = args.shift();
-  if (!taskId || !phaseId) {
-    console.error("Missing task id or phase id");
-    process.exit(2);
-  }
-  try {
-    console.log(JSON.stringify(updateTaskPhase(targetArg(), taskId, phaseId, { state, completion, evidenceStatus }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (["task-start", "task-log", "task-block", "task-review", "task-complete"].includes(command)) {
-  const message = takeOption("--message", "");
-  const evidence = takeOption("--evidence", "");
-  const taskId = args.shift();
-  if (!taskId) {
-    console.error("Missing task id");
-    process.exit(2);
-  }
-  const lifecycle = {
-    "task-start": { event: "task-start", state: "in_progress" },
-    "task-log": { event: "task-log", state: "" },
-    "task-block": { event: "task-block", state: "blocked" },
-    "task-review": { event: "task-review", state: "review" },
-    "task-complete": { event: "task-complete", state: "done" },
-  }[command];
-  try {
-    console.log(JSON.stringify(updateTaskLifecycle(targetArg(), taskId, { ...lifecycle, message, evidence }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "review-confirm") {
-  const reviewer = takeOption("--reviewer", "Human Reviewer");
-  const message = takeOption("--message", "");
-  const evidence = takeOption("--evidence", "");
-  const confirmText = takeOption("--confirm", "");
-  const taskId = args.shift();
-  if (!taskId) {
-    console.error("Missing task id");
-    process.exit(2);
-  }
-  try {
-    console.log(JSON.stringify(confirmTaskReview(targetArg(), taskId, { reviewer, message, evidence, confirmText }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "lesson-promote") {
-  const dryRun = takeFlag("--dry-run");
-  const taskId = args.shift();
-  const candidateId = args.shift();
-  if (!taskId || !candidateId) {
-    console.error("Missing task id or candidate id");
-    process.exit(2);
-  }
-  try {
-    console.log(JSON.stringify(promoteLessonCandidate(targetArg(), taskId, candidateId, { dryRun }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
-} else if (command === "task-list") {
-  const json = takeFlag("--json");
-  const state = takeOption("--state", "");
-  const moduleKey = takeOption("--module", "");
-  const result = listLifecycleTasks(targetArg(), { state, moduleKey });
-  if (json) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    for (const task of result.tasks) {
-      console.log(`${task.id}\t${task.state}\t${task.completion}%\t${task.title}`);
-    }
-  }
-} else if (command === "module-step") {
-  const state = takeOption("--state", "done");
-  const moduleKey = args.shift();
-  const stepId = args.shift();
-  if (!moduleKey || !stepId) {
-    console.error("Missing module key or step id");
-    process.exit(2);
-  }
-  try {
-    console.log(JSON.stringify(updateModuleStep(targetArg(), moduleKey, stepId, { state }), null, 2));
-  } catch (error) {
-    console.error(error.message);
-    process.exit(1);
-  }
+} else if (["new-task", "task-phase", "task-start", "task-log", "task-block", "task-review", "task-complete", "review-confirm", "lesson-promote", "task-list", "module-step"].includes(command)) {
+  runTaskCommand(command, { args, takeFlag, takeOption, targetArg });
 } else if (command === "install-user") {
   const dryRun = takeFlag("--dry-run");
   const force = takeFlag("--force");

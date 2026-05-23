@@ -1,0 +1,113 @@
+.review-queue-stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.review-queue-stats .metric {
+  min-height: 82px;
+  padding: 14px;
+}
+
+.review-queue-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.review-queue-card {
+  gap: 14px;
+}
+
+.review-queue-card .side-panel {
+  box-shadow: none;
+  background: var(--bg);
+  padding: 14px;
+}
+
+.review-queue-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.review-queue-actions a,
+.review-queue-actions button {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.review-queue-actions a:hover,
+.review-queue-actions button:hover {
+  border-color: var(--accent);
+}
+
+.runtime-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.08);
+  color: var(--ink);
+}
+
+.runtime-banner span {
+  color: var(--muted);
+}
+
+.runtime-banner code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.review-workspace {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.review-workspace-main,
+.review-workspace-side,
+.review-doc-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .review-workspace-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+    align-items: start;
+  }
+}
+
+.review-workspace-side {
+  position: sticky;
+  top: 16px;
+}
+
+.review-hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

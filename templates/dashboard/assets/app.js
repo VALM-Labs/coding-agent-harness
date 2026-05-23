@@ -15,6 +15,7 @@ const state = {
   renderMode: "rendered",
   theme: localStorage.getItem("harness.theme") || "system",
   taskLayout: localStorage.getItem("harness.taskLayout") || "list",
+  taskSortOrder: localStorage.getItem("harness.taskSortOrder") === "asc" ? "asc" : "desc",
   runtime: { mode: "static", csrfToken: "", writableActions: [] },
   runtimeLoaded: false,
   runtimePoller: null,
@@ -30,6 +31,8 @@ const taskDocTabs = [
   ["strategy", "execution_strategy.md"],
   ["visualMap", "visual_map.md"],
   ["legacyRoadmap", "visual_roadmap.md"],
+  ["lessonCandidates", "lesson_candidates.md"],
+  ["longRunningContract", "long-running-task-contract.md"],
   ["progress", "progress.md"],
   ["review", "review.md"],
   ["findings", "findings.md"],
@@ -73,15 +76,26 @@ function shell() {
         <button data-theme-toggle>${themeLabel()}</button>
       </div>
     </header>
+    ${runtimeModeBanner()}
     ${renderRoute()}
     <div id="drawer-overlay" class="drawer-overlay"></div>
     <div id="task-drawer" class="task-drawer"></div>
   </div>`;
 }
 
+function runtimeModeBanner() {
+  if (window.__HARNESS_WORKBENCH__ === true) return "";
+  return `<section class="runtime-banner">
+    <strong>${t("staticReadOnly")}</strong>
+    <span>${t("staticReadOnlyDetail")}</span>
+    <code>harness dev</code>
+  </section>`;
+}
+
 function renderRoute() {
   const route = currentRoute();
   if (route.name === "task") return taskDetail(route);
+  if (route.name === "reviewTask") return reviewWorkspace(route);
   if (route.name === "review") return reviewQueue();
   if (route.name === "modules") return modulesView(route.id);
   if (route.name === "tasks") return taskIndex();
@@ -92,6 +106,7 @@ function currentRoute() {
   const hash = window.location.hash || "#/";
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "tasks" && parts[1]) return { name: "task", id: parts[1], doc: parts[2] === "docs" ? parts[3] || "" : "" };
+  if (parts[0] === "review" && parts[1]) return { name: "reviewTask", id: parts[1] };
   if (parts[0] === "review") return { name: "review" };
   if (parts[0] === "modules") return { name: "modules", id: parts[1] || "" };
   if (parts[0] === "tasks") return { name: "tasks" };
@@ -270,24 +285,29 @@ function graphSummary() {
 }
 
 function activeTaskBriefs() {
-  const tasks = activeTasks().slice(0, 8);
+  const tasks = activeTasks();
   return `<section class="task-briefs">
     <div class="section-head">
       <div>
         <p class="eyebrow">${t("currentWork")}</p>
         <h2>${t("activeBriefs")}</h2>
       </div>
-      <a href="#/tasks">${t("openTaskIndex")}</a>
+      <div class="section-actions">
+        <span class="subtle">${t("activeBriefCount").replace("{count}", tasks.length).replace("{order}", taskSortLabel())}</span>
+        <a href="#/tasks">${t("openTaskIndex")}</a>
+      </div>
     </div>
-    <div class="brief-grid">${tasks.map((task) => taskBriefCard(task, { compact: false })).join("") || emptyState(t("noActiveTasks"))}</div>
+    <div class="brief-scroll">
+      <div class="brief-grid">${tasks.map((task) => taskBriefCard(task, { compact: false })).join("") || emptyState(t("noActiveTasks"))}</div>
+    </div>
   </section>`;
 }
 
 function activeTasks() {
   const tasks = bundle.status?.tasks || [];
   const active = tasks.filter((task) => isActiveTaskState(task.state) || ["planned", "not_started"].includes(task.state));
-  if (active.length > 0) return active;
-  return tasks.filter((task) => task.briefSource === "standalone").slice(0, 6);
+  if (active.length > 0) return sortTasksByTime(active);
+  return sortTasksByTime(tasks.filter((task) => task.briefSource === "standalone"));
 }
 
 function isActiveTaskState(state) {
@@ -310,6 +330,7 @@ function taskBriefCard(task, { compact = true } = {}) {
       <p class="brief-teaser">${escapeHtml(summaryText)}</p>
     </div>
     <div class="card-actions">
+      ${taskCopyButton(task)}
       <button class="btn-drawer-trigger" data-open-drawer="${escapeAttr(task.id)}">${t("viewDetails")}</button>
     </div>
   </article>`;
@@ -349,6 +370,59 @@ function stateToColorVar(state) {
   return map[state] || "--muted";
 }
 
+function taskSortLabel() {
+  return state.taskSortOrder === "asc" ? t("sortOldest") : t("sortNewest");
+}
+
+function taskDateKey(task) {
+  const source = `${task.shortId || ""} ${task.id || ""}`.trim();
+  const match = source.match(/(?:^|[^\d])(\d{4})-(\d{2})(?:-(\d{2}))?/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3] || "1");
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return Date.UTC(year, month - 1, day);
+}
+
+function stableTaskLabel(task) {
+  return `${task.shortId || ""} ${task.id || ""} ${task.title || ""}`.trim();
+}
+
+function compareTasksByTime(left, right) {
+  const leftDate = taskDateKey(left);
+  const rightDate = taskDateKey(right);
+  if (leftDate !== null && rightDate !== null && leftDate !== rightDate) {
+    return state.taskSortOrder === "asc" ? leftDate - rightDate : rightDate - leftDate;
+  }
+  if (leftDate !== null && rightDate === null) return -1;
+  if (leftDate === null && rightDate !== null) return 1;
+  return stableTaskLabel(left).localeCompare(stableTaskLabel(right));
+}
+
+function sortTasksByTime(tasks) {
+  return [...tasks].sort(compareTasksByTime);
+}
+
+function taskFolderName(task) {
+  const fromPath = String(task?.path || "").split("/").filter(Boolean).pop();
+  const fromId = String(task?.id || "").split("/").filter(Boolean).pop();
+  return task?.shortId || fromPath || fromId || task?.title || "";
+}
+
+function taskCopyButton(task, extraClass = "") {
+  const folderName = taskFolderName(task);
+  return `<button type="button" class="copy-task-name ${extraClass}" data-copy-task-name="${escapeAttr(folderName)}" data-copy-task-folder="${escapeAttr(folderName)}" aria-label="${escapeAttr(t("copyTaskName"))}" title="${escapeAttr(t("copyTaskName"))}">
+    ${t("copyTaskNameShort")}
+  </button>`;
+}
+
+function taskGroupTimeKey(group) {
+  const match = group.match(/^(?:month|legacy):(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  return Date.UTC(Number(match[1]), Number(match[2]) - 1, 1);
+}
+
 function taskToolbarCard(filteredCount) {
   return `<section class="sidebar-card">
     <h3>${t("filterTitle")}</h3>
@@ -377,6 +451,17 @@ function taskToolbarCard(filteredCount) {
         <button class="layout-btn ${state.taskLayout === "grid" ? "active" : ""}" data-layout="grid" aria-label="${t("layoutGrid")}">
           <svg style="width:12px;height:12px;vertical-align:middle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           ${t("layoutGrid")}
+        </button>
+      </div>
+    </div>
+    <div class="select-group">
+      <label>${t("sortByTime")}</label>
+      <div class="layout-toggle-group sort-toggle-group">
+        <button class="layout-btn ${state.taskSortOrder === "desc" ? "active" : ""}" data-task-sort-order="desc" aria-label="${t("sortNewest")}">
+          ${t("sortNewest")}
+        </button>
+        <button class="layout-btn ${state.taskSortOrder === "asc" ? "active" : ""}" data-task-sort-order="asc" aria-label="${t("sortOldest")}">
+          ${t("sortOldest")}
         </button>
       </div>
     </div>
@@ -483,11 +568,12 @@ function taskRow(task) {
   const briefLabel = briefReady ? t("briefReady") : t("briefMissing");
   const mapLabel = mapReady ? t("mapReady") : t("mapMissing");
 
-  return `<a class="task-row-card" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateToColorVar(task.state)})">
+  return `<article class="task-row-card" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateToColorVar(task.state)})">
     <div class="row-accent-bar"></div>
     <div class="row-main">
       <strong>${escapeHtml(task.title)}</strong>
       <span class="row-meta">${escapeHtml(task.id)} · ${escapeHtml(taskModuleKey(task))}</span>
+      ${taskCopyButton(task, "row-copy")}
     </div>
     <div class="row-status">${tag(task.state)}</div>
     <div class="row-progress">
@@ -506,7 +592,7 @@ function taskRow(task) {
         ${mapReady ? t("badgeMap") : t("badgeMapMissing")}
       </span>
     </div>
-  </a>`;
+  </article>`;
 }
 
 function taskIndex() {
@@ -545,7 +631,18 @@ function orderedTaskGroups(groups) {
     if (group === "unknown") return 3;
     return 4;
   };
-  return Object.entries(groups).sort(([left], [right]) => rank(left) - rank(right) || left.localeCompare(right));
+  return Object.entries(groups).sort(([left], [right]) => {
+    const rankDiff = rank(left) - rank(right);
+    if (rankDiff !== 0) return rankDiff;
+    const leftTime = taskGroupTimeKey(left);
+    const rightTime = taskGroupTimeKey(right);
+    if (leftTime !== null && rightTime !== null && leftTime !== rightTime) {
+      return state.taskSortOrder === "asc" ? leftTime - rightTime : rightTime - leftTime;
+    }
+    if (leftTime !== null && rightTime === null) return -1;
+    if (leftTime === null && rightTime !== null) return 1;
+    return left.localeCompare(right);
+  });
 }
 
 function taskGroups(tasks) {
@@ -570,11 +667,12 @@ function taskGroups(tasks) {
 }
 
 function taskGroup(group, tasks) {
-  const pageCount = Math.max(1, Math.ceil(tasks.length / taskPageSize));
+  const orderedTasks = sortTasksByTime(tasks);
+  const pageCount = Math.max(1, Math.ceil(orderedTasks.length / taskPageSize));
   const page = Math.min(Math.max(1, Number(state.taskPageByGroup[group]) || 1), pageCount);
   const start = (page - 1) * taskPageSize;
-  const visibleTasks = tasks.slice(start, start + taskPageSize);
-  const avgCompletion = tasks.length ? clampCompletion(tasks.reduce((sum, task) => sum + clampCompletion(task.completion), 0) / tasks.length) : 0;
+  const visibleTasks = orderedTasks.slice(start, start + taskPageSize);
+  const avgCompletion = orderedTasks.length ? clampCompletion(orderedTasks.reduce((sum, task) => sum + clampCompletion(task.completion), 0) / orderedTasks.length) : 0;
 
   const isGrid = state.taskLayout === "grid";
   const layoutClass = isGrid ? "task-card-grid" : "task-list";
@@ -591,7 +689,7 @@ function taskGroup(group, tasks) {
       <div class="section-head">
         <div>
           <h2>${taskGroupLabel(group)}</h2>
-          <p class="subtle">${t("showing")} ${Math.min(start + 1, tasks.length)}-${Math.min(start + visibleTasks.length, tasks.length)} / ${tasks.length}</p>
+          <p class="subtle">${t("showing")} ${Math.min(start + 1, orderedTasks.length)}-${Math.min(start + visibleTasks.length, orderedTasks.length)} / ${orderedTasks.length}</p>
         </div>
         <div class="group-actions">
           <div class="group-progress" aria-label="${escapeAttr(t("groupCompletion"))}">
@@ -616,10 +714,13 @@ function taskCard(task) {
   const briefLabel = briefReady ? t("briefReady") : t("briefMissing");
   const mapLabel = mapReady ? t("mapReady") : t("mapMissing");
 
-  return `<a class="task-card" href="#/tasks/${encodeURIComponent(task.id)}" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateColor})">
+  return `<article class="task-card" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateColor})">
     <div class="card-header">
       <span class="card-id">${escapeHtml(task.id)}</span>
-      ${tag(task.state)}
+      <div class="card-header-actions">
+        ${taskCopyButton(task, "compact")}
+        ${tag(task.state)}
+      </div>
     </div>
     <h4 class="card-title" title="${escapeAttr(task.title)}">${escapeHtml(task.title)}</h4>
     <div class="card-meta">
@@ -642,7 +743,7 @@ function taskCard(task) {
         ${mapReady ? t("badgeMap") : t("badgeMapMissing")}
       </span>
     </div>
-  </a>`;
+  </article>`;
 }
 
 function taskGroupLabel(group) {
@@ -657,12 +758,12 @@ function taskGroupLabel(group) {
 
 function filteredTasks() {
   const query = state.query.trim().toLowerCase();
-  return (bundle.status?.tasks || []).filter((task) => {
+  return sortTasksByTime((bundle.status?.tasks || []).filter((task) => {
     const stateMatch = state.taskState === "all" || task.state === state.taskState;
     if (!stateMatch) return false;
     if (!query) return true;
     return [task.id, task.shortId, task.title, task.module, task.inferredModule, task.classificationSource, task.classificationBucket, task.state].some((value) => String(value || "").toLowerCase().includes(query));
-  });
+  }));
 }
 
 function taskModuleKey(task) {
@@ -680,6 +781,7 @@ function taskDetail(route) {
         <p class="eyebrow">${t("taskVisibility")}</p>
         <h2>${escapeHtml(task.title)}</h2>
         <p>${escapeHtml(task.path)}</p>
+        ${taskCopyButton(task, "detail-copy")}
       </div>
       <div class="detail-score">${task.completion}%</div>
     </section>
@@ -690,7 +792,7 @@ function taskDetail(route) {
         ${taskDocumentLibrary(task, route.doc)}
       </article>
       <aside class="detail-side">
-        ${reviewActionPanel(task)}
+        ${reviewActionPanel(task, { mode: "summary" })}
         ${openFindings(task)}
         ${evidenceList(task)}
         ${documentTabs(task)}
@@ -777,7 +879,7 @@ function taskDocumentPriority(task) {
   const stateName = task?.state || "";
   const lifecycle = task?.lifecycleState || "";
   if (stateName === "review" || ["in_review", "review-blocked"].includes(lifecycle)) {
-    return ["walkthrough", "review", "findings", "visualMap", "progress", "brief", "taskPlan", "strategy", "legacyRoadmap", "references", "artifacts"];
+    return ["walkthrough", "lessonCandidates", "review", "findings", "visualMap", "progress", "brief", "taskPlan", "strategy", "longRunningContract", "legacyRoadmap", "references", "artifacts"];
   }
   if (stateName === "in_progress" || lifecycle === "active" || stateName === "blocked") {
     return ["progress", "visualMap", "brief", "taskPlan", "strategy", "findings", "review", "walkthrough", "references", "artifacts", "legacyRoadmap"];
@@ -831,11 +933,26 @@ function openFindings(task) {
   </section>`;
 }
 
-function reviewActionPanel(task) {
-  if (!canUseWorkbenchAction("review-complete")) return "";
-  if (!isTaskInReviewStage(task)) return "";
+function reviewActionPanel(task, { mode = "summary" } = {}) {
+  if (!isTaskInReviewQueue(task)) return "";
   const blocking = task.reviewStatus === "blocked-open-findings" || (task.risks || []).some((risk) => /^P[0-2]$/i.test(risk.severity || "") && (risk.open || risk.blocksRelease));
   const confirmed = task.reviewStatus === "confirmed";
+  const candidateBlocked = task.budget !== "simple" && !task.lessonCandidateDecisionComplete;
+  const candidateStatus = task.lessonCandidateStatus || "missing";
+  if (mode !== "workspace") {
+    return `<section class="side-panel review-actions">
+      <h3>${t("reviewActions")}</h3>
+      <p>${escapeHtml(confirmed ? t("reviewAlreadyConfirmed") : t("reviewOpenInWorkspace"))}</p>
+      <p>${escapeHtml(t("lessonCandidateStatus"))}: ${tag(candidateStatus)}</p>
+      <a href="#/review/${encodeURIComponent(task.id)}">${t("openReviewWorkspace")}</a>
+    </section>`;
+  }
+  if (!canUseWorkbenchAction("review-complete")) {
+    return `<section class="side-panel review-actions">
+      <h3>${t("reviewActions")}</h3>
+      <p>${escapeHtml(t("staticReadOnlyDetail"))}</p>
+    </section>`;
+  }
   if (confirmed) {
     return `<section class="side-panel review-actions">
       <h3>${t("reviewActions")}</h3>
@@ -843,26 +960,27 @@ function reviewActionPanel(task) {
     </section>`;
   }
   const missingWalkthrough = task.budget !== "simple" && !task.walkthroughPath;
-  const disabled = blocking || missingWalkthrough;
-  const message = missingWalkthrough ? t("reviewWalkthroughRequired") : blocking ? t("reviewBlocked") : t("reviewWorkbenchReady");
+  const disabled = blocking || missingWalkthrough || candidateBlocked;
+  const message = missingWalkthrough ? t("reviewWalkthroughRequired") : blocking ? t("reviewBlocked") : candidateBlocked ? t("reviewCandidateDecisionRequired") : t("reviewWorkbenchReady");
   return `<section class="side-panel review-actions">
     <h3>${t("reviewActions")}</h3>
     <p>${escapeHtml(message)}</p>
+    <p>${escapeHtml(t("lessonCandidateStatus"))}: ${tag(candidateStatus)}</p>
     <label class="review-check">
       <input type="checkbox" data-review-confirm-check="${escapeAttr(task.id)}" ${disabled ? "disabled" : ""}>
       <span>${t("reviewConfirmChecklist")}</span>
     </label>
+    <div class="review-confirm-copy">
+      ${taskCopyButton(task, "review-copy-task-name")}
+    </div>
     <input data-review-confirm-text="${escapeAttr(task.id)}" value="" placeholder="${escapeAttr(task.shortId || task.id)}" ${disabled ? "disabled" : ""}>
     <button data-review-complete="${escapeAttr(task.id)}" ${disabled ? "disabled" : ""}>${t("confirmReviewComplete")}</button>
     <div class="review-result" data-review-result="${escapeAttr(task.id)}"></div>
   </section>`;
 }
 
-function isTaskInReviewStage(task) {
-  const state = task?.state || "";
-  const lifecycle = task?.lifecycleState || "";
-  if (["not_started", "planned", "in_progress"].includes(state)) return false;
-  return state === "review" || ["in_review", "review-blocked"].includes(lifecycle);
+function isTaskInReviewQueue(task) {
+  return (task?.reviewQueueState || "not-in-queue") !== "not-in-queue";
 }
 
 function evidenceList(task) {
@@ -934,9 +1052,11 @@ function moduleCard(module) {
 
 function reviewQueue() {
   const tasks = reviewQueueTasks();
-  const ready = tasks.filter((task) => task.reviewStatus !== "blocked-open-findings" && task.reviewStatus !== "confirmed").length;
-  const blocked = tasks.filter((task) => task.reviewStatus === "blocked-open-findings").length;
-  const confirmed = tasks.filter((task) => task.reviewStatus === "confirmed").length;
+  const ready = tasks.filter((task) => task.reviewQueueState === "ready-to-confirm").length;
+  const material = tasks.filter((task) => task.reviewQueueState === "needs-material").length;
+  const debt = tasks.filter((task) => task.reviewQueueState === "closed-debt").length;
+  const blocked = tasks.filter((task) => task.reviewQueueState === "blocked").length;
+  const confirmed = tasks.filter((task) => task.reviewQueueState === "confirmed").length;
   return `<div class="dashboard-grid review-queue-page">
     <main class="dashboard-main stack">
       <section class="flow-panel">
@@ -946,7 +1066,7 @@ function reviewQueue() {
             <h2>${t("reviewQueue")}</h2>
             <p class="subtle">${t("reviewQueueSubtitle")}</p>
           </div>
-          <span class="subtle">${ready}/${tasks.length} ${t("reviewReady")}</span>
+          <span class="subtle">${ready + debt}/${tasks.length} ${t("reviewReady")}</span>
         </div>
         <div class="task-card-grid review-queue-grid">
           ${tasks.map(reviewQueueCard).join("") || emptyState(t("noReviewTasks"))}
@@ -958,6 +1078,8 @@ function reviewQueue() {
         <h3>${t("reviewQueue")}</h3>
         <div class="review-queue-stats">
           ${metric(t("reviewReady"), ready)}
+          ${metric(t("reviewNeedsMaterial"), material)}
+          ${metric(t("reviewClosedDebt"), debt)}
           ${metric(t("reviewBlockedQueue"), blocked)}
           ${metric(t("reviewConfirmedQueue"), confirmed)}
         </div>
@@ -972,12 +1094,13 @@ function reviewQueue() {
 
 function reviewQueueTasks() {
   return (bundle.status?.tasks || [])
-    .filter(isTaskInReviewStage)
+    .filter(isTaskInReviewQueue)
     .sort((left, right) => reviewSortKey(left).localeCompare(reviewSortKey(right)));
 }
 
 function reviewSortKey(task) {
-  const rank = task.reviewStatus === "blocked-open-findings" ? "0" : task.reviewStatus === "confirmed" ? "2" : "1";
+  const ranks = { blocked: "0", "ready-to-confirm": "1", "closed-debt": "2", "needs-material": "3", confirmed: "4" };
+  const rank = ranks[task.reviewQueueState] || "5";
   return `${rank}:${task.id}`;
 }
 
@@ -987,6 +1110,7 @@ function reviewQueueCard(task) {
     <div class="card-header">
       <span class="card-id">${escapeHtml(task.id)}</span>
       ${tag(task.reviewStatus || "missing")}
+      ${tag(task.reviewQueueState || "not-in-queue")}
     </div>
     <h4 class="card-title" title="${escapeAttr(task.title)}">${escapeHtml(task.title)}</h4>
     <div class="card-meta">
@@ -996,10 +1120,10 @@ function reviewQueueCard(task) {
     </div>
     <p class="subtle">${escapeHtml(firstUsefulLine(task.summary || task.briefText || ""))}</p>
     <div class="review-queue-actions">
+      <a href="#/review/${encodeURIComponent(task.id)}">${t("openReviewWorkspace")}</a>
       <a href="#/tasks/${encodeURIComponent(task.id)}">${t("fullView")}</a>
       <button data-open-drawer="${escapeAttr(task.id)}">${t("viewDetails")}</button>
     </div>
-    ${reviewActionPanel(task)}
   </article>`;
 }
 
@@ -1008,6 +1132,57 @@ function firstUsefulLine(text) {
     .split(/\n+/)
     .map((line) => line.trim())
     .filter(Boolean)[0] || "";
+}
+
+function reviewWorkspace(route) {
+  const task = (bundle.status?.tasks || []).find((item) => item.id === route.id);
+  if (!task) return `<main>${emptyState(t("taskNotFound"))}</main>`;
+  const walkthroughDoc = taskDocument(task, "__walkthrough__");
+  const candidateDoc = taskDocument(task, "lesson_candidates.md");
+  const reviewDoc = taskDocument(task, "review.md");
+  const findingsDoc = taskDocument(task, "findings.md");
+  return `<main class="review-workspace">
+    <nav class="crumbs"><a href="#/review">${t("reviewQueue")}</a><span>/</span><span>${escapeHtml(task.id)}</span></nav>
+    <section class="detail-hero review-hero">
+      <div>
+        <p class="eyebrow">${t("reviewWorkspace")}</p>
+        <h2>${escapeHtml(task.title)}</h2>
+        <p>${escapeHtml(task.path)}</p>
+      </div>
+      <div class="review-hero-tags">
+        ${tag(task.lifecycleState || "unknown")}
+        ${tag(task.reviewStatus || "missing")}
+        ${tag(task.lessonCandidateStatus || "missing")}
+      </div>
+    </section>
+    <section class="review-workspace-grid">
+      <article class="review-workspace-main stack">
+        ${reviewDocPanel("walkthrough", walkthroughDoc, task.walkthroughPath)}
+        ${reviewDocPanel("lessonCandidates", candidateDoc, task.lessonCandidatePath)}
+        ${reviewDocPanel("review", reviewDoc, task.reviewPath)}
+        ${reviewDocPanel("findings", findingsDoc, task.findingsPath)}
+      </article>
+      <aside class="review-workspace-side stack">
+        ${reviewActionPanel(task, { mode: "workspace" })}
+        ${taskStateSummary(task)}
+        ${openFindings(task)}
+        ${evidenceList(task)}
+      </aside>
+    </section>
+  </main>`;
+}
+
+function reviewDocPanel(key, doc, fallbackPath = "") {
+  return `<section class="doc-section review-doc-panel">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">${escapeHtml(fallbackPath || "")}</p>
+        <h2>${t(key)}</h2>
+      </div>
+      ${doc ? `<button data-render-toggle>${state.renderMode === "rendered" ? t("source") : t("rendered")}</button>` : ""}
+    </div>
+    <div class="markdown">${doc ? window.HarnessMarkdown.render(doc.content, state.renderMode) : emptyState(t("documentMissing"))}</div>
+  </section>`;
 }
 
 function migrationPanel() {
@@ -1272,6 +1447,13 @@ function bind() {
     localStorage.setItem("harness.taskLayout", state.taskLayout);
     app();
   }));
+  document.querySelectorAll("[data-task-sort-order]").forEach((btn) => btn.addEventListener("click", () => {
+    state.taskSortOrder = btn.dataset.taskSortOrder === "asc" ? "asc" : "desc";
+    localStorage.setItem("harness.taskSortOrder", state.taskSortOrder);
+    state.taskPageByGroup = {};
+    state.taskGroupPage = 1;
+    app();
+  }));
   document.querySelectorAll("[data-render-toggle]").forEach((button) => button.addEventListener("click", () => {
     state.renderMode = state.renderMode === "rendered" ? "source" : "rendered";
     app();
@@ -1315,6 +1497,7 @@ function bind() {
     const taskId = el.dataset.openDrawer;
     openDrawer(taskId);
   }));
+  bindCopyTaskNameButtons(document);
   document.querySelectorAll("[data-open-lesson-drawer]").forEach((el) => el.addEventListener("click", (e) => {
     e.preventDefault();
     const lessonId = el.dataset.openLessonDrawer;
@@ -1404,6 +1587,7 @@ function renderDrawerContent(taskId) {
       <div>
         <h2>${escapeHtml(task.title)}</h2>
         <p style="font-family: var(--font-mono); font-size: 11px; margin: 4px 0 0; color: var(--muted);">${escapeHtml(task.id)}</p>
+        ${taskCopyButton(task, "detail-copy")}
       </div>
       <button class="btn-close" data-close-drawer>×</button>
     </div>
@@ -1421,7 +1605,7 @@ function renderDrawerContent(taskId) {
         <a href="#/tasks/${encodeURIComponent(task.id)}" class="btn-drawer-trigger" style="text-decoration: none;">${t("fullView")}</a>
       </div>
       ${taskStateSummary(task)}
-      ${reviewActionPanel(task)}
+      ${reviewActionPanel(task, { mode: "summary" })}
       ${timeline}
       ${documents}
       ${findings}
@@ -1445,7 +1629,43 @@ function openDrawer(taskId) {
     state.renderMode = state.renderMode === "rendered" ? "source" : "rendered";
     openDrawer(taskId);
   }));
+  bindCopyTaskNameButtons(drawer);
   drawer.querySelectorAll("[data-review-complete]").forEach((button) => button.addEventListener("click", () => completeReviewFromDashboard(button.dataset.reviewComplete)));
+}
+
+function bindCopyTaskNameButtons(root) {
+  root.querySelectorAll("[data-copy-task-name]").forEach((button) => button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const taskName = button.dataset.copyTaskName || "";
+    const defaultText = t("copyTaskNameShort");
+    try {
+      await copyText(taskName);
+      button.textContent = t("copyTaskNameSuccess");
+    } catch {
+      button.textContent = t("copyTaskNameFailed");
+    }
+    window.setTimeout(() => {
+      button.textContent = defaultText;
+    }, 1400);
+  }));
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("copy failed");
 }
 
 function renderLessonDrawerContent(lessonId) {

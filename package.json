@@ -31,8 +31,8 @@
     "status": "node scripts/harness.mjs status --json .",
     "dashboard": "node scripts/harness.mjs dashboard --out tmp/harness-dashboard.html examples/minimal-project",
     "dashboard:folder": "node scripts/harness.mjs dashboard --out-dir tmp/harness-dashboard examples/minimal-project",
-    "smoke:dashboard": "node scripts/smoke-dashboard.mjs",
-    "test": "node scripts/test-harness.mjs"
+    "smoke:dashboard": "node tests/smoke-dashboard.mjs",
+    "test": "node tests/run-all.mjs"
   },
   "files": [
     "README.md",
