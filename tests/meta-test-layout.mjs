@@ -35,6 +35,10 @@ const taskScannerModule = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-
 assert(taskScannerModule.split(/\r?\n/).length <= 600, "task scanner should stay below 600 lines by routing lesson candidate parsing out");
 assert(fs.existsSync(path.join(repoRoot, "scripts/lib/task-lesson-candidates.mjs")), "lesson candidate parsing should live outside task-scanner.mjs");
 
+const harnessChecker = fs.readFileSync(path.join(repoRoot, "scripts/check-harness.mjs"), "utf8");
+assert(harnessChecker.split(/\r?\n/).length <= 650, "check-harness should stay below 650 lines by routing module-parallel checks out");
+assert(fs.existsSync(path.join(repoRoot, "scripts/lib/check-module-parallel.mjs")), "module-parallel private harness checks should live outside check-harness.mjs");
+
 const cssManifestPath = path.join(repoRoot, "templates/dashboard/assets/app.css.manifest.json");
 assert(fs.existsSync(cssManifestPath), "dashboard CSS should be assembled from a manifest of css-src files");
 const cssManifest = JSON.parse(fs.readFileSync(cssManifestPath, "utf8"));
