@@ -273,6 +273,7 @@ const invalidLessonTask = invalidLessonStatus.tasks.find((task) => task.id === l
 assert(invalidLessonTask.lessonCandidateIssues.includes("missing-column:Scope"), "needs-promotion lesson rows should require Scope column");
 assert(invalidLessonTask.lessonCandidateIssues.includes("missing-column:Boundary Reason"), "needs-promotion lesson rows should require Boundary Reason column");
 assert(invalidLessonTask.lessonCandidateIssues.some((issue) => issue.includes("missing-row-field:LC-QUEUE-LESSON:Conflict Check")), "needs-promotion lesson rows should require conflict check value");
+assert(invalidLessonTask.lessonCandidateIssues.includes("missing-column:Detail Artifact"), "needs-promotion lesson rows should require Detail Artifact column");
 
 fs.writeFileSync(
   path.join(lessonDir, "lesson_candidates.md"),
@@ -291,9 +292,32 @@ fs.writeFileSync(
     "",
     "## Candidates",
     "",
-    "| ID | Row Status | Title | Scope | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | global | Queue model affects all harness users | Prevents Review queue from absorbing lesson work | approved | lesson detail docs | no matching lesson found | task-state-machine docs | pending |",
+    "| ID | Row Status | Title | Scope | Module Key | Detail Artifact | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | global | n/a | lessons/LC-QUEUE-LESSON.md | Queue model affects all harness users | Prevents Review queue from absorbing lesson work | approved | lesson detail docs | no matching lesson found | task-state-machine docs | pending |",
+    "",
+  ].join("\n"),
+);
+const missingDetailArtifactStatus = expectJson(["status", "--json", target]);
+const missingDetailArtifactTask = missingDetailArtifactStatus.tasks.find((task) => task.id === lessonTask.task.id);
+assert(
+  missingDetailArtifactTask.lessonCandidateIssues.includes("missing-detail-artifact:LC-QUEUE-LESSON:lessons/LC-QUEUE-LESSON.md"),
+  "needs-promotion lesson rows should require the task-local detail artifact file to exist",
+);
+
+fs.mkdirSync(path.join(lessonDir, "lessons"), { recursive: true });
+fs.writeFileSync(
+  path.join(lessonDir, "lessons/LC-QUEUE-LESSON.md"),
+  [
+    "# LC-QUEUE-LESSON - Preserve queue lifecycle lesson",
+    "",
+    "## Problem / Trigger",
+    "",
+    "The Lessons queue needs a durable detail artifact written while the source task context is still fresh.",
+    "",
+    "## Correct Rule",
+    "",
+    "Sedimentation follow-up work reviews this artifact instead of reconstructing the lesson from a brief row.",
     "",
   ].join("\n"),
 );
@@ -310,11 +334,13 @@ assert(lessonStatusTask.taskQueues.includes("lessons"), "needs-promotion lesson 
 assert(!lessonStatusTask.taskQueues.includes("review"), "needs-promotion lesson work should not enter Review queue");
 assert(lessonStatusTask.lessonCandidateRows[0].scope === "global", "lesson candidate parser should expose scope");
 assert(lessonStatusTask.lessonCandidateRows[0].boundaryReason.includes("Queue model"), "lesson candidate parser should expose boundary reason");
+assert(lessonStatusTask.lessonCandidateRows[0].detailArtifact === "lessons/LC-QUEUE-LESSON.md", "lesson candidate parser should expose detail artifact");
 assert(lessonStatusTask.lessonCandidateRows[0].conflictCheck.includes("no matching"), "lesson candidate parser should expose conflict check");
 assert(lessonStatusTask.lessonCandidateRows[0].followUpTask === "pending", "lesson candidate parser should expose follow-up task");
 const lessonSedimentDryRun = expectJson(["lesson-sediment", lessonTask.task.id, "LC-QUEUE-LESSON", "--dry-run", target]);
 assert(lessonSedimentDryRun.dryRun === true, "lesson-sediment --dry-run should not mutate files");
 assert(lessonSedimentDryRun.prompt.includes("Source candidate: LC-QUEUE-LESSON"), "lesson-sediment should produce copyable prompt");
+assert(lessonSedimentDryRun.prompt.includes("Detail artifact: TARGET:docs/09-PLANNING/TASKS"), "lesson-sediment prompt should link task-local lesson detail artifact");
 const lessonSedimentationPreset = expectJson(["preset", "inspect", "lesson-sedimentation", "--json"]);
 assert(lessonSedimentationPreset.id === "lesson-sedimentation", "lesson-sedimentation preset should be inspectable");
 assert(expectJson(["preset", "check", "lesson-sedimentation", "--json"]).status === "pass", "lesson-sedimentation preset check should pass");
@@ -325,6 +351,8 @@ assert(lessonSediment.followUpTask.id.startsWith("TASKS/"), "lesson-sediment sho
 assert(fs.existsSync(path.join(target, lessonSediment.followUpTask.path.replace(/^TARGET:/, ""), "artifacts/lesson-sedimentation-prompt.md")), "lesson-sediment should write prompt artifact");
 const followUpTaskPlan = fs.readFileSync(path.join(target, lessonSediment.followUpTask.path.replace(/^TARGET:/, ""), "task_plan.md"), "utf8");
 assert(followUpTaskPlan.includes(`| Source Lesson Candidates | TARGET:docs/09-PLANNING/${lessonTask.task.id}/lesson_candidates.md |`), "lesson-sediment context should link the source lesson_candidates.md file");
+assert(followUpTaskPlan.includes(`| Source Lesson Detail | TARGET:docs/09-PLANNING/${lessonTask.task.id}/lessons/LC-QUEUE-LESSON.md |`), "lesson-sediment context should link the source detail artifact");
+assert(followUpTaskPlan.includes("The Lessons queue needs a durable detail artifact"), "lesson-sediment context should summarize the source detail artifact");
 assert(followUpTaskPlan.includes("| Original Candidate Row |"), "lesson-sediment context should preserve the original candidate row");
 assert(followUpTaskPlan.includes("Review Summary"), "lesson-sediment context should include source review summary");
 assert(followUpTaskPlan.includes("Findings Summary"), "lesson-sediment context should include source findings summary");

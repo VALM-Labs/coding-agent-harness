@@ -137,9 +137,9 @@ Global governance tables only keep index, state, route, and audit summary. They 
 | --- | --- | --- |
 | Global tables: Feature SSoT, Harness Ledger, Closeout SSoT, Regression SSoT, Cadence Ledger | Current state, owner, task/module/detail links, regression gate, closeout or audit summary | Module-internal steps, undecided lesson candidates, full command output, long evidence paragraphs, review transcripts, temporary repair prompts |
 | Module layer: Module Registry, `module_plan.md` | Module boundary, module steps, handoff, current blockers, and local evidence indexes | Final promoted lesson body or cross-module release audit ledger |
-| Task layer: `brief.md`, `task_plan.md`, `progress.md`, `review.md`, `lesson_candidates.md`, `artifacts/INDEX.md` | Execution detail, evidence, agent review, candidate lessons, repair prompts, and raw artifact routing | Cross-task ledgers or promoted lesson detail bodies |
+| Task layer: `brief.md`, `task_plan.md`, `progress.md`, `review.md`, `lesson_candidates.md`, `lessons/LC-*.md`, `artifacts/INDEX.md` | Execution detail, evidence, agent review, candidate lessons, task-local lesson detail, repair prompts, and raw artifact routing | Cross-task ledgers or promoted lesson detail bodies |
 
-The checker enforces this boundary for new global table rows. Overloaded rows that already existed before 2026-05-24 are surfaced in Dashboard migration advice as `legacy-report-only`; they are not automatically deleted or bulk-rewritten. New rows that continue placing task/module-local detail in global tables are reported as `governance-table-entropy` failures. Lesson candidates stay in `lesson_candidates.md`; accepted reusable lessons live in `docs/01-GOVERNANCE/lessons/*.md`. The fix is to keep the global summary row and move detail into module/task/detail documents linked from that row.
+The checker enforces this boundary for new global table rows. Overloaded rows that already existed before 2026-05-24 are surfaced in Dashboard migration advice as `legacy-report-only`; they are not automatically deleted or bulk-rewritten. New rows that continue placing task/module-local detail in global tables are reported as `governance-table-entropy` failures. Lesson candidates stay in `lesson_candidates.md`; candidates that enter `needs-promotion` must link a task-local `lessons/LC-*.md` detail artifact, and accepted reusable lessons live in `docs/01-GOVERNANCE/lessons/*.md`. The fix is to keep the global summary row and move detail into module/task/detail documents linked from that row.
 
 ## Human Confirmation Loop
 
@@ -185,6 +185,7 @@ CLI-owned mechanical writes and agent-owned manual slices have different boundar
 Lesson promotion does not write a shared Lessons table. The Dashboard or CLI should prefer a dry-run or follow-up sedimentation task so the assignee first:
 
 - Classifies scope and boundary reason.
+- Reads the task-local detail artifact referenced by the candidate row instead of reconstructing the lesson from the brief row.
 - Checks conflicts against existing lesson candidates, lesson detail docs, reference standards, templates, and checkers.
 - Proposes a target diff or no-action reason.
 - Writes the promoted lesson detail doc or standard update only after human approval.

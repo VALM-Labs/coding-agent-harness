@@ -4,11 +4,12 @@
 
 Lessons 不再使用一张手工维护的全局表。原因很简单：lesson candidate 是任务收口时的审查材料，promotion 是后续治理动作；把两者都塞进共享表，会让多个 agent 争抢同一个文件，也会让表和任务本地事实漂移。
 
-新的事实来源只有两层：
+新的事实来源只有三层：
 
 | 层级 | 文件 | 职责 |
 | --- | --- | --- |
 | 任务本地队列 | `docs/09-PLANNING/**/lesson_candidates.md` | 记录候选、拒绝、无候选、排队 promotion 和人工判定 |
+| 任务本地详情 | `docs/09-PLANNING/**/lessons/LC-*.md` | 在源任务上下文还新鲜时写完整 lesson 正文，供后续沉淀任务读取 |
 | Promoted lesson 详情 | `docs/01-GOVERNANCE/lessons/L-YYYY-MM-DD-NNN-<slug>.md` | 记录已接受、可复用、需要后续治理合入的经验 |
 
 `docs/Harness-Ledger.md` 和 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 只记录 closeout 结果：
@@ -22,6 +23,11 @@ docs/01-GOVERNANCE/
 │   ├── L-2026-05-07-001-xxx.md
 │   └── ...
 └── _archive/                    ← 已合入或废弃的历史详情归档
+
+docs/09-PLANNING/TASKS/<task-id>/
+├── lesson_candidates.md          ← 候选索引和人工路由状态
+└── lessons/
+    └── LC-YYYYMMDD-NNN.md        ← task-local detail artifact
 ```
 
 ## 触发时机
@@ -33,7 +39,9 @@ docs/01-GOVERNANCE/
 3. 有没有踩坑经验值得记录，避免下次重复？
 4. 有没有架构层面的洞察，值得更新架构文档？
 
-如果任何一条答案是“有”，先写入任务目录的 `lesson_candidates.md`，由人工 review 决定是否进入治理 promotion。
+如果任何一条答案是“有”，先写入任务目录的 `lesson_candidates.md`。当候选进入
+`needs-promotion` 时，Agent 必须同步写出任务本地 `lessons/LC-*.md` 详情文件，并在
+`Detail Artifact` 列链接它；后续沉淀任务读取这个详情文件，不从表格 brief 复写正文。
 
 人工决定后只允许以下任务级状态：
 
@@ -42,16 +50,17 @@ docs/01-GOVERNANCE/
 - `promoted`：维护命令已经创建 promoted lesson 详情文档，并回写源 candidate。
 - `rejected`：候选已带理由拒绝。
 
-`needs-promotion` 不阻塞任务 closeout，但必须在 Closeout SSoT / Harness Ledger 中记录 `queued-promotion: LC-YYYYMMDD-NNN`，并由后续维护任务处理。`promoted` 或人工直接创建详情文档时记录 `checked-created: L-YYYY-MM-DD-NNN`。如果没有候选，记录 `checked-candidate: LC-...` 或 `checked-none: <reason>`；`checked-none` 只用于旧任务兼容或没有 candidate 文件的历史收口。
+`needs-promotion` 不阻塞任务 closeout，但必须在 Closeout SSoT / Harness Ledger 中记录 `queued-promotion: LC-YYYYMMDD-NNN`，并由后续维护任务处理。模块级候选还必须填写 `Module Key`，避免沉淀任务丢失模块边界。`promoted` 或人工直接创建详情文档时记录 `checked-created: L-YYYY-MM-DD-NNN`。如果没有候选，记录 `checked-candidate: LC-...` 或 `checked-none: <reason>`；`checked-none` 只用于旧任务兼容或没有 candidate 文件的历史收口。
 
 ## Promotion 执行
 
-promotion 只写详情文档和源 candidate，不写共享 Lessons 表：
+promotion 只写 promoted 详情文档和源 candidate，不写共享 Lessons 表：
 
-1. 选择 `templates/lessons/` 下的对应模板，或由 `lesson-promote --apply` 创建详情文档。
-2. 详情文档写清背景、现状问题、建议改动、影响范围和冲突声明。
-3. 回写源任务 `lesson_candidates.md`：对应候选标记为 `promoted`，并记录 `promoted:<L-ID>`。
-4. 在 Closeout SSoT / Harness Ledger 中记录 `checked-created:<L-ID>` 或 `queued-promotion:<LC-ID>`。
+1. 读取源任务 `lesson_candidates.md` 中的 `Detail Artifact` 指向的任务本地详情文件。
+2. 选择 `templates/lessons/` 下的对应模板，或由 `lesson-promote --apply` 创建 promoted 详情文档。
+3. promoted 详情文档写清背景、现状问题、建议改动、影响范围和冲突声明。
+4. 回写源任务 `lesson_candidates.md`：对应候选标记为 `promoted`，并记录 `promoted:<L-ID>`。
+5. 在 Closeout SSoT / Harness Ledger 中记录 `checked-created:<L-ID>` 或 `queued-promotion:<LC-ID>`。
 
 `lesson-promote --apply` 是 CLI-owned 机械写入：目标仓库必须是干净 Git root，
 命令会加 governance lock，只允许提交新 lesson detail 和源任务 `lesson_candidates.md`。
@@ -91,6 +100,7 @@ promotion 只写详情文档和源 candidate，不写共享 Lessons 表：
 Agent 在产出任何 promoted lesson 之前，必须查看：
 
 - 任务本地 `lesson_candidates.md`
+- 任务本地 `lessons/LC-*.md`
 - `docs/01-GOVERNANCE/lessons/*.md`
 - 目标 reference / template / checker
 
@@ -141,10 +151,11 @@ pending governance integration -> approved -> merged
 ## 人的审批工作流
 
 1. 打开 dashboard 的 Lessons 队列，或搜索任务本地 `lesson_candidates.md` 中的 `needs-promotion`。
-2. 需要提升时创建后续 sedimentation task，或批准 `lesson-promote --apply`。
-3. 查看生成的 `docs/01-GOVERNANCE/lessons/*.md`。
-4. 有冲突的 lesson 一起审。
-5. 批准后由维护任务更新目标 reference / template / checker。
+2. 查看候选行的 `Detail Artifact`，确认任务本地详情正文足够完整。
+3. 需要提升时创建后续 sedimentation task，或批准 `lesson-promote --apply`。
+4. 查看生成的 `docs/01-GOVERNANCE/lessons/*.md`。
+5. 有冲突的 lesson 一起审。
+6. 批准后由维护任务更新目标 reference / template / checker。
 
 ## 合入执行
 

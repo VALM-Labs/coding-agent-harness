@@ -44,8 +44,8 @@
 
 ## Candidates
 
-| ID | Row Status | Title | Scope | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ID | Row Status | Title | Scope | Module Key | Detail Artifact | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## No-Candidate Reason
 
@@ -54,6 +54,8 @@
 ## Promotion Notes
 
 - 如果人工审查认为候选值得沉淀，把对应行标记为 `needs-promotion`，并记录目标治理位置。
+- 候选标记为 `needs-promotion` 时，必须趁源任务上下文还新鲜写出完整 task-local detail artifact，并在 `Detail Artifact` 中链接。
+- `Scope` 使用 `task`、`module` 或 `global`；module 级候选必须填写 `Module Key`。
 - 如果人工审查拒绝候选，把对应行标记为 `rejected`，并在 review decision 中保留理由。
 - `needs-promotion` 不阻止任务 closeout，但必须继续出现在维护队列和收口记录里。
 - 默认 promotion 行为是先 dry-run 或创建后续沉淀任务。不要写共享 Lessons 表；被接受的候选应成为 promoted lesson 详情文档。

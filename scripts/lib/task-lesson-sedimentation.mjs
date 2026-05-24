@@ -112,6 +112,8 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
     writeScopes: ["docs/09-PLANNING/TASKS/**"],
   });
   const prompt = renderLessonSedimentationPrompt(preset, {
+    target,
+    sourceTaskDir,
     sourceTaskId,
     sourceShortId,
     candidate,
@@ -188,12 +190,15 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
 }
 
 function renderLessonSedimentationPrompt(preset, values) {
+  const detailArtifact = resolveDetailArtifact(values.target, values.sourceTaskDir, values.candidate);
   const prompt = renderPresetTemplate(preset, preset.entrypoints.newTask?.templates?.prompt, {
     sourceTaskId: values.sourceTaskId,
     sourceShortId: values.sourceShortId,
     candidateId: values.candidate.id,
     candidateTitle: values.candidate.title,
     candidateScope: values.candidate.scope,
+    candidateModuleKey: values.candidate.moduleKey || "n/a",
+    detailArtifact: detailArtifact.prefixedPath || "not provided",
     boundaryReason: values.candidate.boundaryReason,
     whyItMightMatter: values.candidate.whyItMightMatter,
     promotionTarget: values.candidate.promotionTarget,
@@ -206,9 +211,11 @@ function renderLessonSedimentationPrompt(preset, values) {
 
 function renderContextPacket({ target, sourceTaskDir, sourceTaskId, candidate, followUpTaskId, audit }) {
   const sourceLessonPath = `TARGET:${toPosix(path.relative(target.projectRoot, path.join(sourceTaskDir, lessonCandidatesFile)))}`;
+  const detailArtifact = resolveDetailArtifact(target, sourceTaskDir, candidate);
   const sourceReview = summarizeMarkdown(readFileSafe(path.join(sourceTaskDir, "review.md")));
   const sourceFindings = summarizeMarkdown(readFileSafe(path.join(sourceTaskDir, "findings.md")));
   const sourceProgress = summarizeMarkdown(readFileSafe(path.join(sourceTaskDir, "progress.md")));
+  const sourceLessonDetail = summarizeMarkdown(detailArtifact.path ? readFileSafe(detailArtifact.path) : "");
   return [
     "## Lesson Sedimentation Context Packet",
     "",
@@ -218,10 +225,13 @@ function renderContextPacket({ target, sourceTaskDir, sourceTaskId, candidate, f
     `| Follow-up Task | ${followUpTaskId} |`,
     `| Source Task | ${sourceTaskId} |`,
     `| Source Lesson Candidates | ${sourceLessonPath} |`,
+    `| Source Lesson Detail | ${detailArtifact.prefixedPath || "not provided"} |`,
     `| Candidate ID | ${candidate.id} |`,
     `| Candidate Title | ${markdownCell(candidate.title)} |`,
     `| Original Candidate Row | ${markdownCell(candidate.originalRow || "")} |`,
     `| Scope | ${markdownCell(candidate.scope || "unspecified")} |`,
+    `| Module Key | ${markdownCell(candidate.moduleKey || "n/a")} |`,
+    `| Detail Summary | ${markdownCell(sourceLessonDetail || "not recorded")} |`,
     `| Boundary Reason | ${markdownCell(candidate.boundaryReason || "unspecified")} |`,
     `| Why It Might Matter | ${markdownCell(candidate.whyItMightMatter || "unspecified")} |`,
     `| Promotion Target | ${markdownCell(candidate.promotionTarget || "unspecified")} |`,
@@ -233,6 +243,19 @@ function renderContextPacket({ target, sourceTaskDir, sourceTaskId, candidate, f
     `| Preset Manifest | ${audit.manifestPath} |`,
     "",
   ].join("\n");
+}
+
+function resolveDetailArtifact(target, sourceTaskDir, candidate) {
+  const raw = String(candidate.detailArtifact || "").trim();
+  if (!raw || /^(?:n\/a|none|pending)$/i.test(raw)) return { path: "", prefixedPath: "" };
+  const absolute = raw.startsWith("TARGET:")
+    ? path.resolve(target.projectRoot, raw.replace(/^TARGET:/, "").replace(/^\/+/, ""))
+    : path.resolve(sourceTaskDir, raw.replace(/^\.?\//, ""));
+  if (!absolute.startsWith(path.resolve(sourceTaskDir) + path.sep)) return { path: "", prefixedPath: "" };
+  return {
+    path: absolute,
+    prefixedPath: `TARGET:${toPosix(path.relative(target.projectRoot, absolute))}`,
+  };
 }
 
 function appendToFollowUpTask({ followUpDir, sourceTaskId, candidate, prompt, contextPacket, audit }) {
