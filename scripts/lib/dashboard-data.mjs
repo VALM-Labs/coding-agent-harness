@@ -200,6 +200,7 @@ export function collectGraph(status, tables = { tables: [] }) {
 }
 
 export function categorizeWarning(message) {
+  if (/governance-table-entropy/i.test(message)) return "Governance Table Boundary";
   if (/missing execution_strategy\.md|missing visual_(?:map|roadmap)\.md|Visual (?:Map|Roadmap)/i.test(message)) return "Plan Contract Missing";
   if (/legacy-compat|adoption-needed|legacy check/i.test(message)) return "Adoption Advice";
   if (/Evidence|evidence/i.test(message)) return "Missing Evidence";
@@ -213,6 +214,7 @@ function warningType(message) {
   if (/missing visual_map\.md|Visual Map/i.test(message)) return "missing-visual-map";
   if (/missing visual_roadmap\.md|Visual Roadmap/i.test(message)) return "missing-visual-roadmap";
   if (/Reviewer Identity|Confidence Challenge|Final Confidence Basis|Evidence Checked/i.test(message)) return "review-schema-gap";
+  if (/governance-table-entropy/i.test(message)) return "governance-table-entropy";
   if (/Evidence|evidence/i.test(message)) return "missing-evidence";
   if (/missing required file/i.test(message)) return "legacy-reference-gap";
   if (/legacy-compat|legacy check|adoption-needed/i.test(message)) return "capability-adoption";
@@ -231,6 +233,7 @@ function warningScope(message) {
 
 function warningPhase(type, scope) {
   if (type === "capability-adoption") return "baseline";
+  if (type === "governance-table-entropy") return "global-table-boundary";
   if (type === "missing-brief" || type === "missing-execution-strategy" || type === "missing-visual-map" || type === "missing-visual-roadmap") return "active-task-contracts";
   if (scope === "module") return "module-classification";
   if (type === "review-schema-gap" || type === "missing-evidence") return "review-evidence";
@@ -240,6 +243,7 @@ function warningPhase(type, scope) {
 
 function warningFixability(type, scope) {
   if (["missing-brief", "missing-execution-strategy", "missing-visual-map", "missing-visual-roadmap"].includes(type)) return "guided";
+  if (type === "governance-table-entropy") return "manual";
   if (type === "legacy-reference-gap" || scope === "reference") return "template";
   if (type === "capability-adoption") return "decision";
   if (type === "review-schema-gap" || type === "missing-evidence") return "human-evidence";
@@ -248,6 +252,7 @@ function warningFixability(type, scope) {
 
 function warningPriority(type, scope, message) {
   if (/fail|invalid|blocked/i.test(message) || type === "schema-drift") return "P1";
+  if (type === "governance-table-entropy") return /legacy-report-only/i.test(message) ? "P3" : "P2";
   if (["missing-brief", "missing-execution-strategy", "missing-visual-map", "missing-visual-roadmap"].includes(type) && scope === "task") return "P2";
   if (type === "review-schema-gap" || type === "missing-evidence") return "P2";
   if (type === "capability-adoption") return "P3";
@@ -284,19 +289,24 @@ function summarizeWarnings(warnings) {
 }
 
 export function collectAdoption(status) {
-  const warnings = status.checkState.details.warnings.flatMap((message) => splitWarningMessage(message)).map((message, index) => {
+  const dashboardMessages = [
+    ...(status.checkState.details.warnings || []),
+    ...(status.checkState.details.failures || []).filter((message) => /governance-table-entropy/i.test(message)),
+  ];
+  const warnings = dashboardMessages.flatMap((message) => splitWarningMessage(message)).map((message, index) => {
     const type = warningType(message);
     const scope = warningScope(message);
     const affectedPaths = warningAffectedPaths(message);
+    const stableSuffix = type === "governance-table-entropy" ? `-${stableWarningIdPart(governanceWarningRowKey(message))}` : "";
     return {
-      id: `AD-${String(index + 1).padStart(3, "0")}`,
+      id: `AD-${String(index + 1).padStart(3, "0")}${stableSuffix}`,
       category: categorizeWarning(message),
       type,
       scope,
       priority: warningPriority(type, scope, message),
       phase: warningPhase(type, scope),
       fixability: warningFixability(type, scope),
-      status: "open",
+      status: /legacy-report-only/i.test(message) ? "legacy-report-only" : "open",
       confidence: warningConfidence(message),
       severity: status.mode === "legacy-compat" ? "advice" : "warning",
       title: warningTitle(message),
@@ -330,6 +340,18 @@ export function collectAdoption(status) {
   };
 }
 
+function governanceWarningRowKey(message) {
+  const match = String(message || "").match(/\brow\s+([^:]+)/i);
+  return match ? match[1].trim() : "global-table";
+}
+
+function stableWarningIdPart(value) {
+  return String(value || "global-table")
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "global-table";
+}
+
 export function splitWarningMessage(message) {
   return String(message || "")
     .split(/\n-\s+/)
@@ -338,6 +360,7 @@ export function splitWarningMessage(message) {
 }
 
 function warningTitle(message) {
+  if (/governance-table-entropy/i.test(message)) return "Global table boundary";
   if (/missing execution_strategy\.md/i.test(message)) return "Missing execution strategy";
   if (/missing visual_map\.md|Visual Map/i.test(message)) return "Missing visual map";
   if (/missing visual_roadmap\.md|Visual Roadmap/i.test(message)) return "Missing legacy visual roadmap";
@@ -354,6 +377,7 @@ function warningAffected(message) {
 }
 
 function warningAction(message) {
+  if (/governance-table-entropy/i.test(message)) return "Move local detail to module/task docs; keep the global row to summary, state, route, and audit result.";
   if (/execution_strategy\.md/i.test(message)) return "Add standalone execution strategy file.";
   if (/visual_map\.md|Visual Map/i.test(message)) return "Add standalone visual map file.";
   if (/visual_roadmap\.md|Visual Roadmap/i.test(message)) return "Rewrite legacy visual_roadmap.md into canonical visual_map.md.";
