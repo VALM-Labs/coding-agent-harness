@@ -94,7 +94,7 @@ export function runTaskCommand(command, { args, takeFlag, takeOption, targetArg 
     try {
       console.log(JSON.stringify(confirmTaskReview(targetArg(), taskId, { reviewer, message, evidence, confirmText }), null, 2));
     } catch (error) {
-      console.error(error.message);
+      console.error(formatTaskCommandError(error));
       process.exit(1);
     }
     return;
@@ -200,4 +200,23 @@ export function runTaskCommand(command, { args, takeFlag, takeOption, targetArg 
   }
 
   throw new Error(`Unsupported task command: ${command}`);
+}
+
+function formatTaskCommandError(error) {
+  const lines = [error.message];
+  if (Array.isArray(error.recovery) && error.recovery.length > 0) {
+    lines.push("", "Recovery:");
+    for (const item of error.recovery) lines.push(`- ${item}`);
+  }
+  if (error.details?.entries?.length) {
+    lines.push("", "Blocking Git status:");
+    for (const entry of error.details.entries) lines.push(`- ${entry.raw || entry.path}`);
+  }
+  if (error.details?.disallowed?.length) {
+    lines.push("", "Disallowed paths:");
+    for (const item of error.details.disallowed) lines.push(`- ${item}`);
+  }
+  if (error.details?.stderr) lines.push("", error.details.stderr);
+  if (error.details?.stdout) lines.push("", error.details.stdout);
+  return lines.join("\n");
 }

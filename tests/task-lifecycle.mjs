@@ -2,7 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   acceptNoLessonCandidate,
   assert,
@@ -310,6 +310,7 @@ assert(preCompleteTask?.walkthroughPath?.endsWith(`docs/10-WALKTHROUGH/${todayLo
 assert(preCompleteTask?.reviewStatus === "agent-reviewed", "status should classify agent-written review evidence separately from human confirmation");
 const reviewTemplateTask = preCompleteStatus.tasks.find((task) => task.id === `TASKS/${todayLocal}-review-template-placeholder`);
 assert(reviewTemplateTask?.reviewStatus === "required", "review template placeholder Verdict: yes / no should not count as a completed review");
+commitFixtureBaseline(lifecycleTarget, "before phase lifecycle review confirmation");
 const preCompleteConfirm = expectJson(["review-confirm", `TASKS/${todayLocal}-phase-2-lifecycle`, "--reviewer", "Human Reviewer", "--message", "walkthrough reviewed", "--confirm", `${todayLocal}-phase-2-lifecycle`, lifecycleTarget]);
 assert(preCompleteConfirm.task?.reviewStatus === "confirmed", "review-confirm should confirm review before task-complete");
 const lifecycleComplete = expectJson(["task-complete", "phase-2-lifecycle", "--message", "生命周期闭环完成", lifecycleTarget]);
@@ -393,6 +394,7 @@ fs.appendFileSync(
   `\n| CL-MODULE-LIFECYCLE | 2026-05-21 | Module lifecycle | \`docs/09-PLANNING/MODULES/auth/${todayLocal}-module-lifecycle/task_plan.md\` | \`docs/09-PLANNING/MODULES/auth/${todayLocal}-module-lifecycle/review.md\` | \`docs/10-WALKTHROUGH/${todayLocal}-module-lifecycle-walkthrough.md\` | pending human review | none | checked-none | pending |\n`,
 );
 acceptNoLessonCandidate(path.join(lifecycleTarget, `docs/09-PLANNING/MODULES/auth/${todayLocal}-module-lifecycle`));
+commitFixtureBaseline(lifecycleTarget, "before module lifecycle review confirmation");
 const moduleConfirm = expectJson(["review-confirm", `MODULES/auth/${todayLocal}-module-lifecycle`, "--reviewer", "Human Reviewer", "--confirm", `${todayLocal}-module-lifecycle`, lifecycleTarget]);
 assert(moduleConfirm.task?.id === `MODULES/auth/${todayLocal}-module-lifecycle`, "review-confirm should accept full module task ids");
 const workbenchReviewTask = expectJson(["new-task", "workbench-review", "--title", "Workbench review gate", "--locale", "zh-CN", lifecycleTarget]);
@@ -478,6 +480,7 @@ try {
   expectJson(["task-start", "workbench-review", "--message", "readying workbench review fixture", lifecycleTarget]);
   expectJson(["task-phase", "workbench-review", "PH-01", "--state", "done", "--completion", "100", "--evidence", "present", lifecycleTarget]);
   expectJson(["task-review", "workbench-review", "--message", "submitted for workbench confirmation", "--evidence", "command:TARGET:workbench-smoke:passed", lifecycleTarget]);
+  commitFixtureBaseline(lifecycleTarget, "before workbench review confirmation");
   const okResponse = await fetch(new URL("api/tasks/review-complete", runtime.url), {
     method: "POST",
     headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: runtime.url.replace(/\/$/, "") },
@@ -496,6 +499,24 @@ try {
   assert([400, 409].includes(closedReviewResponse.status), `workbench review completion should reject closed review debt, got ${closedReviewResponse.status}: ${closedReviewText}`);
 } finally {
   workbench.kill("SIGTERM");
+}
+
+function commitFixtureBaseline(target, message) {
+  if (!fs.existsSync(path.join(target, ".git"))) {
+    expectFixtureGit(target, ["init"]);
+    expectFixtureGit(target, ["config", "user.name", "Harness Test"]);
+    expectFixtureGit(target, ["config", "user.email", "harness-test@example.invalid"]);
+  }
+  expectFixtureGit(target, ["add", "."]);
+  const diff = spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: target, encoding: "utf8" });
+  if (diff.status === 0) return;
+  expectFixtureGit(target, ["commit", "-m", `test fixture baseline: ${message}`]);
+}
+
+function expectFixtureGit(target, args) {
+  const result = spawnSync("git", args, { cwd: target, encoding: "utf8" });
+  assert(result.status === 0, `git ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
+  return result;
 }
 const devDir = path.join(tmpRoot, "dev-workbench");
 const dev = spawn(node, [cli, "dev", "--no-open", "--out-dir", devDir, "--host", "127.0.0.1", "--port", "0", lifecycleTarget], {

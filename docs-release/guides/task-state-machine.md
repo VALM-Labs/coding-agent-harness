@@ -154,14 +154,17 @@ sequenceDiagram
     API-->>UI: reject with repairPrompt
   else accepted
     API->>Lifecycle: confirmTaskReview()
+    Lifecycle->>Lifecycle: verify Git clean, identity, hooks, allowlist
     Lifecycle->>Docs: write Human Review Confirmation
     Lifecycle->>Docs: append review-confirm log
+    Lifecycle->>Lifecycle: commit allowlisted review/progress files
+    Lifecycle->>Docs: record confirmation commit SHA + committed audit status
     API->>Scanner: regenerate dashboard snapshot
     API-->>UI: confirmed task
   end
 ```
 
-严格规则：Agent 可以准备 review evidence，也可以提交审查；但任务只有在 Human Review Confirmation block 存在后，才算人工确认。
+严格规则：Agent 可以准备 review evidence，也可以提交审查；但任务只有在 Human Review Confirmation block 存在后，才算人工确认。确认动作必须通过 gated auto-commit：Git 状态不干净、提交身份缺失、hook/preflight 失败，或待写文件超出当前任务 `review.md` / `progress.md` 白名单时，CLI 和 Workbench 都会拒绝并返回恢复建议。
 
 ## Lesson 沉淀
 

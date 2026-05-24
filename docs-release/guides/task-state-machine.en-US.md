@@ -154,14 +154,17 @@ sequenceDiagram
     API-->>UI: reject with repairPrompt
   else accepted
     API->>Lifecycle: confirmTaskReview()
+    Lifecycle->>Lifecycle: verify clean Git state, identity, hooks, allowlist
     Lifecycle->>Docs: write Human Review Confirmation
     Lifecycle->>Docs: append review-confirm log
+    Lifecycle->>Lifecycle: commit allowlisted review/progress files
+    Lifecycle->>Docs: record confirmation commit SHA + committed audit status
     API->>Scanner: regenerate dashboard snapshot
     API-->>UI: confirmed task
   end
 ```
 
-Strict rule: an agent can prepare review evidence and submit the task for review, but the task is not human-confirmed until the Human Review Confirmation block exists.
+Strict rule: an agent can prepare review evidence and submit the task for review, but the task is not human-confirmed until the Human Review Confirmation block exists. Confirmation must use gated auto-commit: the CLI and Workbench reject dirty Git state, missing commit identity, hook/preflight failure, or writes outside the current task `review.md` / `progress.md` allowlist, and return recovery guidance.
 
 ## Lesson Sedimentation
 

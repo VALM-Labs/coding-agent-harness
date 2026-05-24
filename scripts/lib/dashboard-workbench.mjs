@@ -77,8 +77,8 @@ export async function serveDashboardWorkbench(outDir, targetInput, { host = "127
       }
       serveStaticFile(response, outputDir, requestUrl.pathname, request.method === "HEAD");
     } catch (error) {
-      const status = /CSRF|Origin|Host/.test(error.message) ? 403 : 400;
-      writeJson(response, status, { error: error.message });
+      const status = error.status || (/CSRF|Origin|Host/.test(error.message) ? 403 : 400);
+      writeJson(response, status, errorPayload(error));
     }
   });
 
@@ -197,6 +197,14 @@ function serveStaticFile(response, outputDir, urlPath, headOnly) {
 function writeJson(response, status, payload) {
   response.writeHead(status, jsonHeaders);
   response.end(`${JSON.stringify(payload)}\n`);
+}
+
+function errorPayload(error) {
+  const payload = { error: error.message };
+  if (error.code) payload.code = error.code;
+  if (Array.isArray(error.recovery) && error.recovery.length > 0) payload.recovery = error.recovery;
+  if (error.details) payload.details = error.details;
+  return payload;
 }
 
 function mimeType(filePath) {

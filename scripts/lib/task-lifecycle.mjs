@@ -49,6 +49,7 @@ import {
   firstColumn,
   updateMarkdownTableRow,
 } from "./markdown-utils.mjs";
+import { commitReviewConfirmationGate, prepareReviewConfirmGitGate } from "./review-confirm-git-gate.mjs";
 
 function taskTemplateFiles({ locale = "en-US" } = {}) {
   return [
@@ -449,6 +450,7 @@ export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Revie
   if (budget !== "simple" && !isLessonCandidateDecisionComplete(candidateStatus)) {
     throw new Error(`Human review confirmation requires lesson candidate decision complete; current status is ${candidateStatus.status}.`);
   }
+  const gitGate = prepareReviewConfirmGitGate(target.projectRoot, [reviewPath, progressPath]);
 
   const timestamp = nowTimestamp();
   const confirmationId = `HRC-${timestamp.replace(/[^0-9]/g, "").slice(0, 14)}`;
@@ -456,23 +458,9 @@ export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Revie
   const safeReviewerEmail = markdownCell(process.env.GIT_AUTHOR_EMAIL || process.env.GIT_COMMITTER_EMAIL || "reviewer@example.invalid");
   const safeMessage = markdownCell(message || "Human review confirmed");
   const safeEvidence = markdownCell(evidence || `TARGET:docs/09-PLANNING/${canonicalTaskId}/review.md`);
-  const confirmationBlock = [
-    "## Human Review Confirmation",
-    "",
-    "| Field | Value |",
-    "| --- | --- |",
-    `| Confirmation ID | ${confirmationId} |`,
-    `| Confirmed At | ${timestamp} |`,
-    `| Reviewer | ${safeReviewer} |`,
-    `| Reviewer Email | ${safeReviewerEmail} |`,
-    `| Task Key | ${canonicalTaskId} |`,
-    `| Confirm Text | ${markdownCell(confirmText)} |`,
-    `| Evidence Checked | ${safeEvidence} |`,
-    "| Commit SHA | pending |",
-    "| Audit Status | write-only |",
-    `| Message | ${safeMessage} |`,
-    "",
-  ].join("\n");
+  const renderConfirmationBlock = ({ commitSha = "pending", auditStatus = "commit-pending" } = {}) =>
+    `## Human Review Confirmation\n\n| Field | Value |\n| --- | --- |\n| Confirmation ID | ${confirmationId} |\n| Confirmed At | ${timestamp} |\n| Reviewer | ${safeReviewer} |\n| Reviewer Email | ${safeReviewerEmail} |\n| Task Key | ${canonicalTaskId} |\n| Confirm Text | ${markdownCell(confirmText)} |\n| Evidence Checked | ${safeEvidence} |\n| Commit SHA | ${markdownCell(commitSha)} |\n| Audit Status | ${markdownCell(auditStatus)} |\n| Message | ${safeMessage} |\n`;
+  const confirmationBlock = renderConfirmationBlock();
   const nextReview = replaceReviewConfirmation(reviewContent, confirmationBlock);
   fs.writeFileSync(reviewPath, nextReview.endsWith("\n") ? nextReview : `${nextReview}\n`);
   let progressContent = readFileSafe(progressPath);
@@ -483,9 +471,20 @@ export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Revie
     actor: reviewer || "Human Reviewer",
   });
   fs.writeFileSync(progressPath, progressContent.endsWith("\n") ? progressContent : `${progressContent}\n`);
+  const audit = commitReviewConfirmationGate(gitGate, {
+    taskId: canonicalTaskId,
+    reviewPath,
+    message: message || `Human review confirmed by ${reviewer}`,
+    writeFinalAudit(commitSha) {
+      const currentReview = readFileSafe(reviewPath);
+      const finalReview = replaceReviewConfirmation(currentReview, renderConfirmationBlock({ commitSha, auditStatus: "committed" }));
+      fs.writeFileSync(reviewPath, finalReview.endsWith("\n") ? finalReview : `${finalReview}\n`);
+    },
+  });
   return {
     event: "review-confirm",
     task: findTaskByDirectory(target, taskDir) || { id: canonicalTaskId, reviewStatus: "confirmed" },
+    audit,
   };
 }
 function assertTaskDirectoryInsidePlanning(target, taskDir) {
@@ -507,9 +506,9 @@ function markdownCell(value) {
 function replaceReviewConfirmation(content, block) {
   const trimmed = String(content || "").trimEnd();
   if (/^##\s*(?:Human Review Confirmation|人工审查确认)\s*$/im.test(trimmed)) {
-    return trimmed.replace(/^##\s*(?:Human Review Confirmation|人工审查确认)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, block.trimEnd());
+    return trimmed.replace(/^##\s*(?:Human Review Confirmation|人工审查确认)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, `${block.trimEnd()}\n\n`);
   }
-  return `${trimmed}\n\n${block}`;
+  return `${trimmed}\n\n${block.trimEnd()}\n`;
 }
 function renderAgentReviewSubmission({ target, taskDir, canonicalTaskId, message, evidence }) {
   const timestamp = nowTimestamp();
@@ -538,9 +537,9 @@ function renderAgentReviewSubmission({ target, taskDir, canonicalTaskId, message
 function replaceAgentReviewSubmission(content, block) {
   const trimmed = String(content || "").trimEnd();
   if (/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$/im.test(trimmed)) {
-    return `${trimmed.replace(/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, block.trimEnd())}\n`;
+    return `${trimmed.replace(/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, `${block.trimEnd()}\n\n`)}\n`;
   }
-  return `${trimmed}\n\n${block}\n`;
+  return `${trimmed}\n\n${block.trimEnd()}\n`;
 }
 function hashTaskMaterials(taskDir) {
   const hash = crypto.createHash("sha256");

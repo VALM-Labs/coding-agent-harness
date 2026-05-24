@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   acceptNoLessonCandidate,
   assert,
@@ -127,6 +128,7 @@ assert(blockedConfirm.status !== 0, "review-confirm should reject blocked queue 
 assert(blockedConfirm.stderr.includes("blocking review findings"), "blocked confirmation failure should explain finding blocker");
 
 fs.writeFileSync(reviewPath, afterSubmitReview);
+commitFixtureBaseline(target, "before queue review confirmation");
 const confirmed = expectJson([
   "review-confirm",
   taskId,
@@ -255,4 +257,22 @@ function replaceHumanConfirmationSection(content, replacement) {
   const pattern = /^##\s*(?:Human Review Confirmation|人工审查确认)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im;
   if (pattern.test(source)) return `${source.replace(pattern, replacement.trimEnd())}\n`;
   return `${source}\n\n${replacement.trimEnd()}\n`;
+}
+
+function commitFixtureBaseline(targetRoot, message) {
+  if (!fs.existsSync(path.join(targetRoot, ".git"))) {
+    expectFixtureGit(targetRoot, ["init"]);
+    expectFixtureGit(targetRoot, ["config", "user.name", "Harness Test"]);
+    expectFixtureGit(targetRoot, ["config", "user.email", "harness-test@example.invalid"]);
+  }
+  expectFixtureGit(targetRoot, ["add", "."]);
+  const diff = spawnSync("git", ["diff", "--cached", "--quiet"], { cwd: targetRoot, encoding: "utf8" });
+  if (diff.status === 0) return;
+  expectFixtureGit(targetRoot, ["commit", "-m", `test fixture baseline: ${message}`]);
+}
+
+function expectFixtureGit(targetRoot, args) {
+  const result = spawnSync("git", args, { cwd: targetRoot, encoding: "utf8" });
+  assert(result.status === 0, `git ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
+  return result;
 }

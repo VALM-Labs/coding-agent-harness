@@ -91,10 +91,10 @@ Scanner 会根据必需文件、章节、证据和这个严格提交块派生 `m
 | Task Key | {{TASK_ID}} |
 | Confirm Text | [必须匹配任务 ID 或命令要求的确认短语] |
 | Evidence Checked | [review packet / tests / diff 摘要] |
-| Commit SHA | [sha 或 pending] |
-| Audit Status | committed / write-only / blocked |
+| Commit SHA | [由 review-confirm 生成的确认提交 SHA] |
+| Audit Status | committed / blocked |
 
-任务仍属于缺材料、阻塞或 Lessons 路由时，不要填写本节。
+任务仍属于缺材料、阻塞或 Lessons 路由时，不要填写本节。`review-confirm` 与 Dashboard Workbench 必须在 Git dirty、提交身份缺失、hook 失败，或写入超出当前任务 `review.md` / `progress.md` 白名单时拒绝确认。
 
 ## 残余风险
 
