@@ -107,6 +107,12 @@ function lessonCandidateRows(content) {
   const titleIndex = firstColumn(header, ["Title", "标题"]);
   const decisionIndex = firstColumn(header, ["Review Decision", "审查决定"]);
   const targetIndex = firstColumn(header, ["Promotion Target", "沉淀目标"]);
+  const scopeIndex = firstColumn(header, ["Scope", "范围"]);
+  const boundaryIndex = firstColumn(header, ["Boundary Reason", "边界原因"]);
+  const whyIndex = firstColumn(header, ["Why It Might Matter", "价值说明", "为什么重要"]);
+  const conflictIndex = firstColumn(header, ["Conflict Check", "冲突检查"]);
+  const requiredUpdateIndex = firstColumn(header, ["Required Standard Update", "必需标准更新"]);
+  const followUpIndex = firstColumn(header, ["Follow-up Task", "Followup Task", "后续任务"]);
   if (idIndex < 0 || statusIndex < 0) return [];
   return rows
     .filter((row) => /^LC-[A-Za-z0-9-]+$/i.test(row[idIndex] || ""))
@@ -114,8 +120,14 @@ function lessonCandidateRows(content) {
       id: row[idIndex] || "",
       status: normalizeLessonCandidateStatus(row[statusIndex] || ""),
       title: row[titleIndex] || "",
+      scope: scopeIndex >= 0 ? row[scopeIndex] || "" : "",
+      boundaryReason: boundaryIndex >= 0 ? row[boundaryIndex] || "" : "",
+      whyItMightMatter: whyIndex >= 0 ? row[whyIndex] || "" : "",
       reviewDecision: row[decisionIndex] || "",
       promotionTarget: row[targetIndex] || "",
+      conflictCheck: conflictIndex >= 0 ? row[conflictIndex] || "" : "",
+      requiredStandardUpdate: requiredUpdateIndex >= 0 ? row[requiredUpdateIndex] || "" : "",
+      followUpTask: followUpIndex >= 0 ? row[followUpIndex] || "" : "",
     }));
 }
 

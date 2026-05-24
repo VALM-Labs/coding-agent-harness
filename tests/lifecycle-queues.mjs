@@ -166,9 +166,9 @@ fs.writeFileSync(
     "",
     "## Candidates",
     "",
-    "| ID | Row Status | Title | Review Decision | Promotion Target |",
-    "| --- | --- | --- | --- | --- |",
-    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | approved | Lessons SSoT |",
+    "| ID | Row Status | Title | Scope | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | global | Queue model affects all harness users | Prevents Review queue from absorbing lesson work | approved | Lessons SSoT | no matching lesson found | task-state-machine docs | pending |",
     "",
   ].join("\n"),
 );
@@ -182,6 +182,22 @@ const lessonStatus = expectJson(["status", "--json", target]);
 const lessonStatusTask = lessonStatus.tasks.find((task) => task.id === lessonTask.task.id);
 assert(lessonStatusTask.taskQueues.includes("lessons"), "needs-promotion lesson work should enter Lessons queue");
 assert(!lessonStatusTask.taskQueues.includes("review"), "needs-promotion lesson work should not enter Review queue");
+assert(lessonStatusTask.lessonCandidateRows[0].scope === "global", "lesson candidate parser should expose scope");
+assert(lessonStatusTask.lessonCandidateRows[0].boundaryReason.includes("Queue model"), "lesson candidate parser should expose boundary reason");
+assert(lessonStatusTask.lessonCandidateRows[0].conflictCheck.includes("no matching"), "lesson candidate parser should expose conflict check");
+assert(lessonStatusTask.lessonCandidateRows[0].followUpTask === "pending", "lesson candidate parser should expose follow-up task");
+const lessonSedimentDryRun = expectJson(["lesson-sediment", lessonTask.task.id, "LC-QUEUE-LESSON", "--dry-run", target]);
+assert(lessonSedimentDryRun.dryRun === true, "lesson-sediment --dry-run should not mutate files");
+assert(lessonSedimentDryRun.prompt.includes("Source candidate: LC-QUEUE-LESSON"), "lesson-sediment should produce copyable prompt");
+const lessonSedimentationPreset = expectJson(["preset", "inspect", "lesson-sedimentation", "--json"]);
+assert(lessonSedimentationPreset.id === "lesson-sedimentation", "lesson-sedimentation preset should be inspectable");
+assert(expectJson(["preset", "check", "lesson-sedimentation", "--json"]).status === "pass", "lesson-sedimentation preset check should pass");
+const lessonSediment = expectJson(["lesson-sediment", lessonTask.task.id, "LC-QUEUE-LESSON", target]);
+assert(lessonSediment.preset === "lesson-sedimentation", "lesson-sediment should report preset");
+assert(lessonSediment.followUpTask.id.startsWith("TASKS/"), "lesson-sediment should create a follow-up task");
+assert(fs.existsSync(path.join(target, lessonSediment.followUpTask.path.replace(/^TARGET:/, ""), "artifacts/lesson-sedimentation-prompt.md")), "lesson-sediment should write prompt artifact");
+const lessonCandidatesAfterSediment = fs.readFileSync(path.join(lessonDir, "lesson_candidates.md"), "utf8");
+assert(lessonCandidatesAfterSediment.includes(lessonSediment.followUpTask.id), "lesson-sediment should record follow-up task id on source candidate");
 const lessonConfirm = run(["review-confirm", lessonTask.task.id, "--reviewer", "Human Reviewer", "--confirm", `${todayLocal}-queue-lesson`, target]);
 assert(lessonConfirm.status !== 0, "review-confirm should reject tasks that are only in Lessons queue");
 assert(lessonConfirm.stderr.includes("Review queue"), "Lessons queue confirmation failure should mention Review queue gate");

@@ -113,6 +113,10 @@ assert(dashboardApp.includes("warningQueue()"), "dashboard missing warning queue
 assert(dashboardApp.includes("reviewWorkspace("), "dashboard missing review workspace route implementation");
 assert(dashboardApp.includes("reviewQueueState"), "dashboard review queue must use status-level review queue state");
 assert(dashboardApp.includes("[\"lessonCandidates\", \"lesson_candidates.md\"]"), "dashboard should expose lesson candidate documents");
+assert(dashboardApp.includes("data-copy-lesson-prompt"), "dashboard lessons queue should expose copyable sedimentation prompt");
+assert(dashboardApp.includes("data-create-lesson-sedimentation"), "dashboard lessons queue should expose sedimentation task creation action");
+assert(dashboardApp.includes("lessonCandidateRows"), "dashboard should render parsed lesson candidate row facts");
+assert(dashboardApp.includes("sedimentationStatus"), "dashboard state summary should expose sedimentation axis");
 assert(dashboardApp.includes("migrationRunwayBreakdown"), "dashboard missing aggregate migration runway drilldown");
 assert(dashboardApp.includes("[\"brief\", \"brief.md\"]"), "dashboard should make brief.md the first task detail tab");
 assert(dashboardApp.includes("[\"visualMap\", \"visual_map.md\"]"), "dashboard should expose canonical visual_map.md tab");
