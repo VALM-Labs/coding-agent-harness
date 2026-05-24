@@ -36,7 +36,7 @@
 - 有没有反复出现、跨页面/跨模块/跨阶段的共性问题：[有/无，写一句理由]
 - 有没有下次 agent 也可能重复踩的坑：[有/无，写一句理由]
 - Lessons 结果：[checked-created: L-YYYY-MM-DD-NNN / queued-promotion: LC-YYYYMMDD-NNN / checked-candidate: LC-YYYYMMDD-NNN / checked-none: 一句话原因]
-- Lessons Detail Doc：[如 checked-created，填 `docs/01-GOVERNANCE/lessons/...md`；如 queued/checked-candidate，填 `lesson_candidates.md`；否则写"无"]
+- Lessons Detail Doc：[如 checked-created，填 `docs/01-GOVERNANCE/lessons/...md`；如 queued/checked-candidate，填 `lesson_candidates.md` 和任务本地 `lessons/LC-...md`；否则写"无"]
 
 ## 相关文件
 - Task Plan: [路径]
@@ -106,10 +106,10 @@ docs/10-WALKTHROUGH/Closeout-SSoT.md
 
 如果任何一条答案是“有”：
 
-1. 查找任务本地 `lesson_candidates.md` 和 `docs/01-GOVERNANCE/lessons/*.md`
+1. 查找任务本地 `lesson_candidates.md`、任务本地 `lessons/LC-*.md` 和 `docs/01-GOVERNANCE/lessons/*.md`
 2. 按 `references/lessons-governance.md` 中的规则处理冲突
-3. 先在任务目录 `lesson_candidates.md` 中登记候选并等待人工 review
-4. 人工确认后，如需沉淀，使用 maintenance CLI 写入 `docs/01-GOVERNANCE/lessons/` 详情文档
+3. 先在任务目录 `lesson_candidates.md` 中登记候选；候选进入 `needs-promotion` 时同步写任务本地 `lessons/LC-*.md` 详情文件并在 `Detail Artifact` 链接
+4. 人工确认后，如需沉淀，使用 maintenance CLI 写入 `docs/01-GOVERNANCE/lessons/` promoted 详情文档
 5. 在 Closeout SSoT 和 Harness Ledger 中记录 `queued-promotion: LC-...` 或 `checked-created: L-YYYY-MM-DD-NNN`
 
 如果所有答案都是“没有”，不能静默跳过；在 Closeout SSoT 和 Harness Ledger 中记录

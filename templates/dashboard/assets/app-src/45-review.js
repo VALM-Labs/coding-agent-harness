@@ -263,6 +263,8 @@ function lessonSedimentationPrompt(task, candidate) {
     `Source task: ${task.id}`,
     `Source candidate: ${candidate.id} - ${candidate.title || ""}`,
     `Candidate scope: ${candidate.scope || "unspecified"}`,
+    `Candidate module key: ${candidate.moduleKey || "n/a"}`,
+    `Detail artifact: ${candidate.detailArtifact || "not provided"}`,
     `Boundary reason: ${candidate.boundaryReason || "unspecified"}`,
     `Why it might matter: ${candidate.whyItMightMatter || "unspecified"}`,
     `Promotion target: ${candidate.promotionTarget || "unspecified"}`,
@@ -270,11 +272,12 @@ function lessonSedimentationPrompt(task, candidate) {
     `Required standard update: ${candidate.requiredStandardUpdate || "pending"}`,
     "",
     "Instructions:",
-    "1. Read the source task, review, findings, progress, and lesson_candidates.md.",
-    "2. Classify whether the lesson is task-local, module-local, or global.",
-    "3. Check conflicts against existing lessons and standards.",
-    "4. Propose the smallest diff first.",
-    "5. Do not write a shared Lessons table; use task-local candidates and promoted detail docs.",
+    "1. Read the source task, review, findings, progress, lesson_candidates.md, and the task-local detail artifact.",
+    "2. Use the detail artifact as the lesson body source; do not reconstruct the lesson from the brief row.",
+    "3. Classify whether the lesson is task-local, module-local, or global, preserving the module key and source path when present.",
+    "4. Check conflicts against existing lessons and standards.",
+    "5. Propose the smallest diff first.",
+    "6. Do not write a shared Lessons table; use task-local candidates and promoted detail docs.",
   ].join("\n");
 }
 

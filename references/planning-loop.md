@@ -55,7 +55,7 @@ slices/<slice-id>/review.md
 8. **复杂任务必须记录 `execution_strategy.md`** — 是否使用 subagent、reviewer、worktree、handoff 都写入独立文件。
 9. **非平凡任务必须记录 `visual_map.md`** — 这是任务图表集合，不只是 roadmap；HTML dashboard 从独立文件的 phase table 计算完成度、阻塞和证据状态。
 10. **路径必须带来源前缀** — 使用 `PUBLIC:`, `PRIVATE:`, `TARGET:`, `EXTERNAL:`, `URL:`，避免脆弱相对路径。
-11. **已验证切片必须主动提交** — 每个有意义的工作切片通过对应检查后，agent 默认主动 commit；只有用户明确要求暂不提交、检查失败、或 dirty diff 归属未清时才延期，并把原因写入 progress / handoff。
+11. **已验证切片必须主动提交** — 每个有意义的工作切片通过对应检查后，agent 默认主动 commit；只有用户明确要求暂不提交、检查失败、或 dirty diff 归属未清时才延期，并把 no-commit reason、owner 和下一步写入 progress / handoff。
 
 ## task_plan.md 模板
 
@@ -221,6 +221,7 @@ walkthrough、Lessons 检查等上下文回写结果。
 
 非平凡任务不是等用户提醒才提交。每个已验证、有意义、范围清晰的切片都应形成 commit。
 提交前只 stage 本任务范围内文件；无关 dirty 文件、私有文件和生成产物必须保留原样或按项目规则处理。
+不能提交时必须写清 no-commit reason、owner 和下一步；归属不清的 dirty diff 不能被混入本任务提交。
 
 任务相关 commit 应在 message footer 中引用任务 ID：
 

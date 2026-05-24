@@ -428,13 +428,30 @@ assert(!closedReviewTask?.taskQueues?.includes("review"), "closed tasks without 
 assert(closedReviewTask?.taskQueues?.includes("missing-materials"), "closed tasks without review submission should enter missing-materials repair routing");
 commitFixtureBaseline(lifecycleTarget, "before workbench lesson action fixture");
 const workbenchLessonTask = expectJson(["new-task", "workbench-lesson-action", "--title", "Workbench lesson action", "--locale", "en-US", lifecycleTarget]);
-const workbenchLessonCandidatePath = path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-workbench-lesson-action/lesson_candidates.md`);
+const workbenchLessonDir = path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-workbench-lesson-action`);
+const workbenchLessonCandidatePath = path.join(workbenchLessonDir, "lesson_candidates.md");
+fs.mkdirSync(path.join(workbenchLessonDir, "lessons"), { recursive: true });
+fs.writeFileSync(
+  path.join(workbenchLessonDir, "lessons/LC-WORKBENCH-001.md"),
+  [
+    "# LC-WORKBENCH-001 - Workbench lesson action",
+    "",
+    "## Problem / Trigger",
+    "",
+    "Workbench lesson creation must preserve the source candidate detail before creating a follow-up task.",
+    "",
+    "## Correct Rule",
+    "",
+    "The follow-up task reads this task-local detail artifact instead of reconstructing the lesson from the candidate row.",
+    "",
+  ].join("\n"),
+);
 fs.writeFileSync(
   workbenchLessonCandidatePath,
   fs.readFileSync(workbenchLessonCandidatePath, "utf8")
     .replace(
-      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LC-WORKBENCH-001 | ready-for-review | A very long dashboard lesson action title that should stay bounded inside queue cards and drawers | process | Workbench click path needs product feedback beyond CLI dry-run | Users need the created follow-up task, prompt, and recovery action visible in the Dashboard | pending | task lifecycle review checklist with a deliberately long promotion target | pending | possibly checker or template | pending |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LC-WORKBENCH-001 | needs-promotion | A very long dashboard lesson action title that should stay bounded inside queue cards and drawers | process | n/a | lessons/LC-WORKBENCH-001.md | Workbench click path needs product feedback beyond CLI dry-run | Users need the created follow-up task, prompt, and recovery action visible in the Dashboard | pending | task lifecycle review checklist with a deliberately long promotion target | pending | possibly checker or template | pending |",
     ),
 );
 commitFixtureBaseline(lifecycleTarget, "before workbench lesson sedimentation fixture");

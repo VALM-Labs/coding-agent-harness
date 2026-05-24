@@ -49,6 +49,13 @@ assert(
   fs.readFileSync(path.join(repoRoot, "templates-zh-CN", "AGENTS.md.template"), "utf8").includes("项目概况"),
   "templates-zh-CN should provide Chinese AGENTS.md content",
 );
+const agentsTemplate = fs.readFileSync(path.join(repoRoot, "templates", "AGENTS.md.template"), "utf8");
+assert(agentsTemplate.includes("no-commit reason"), "English AGENTS template should require a no-commit reason when a verified slice is not committed");
+assert(agentsTemplate.includes("dirty ownership"), "English AGENTS template should name dirty ownership as a commit deferral condition");
+assert(agentsTemplate.includes("unrelated dirty changes"), "English AGENTS template should forbid mixing unrelated dirty changes into commits");
+const zhAgentsTemplate = fs.readFileSync(path.join(repoRoot, "templates-zh-CN", "AGENTS.md.template"), "utf8");
+assert(zhAgentsTemplate.includes("no-commit reason"), "Chinese AGENTS template should require a no-commit reason when a verified slice is not committed");
+assert(zhAgentsTemplate.includes("归属不清"), "Chinese AGENTS template should name unclear dirty ownership as a commit deferral condition");
 for (const relativeFile of chineseNonDashboardTemplateFiles) {
   const content = fs.readFileSync(path.join(repoRoot, "templates-zh-CN", relativeFile), "utf8");
   assert(!brokenMechanicalTemplatePattern.test(content), `Chinese template contains mechanical placeholder text: ${relativeFile}`);

@@ -69,6 +69,7 @@ Closeout SSoT 中：
 任一答案为“有”时：
 
 - 先在任务目录 `lesson_candidates.md` 写候选。
+- 候选进入 `needs-promotion` 时，同步写任务本地 `lessons/LC-*.md` 详情文件，并在 `Detail Artifact` 链接。
 - 人工审查后，如需沉淀，再由维护命令写 promoted lesson 详情文档。
 - `checked-created:<L-ID>` 必须能追溯到该详情文档。
 

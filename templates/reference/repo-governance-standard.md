@@ -10,10 +10,11 @@ Define repository-level rules for branches, commits, pull requests, ownership, g
 2. Use task-scoped branches and worktrees for non-trivial changes, especially when multiple workers are active.
 3. Keep commits focused on the requested scope and avoid mixing unrelated cleanup with feature work.
 4. Generated files, caches, build output, local runtime state, and secrets must be ignored or stored in the approved location.
-5. Commit verified, meaningful slices proactively. Deferred commits require an explicit reason and owner.
-6. Pull requests must follow `docs/11-REFERENCE/pull-request-standard.md` and describe intent, changed surfaces, version impact, checks run, checks not run, review status, references, and residual risk.
-7. Required checks and material review findings block merge unless an approved exception is recorded.
-8. Merge or release ownership must be explicit when several branches or workers contribute to the same outcome.
+5. Commit verified, meaningful slices proactively. Deferred commits require an explicit no-commit reason, owner, and next step.
+6. Do not mix unrelated dirty changes into a task commit. CLI-owned Harness writes should use the local Harness commands so their locked, allowlisted auto-commit can protect shared governance files.
+7. Pull requests must follow `docs/11-REFERENCE/pull-request-standard.md` and describe intent, changed surfaces, version impact, checks run, checks not run, review status, references, and residual risk.
+8. Required checks and material review findings block merge unless an approved exception is recorded.
+9. Merge or release ownership must be explicit when several branches or workers contribute to the same outcome.
 
 ## Required Checklist
 
@@ -21,7 +22,7 @@ Define repository-level rules for branches, commits, pull requests, ownership, g
 - Allowed and forbidden paths are respected.
 - Dirty worktree state was checked before edits.
 - Generated and private files are not accidentally staged.
-- Verified slices have commit SHAs, or deferred commit rationale is recorded.
+- Verified slices have commit SHAs, or deferred commit rationale records the no-commit reason, owner, and next step.
 - PR summary follows `pull-request-standard.md` and includes evidence, version impact, references, and residuals.
 - Review findings are resolved or explicitly accepted.
 - Merge strategy and rollback or revert path are understood.

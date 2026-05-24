@@ -93,7 +93,7 @@ Required fields:
 - Branch pattern
 - Ownership rule
 - Subagent worker rule: each code-changing worker uses its own worktree / branch and hands off a commit SHA
-- Checkpoint commit rule: verified, meaningful slices are committed proactively; deferred commits require an explicit reason
+- Checkpoint commit rule: verified, meaningful slices are committed proactively; deferred commits require an explicit no-commit reason, owner, and next step
 - Merge ordering rule
 - Cleanup rule
 
@@ -133,6 +133,7 @@ Bootstrap is not complete unless repository governance is at least:
 - Worktree concurrency: `implemented`
 - Harness checker: passing or blocked-with-owner with explicit residual
 - Checkpoint commit rule: `implemented`
+- Dirty-state visibility: `implemented` means status/dashboard/checker expose dirty paths that can block CLI-owned auto-commit; unresolved dirty state must have an owner or no-commit reason
 
 ## Related Standards
 

@@ -120,6 +120,8 @@ assert(dashboardApp.includes("lessonCandidatePanel(task, { context: \"drawer\" }
 assert(dashboardApp.includes("lessonSedimentationSuccess"), "dashboard should render post-create follow-up task and prompt actions");
 assert(dashboardApp.includes("lessonSedimentationFailure"), "dashboard should render actionable sedimentation failure details");
 assert(dashboardApp.includes("lessonCandidateRows"), "dashboard should render parsed lesson candidate row facts");
+assert(dashboardApp.includes("candidate.detailArtifact"), "dashboard lesson prompts must include task-local detail artifact paths");
+assert(dashboardApp.includes("Use the detail artifact as the lesson body source"), "dashboard lesson prompts must not reconstruct lessons from brief rows");
 assert(dashboardApp.includes("lesson-candidate-more"), "dashboard lessons queue should disclose when more actionable candidates are hidden in the bounded card");
 assert(dashboardApp.includes("review-doc-scroll"), "review workspace documents should render inside bounded scroll containers");
 assert(dashboardApp.includes("sedimentationStatus"), "dashboard state summary should expose sedimentation axis");

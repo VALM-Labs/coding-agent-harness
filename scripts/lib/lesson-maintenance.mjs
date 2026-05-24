@@ -12,6 +12,11 @@ import {
   collectTasks,
   parseLessonCandidateStatus,
 } from "./task-scanner.mjs";
+import {
+  beginGovernanceSync,
+  commitGovernanceSync,
+  releaseGovernanceSync,
+} from "./governance-sync.mjs";
 
 export function promoteLessonCandidate(targetInput, taskId, candidateId, { dryRun = false, apply = false } = {}) {
   const target = normalizeTarget(targetInput);
@@ -64,11 +69,24 @@ export function promoteLessonCandidate(targetInput, taskId, candidateId, { dryRu
     };
   }
 
-  fs.mkdirSync(path.dirname(detailPath), { recursive: true });
-  if (!fs.existsSync(detailPath)) fs.writeFileSync(detailPath, renderLessonDetail({ lessonId, candidate: row, task, detailRelative }));
-  fs.writeFileSync(candidatePath, markCandidatePromoted(candidateContent, row.id, lessonId));
+  const governanceContext = beginGovernanceSync(target, { operation: `lesson-promote ${task.id} ${row.id}` });
+  try {
+    fs.mkdirSync(path.dirname(detailPath), { recursive: true });
+    if (!fs.existsSync(detailPath)) fs.writeFileSync(detailPath, renderLessonDetail({ lessonId, candidate: row, task, detailRelative }));
+    fs.writeFileSync(candidatePath, markCandidatePromoted(candidateContent, row.id, lessonId));
+    const commit = commitGovernanceSync(
+      governanceContext,
+      [
+        detailRelative,
+        toPosix(path.relative(target.projectRoot, candidatePath)),
+      ],
+      { message: `chore(harness): promote lesson ${row.id}` },
+    );
 
-  return { dryRun: false, taskId: task.id, candidateId: row.id, lessonId, detailDoc: `TARGET:${detailRelative}`, changes };
+    return { dryRun: false, taskId: task.id, candidateId: row.id, lessonId, detailDoc: `TARGET:${detailRelative}`, changes, governance: { commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
 }
 
 function lessonIdFromCandidate(candidateId) {

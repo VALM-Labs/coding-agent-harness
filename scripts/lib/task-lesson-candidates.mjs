@@ -1,7 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
 import {
   tableAfterHeading,
   firstColumn,
 } from "./markdown-utils.mjs";
+import { toPosix } from "./core-shared.mjs";
 
 export const allowedLessonCandidateTaskStatuses = new Set([
   "missing",
@@ -53,6 +56,7 @@ export function parseLessonCandidateStatus(content) {
     for (const row of promotionRows) {
       for (const [field, label] of [
         ["scope", "Scope"],
+        ["detailArtifact", "Detail Artifact"],
         ["boundaryReason", "Boundary Reason"],
         ["whyItMightMatter", "Why It Might Matter"],
         ["promotionTarget", "Promotion Target"],
@@ -91,6 +95,24 @@ export function isLessonCandidateDecisionComplete(candidateStatus) {
   return reviewCompleteLessonCandidateStatuses.has(candidateStatus.status);
 }
 
+export function validateLessonCandidateDetailArtifacts(target, taskDir, candidateStatus) {
+  const issues = [];
+  const rows = Array.isArray(candidateStatus?.rows) ? candidateStatus.rows : [];
+  for (const row of rows.filter((candidate) => candidate.status === "needs-promotion")) {
+    const rawPath = String(row.detailArtifact || "").trim();
+    if (!rawPath) continue;
+    const resolved = resolveTaskLocalLessonArtifact(target, taskDir, rawPath);
+    if (!resolved || !isInsideDirectory(taskDir, resolved)) {
+      issues.push(`invalid-detail-artifact-path:${row.id || "missing-id"}:${rawPath}`);
+      continue;
+    }
+    if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+      issues.push(`missing-detail-artifact:${row.id || "missing-id"}:${rawPath}`);
+    }
+  }
+  return issues;
+}
+
 function emptyLessonCandidateStatus(status, issues = []) {
   return {
     status,
@@ -118,6 +140,21 @@ function lessonCandidateFields(content) {
   return fields;
 }
 
+function resolveTaskLocalLessonArtifact(target, taskDir, artifactPath) {
+  const raw = String(artifactPath || "").trim();
+  if (!raw) return "";
+  if (/^(?:https?:|file:|[A-Za-z]:\\|\/)/.test(raw)) return "";
+  const relative = raw.startsWith("TARGET:")
+    ? raw.replace(/^TARGET:/, "").replace(/^\/+/, "")
+    : toPosix(path.join(toPosix(path.relative(target.projectRoot, taskDir)), raw));
+  return path.resolve(target.projectRoot, relative);
+}
+
+function isInsideDirectory(parent, child) {
+  const relative = path.relative(parent, child);
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
 function lessonCandidateRows(content) {
   const { header, rows } = tableAfterHeading(content, /^ID$/i);
   const idIndex = firstColumn(header, ["ID", "候选 ID"]);
@@ -127,6 +164,8 @@ function lessonCandidateRows(content) {
   const targetIndex = firstColumn(header, ["Promotion Target", "沉淀目标"]);
   const scopeIndex = firstColumn(header, ["Scope", "范围"]);
   const boundaryIndex = firstColumn(header, ["Boundary Reason", "边界原因"]);
+  const moduleKeyIndex = firstColumn(header, ["Module Key", "模块 Key", "模块"]);
+  const detailArtifactIndex = firstColumn(header, ["Detail Artifact", "Lesson Detail", "详情产物", "详情文件"]);
   const whyIndex = firstColumn(header, ["Why It Might Matter", "价值说明", "为什么重要"]);
   const conflictIndex = firstColumn(header, ["Conflict Check", "冲突检查"]);
   const requiredUpdateIndex = firstColumn(header, ["Required Standard Update", "必需标准更新"]);
@@ -134,6 +173,7 @@ function lessonCandidateRows(content) {
   if (idIndex < 0 || statusIndex < 0) return { rows: [], missingColumns: [] };
   const requiredColumnSpecs = [
     ["Scope", scopeIndex],
+    ["Detail Artifact", detailArtifactIndex],
     ["Boundary Reason", boundaryIndex],
     ["Why It Might Matter", whyIndex],
     ["Promotion Target", targetIndex],
@@ -151,6 +191,8 @@ function lessonCandidateRows(content) {
       status: normalizeLessonCandidateStatus(row[statusIndex] || ""),
       title: row[titleIndex] || "",
       scope: scopeIndex >= 0 ? row[scopeIndex] || "" : "",
+      moduleKey: moduleKeyIndex >= 0 ? row[moduleKeyIndex] || "" : "",
+      detailArtifact: detailArtifactIndex >= 0 ? row[detailArtifactIndex] || "" : "",
       boundaryReason: boundaryIndex >= 0 ? row[boundaryIndex] || "" : "",
       whyItMightMatter: whyIndex >= 0 ? row[whyIndex] || "" : "",
       reviewDecision: row[decisionIndex] || "",

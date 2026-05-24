@@ -331,7 +331,7 @@ function mapModuleState(state) {
   return "reserved";
 }
 
-function inspectGit(root) {
+export function inspectGit(root) {
   const gitRootResult = git(root, ["rev-parse", "--show-toplevel"], { allowFailure: true });
   if (gitRootResult.status !== 0) return { inGit: false, gitRoot: "", entries: [] };
   const gitRoot = path.resolve(gitRootResult.stdout.trim());

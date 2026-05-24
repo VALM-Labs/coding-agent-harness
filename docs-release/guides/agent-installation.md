@@ -219,6 +219,7 @@ harness task-complete phase-2-lifecycle \
 - `task-log` 只追加执行记录；证据使用 `type:PATH:summary`，例如
   `command:TARGET:npm-test:passed`。
 - `review-confirm` 会向 `review.md` 追加人工审查确认，并向 `progress.md` 追加日志；如果存在 `Open: yes` 或 `Blocks Release: yes` 的开放 P0/P1/P2 finding，必须拒绝确认。
+- CLI-owned lifecycle 和 lesson 命令会在干净 Git root 中自动提交 allowlisted 写入；dirty 状态会出现在 `status` / dashboard 的警告里，并阻塞这些机械化提交。Agent 手工改动仍要主动提交，不能提交时记录 no-commit reason、owner 和下一步。
 - `status --json` 保留旧 `task.state` 用于兼容，并新增 `lifecycleState`、`reviewStatus`、`closeoutStatus` 和 `stateConflicts`。`done` 只表示实现完成，不等于 `closed`。
 - 人工操作入口使用本地 HTML workbench：`harness dev /path/to/project`。它会启动只绑定 `127.0.0.1` 的动态页面、自动选择端口、打开浏览器并随 docs 变更刷新。无 GUI 或 CI 场景使用 `harness dev --no-open /path/to/project`。
 - 底层兼容入口仍是 `harness dashboard --workbench --out-dir /tmp/harness-workbench /path/to/project`。静态 dashboard 文件仍然只读，不能承载人工确认动作。

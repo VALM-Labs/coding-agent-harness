@@ -44,8 +44,8 @@ Aggregation rule:
 
 ## Candidates
 
-| ID | Row Status | Title | Scope | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ID | Row Status | Title | Scope | Module Key | Detail Artifact | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## No-Candidate Reason
 
@@ -54,6 +54,8 @@ Not decided yet. Fill this only when review accepts that the task produced no re
 ## Promotion Notes
 
 - If human review decides a candidate is worth preserving, mark the row `needs-promotion` and record the target governance location.
+- If a candidate is marked `needs-promotion`, write the full task-local detail artifact while the source task context is fresh, then link it in `Detail Artifact`.
+- Use `Scope` values `task`, `module`, or `global`; module-scoped candidates must fill `Module Key`.
 - If human review rejects a candidate, mark the row `rejected` and keep the reason in the review decision.
 - `needs-promotion` does not block task closeout, but it must remain visible in the maintenance queue and closeout record.
 - Default promotion behavior is dry-run or follow-up-task first. Do not write a shared Lessons table; accepted candidates become promoted lesson detail docs.

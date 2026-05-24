@@ -22,6 +22,7 @@ import {
 import {
   isLessonCandidateDecisionComplete,
   parseLessonCandidateStatus,
+  validateLessonCandidateDetailArtifacts,
 } from "./task-lesson-candidates.mjs";
 import {
   assessMaterialsReadiness,
@@ -323,7 +324,11 @@ export function collectTasks(target) {
     const visualMap = readVisualMapContractFile(taskDir, taskPlan);
     const progress = readFileSafe(progressPath);
     const review = readFileSafe(reviewPath);
-    const lessonCandidates = parseLessonCandidateStatus(readFileSafe(lessonCandidatesPath));
+    const parsedLessonCandidates = parseLessonCandidateStatus(readFileSafe(lessonCandidatesPath));
+    const lessonDetailIssues = validateLessonCandidateDetailArtifacts(target, taskDir, parsedLessonCandidates);
+    const lessonCandidates = lessonDetailIssues.length
+      ? { ...parsedLessonCandidates, issues: [...parsedLessonCandidates.issues, ...lessonDetailIssues] }
+      : parsedLessonCandidates;
     const phases = parsePhases(visualMap.content);
     const completion =
       phases.length > 0

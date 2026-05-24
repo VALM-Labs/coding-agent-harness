@@ -27,7 +27,8 @@
 5. 可写 worker 必须在自己的 worktree 内实现、验证、提交，并 handoff branch、commit SHA、checks、residual。
 6. 遇到共享文件冲突，由 coordinator 或人工决定串行顺序。
 7. 遇到目标失效、权限阻塞、高风险决策或 stop condition 不适用，立即暂停并记录。
-8. 主动提交已验证的、有意义的中间成果；commit message 应说明变更类型和范围。除非用户明确要求暂不提交，或检查失败 / diff 归属不清，否则不要把已完成切片长期留在未提交状态。
+8. 主动提交已验证的、有意义的中间成果；commit message 应说明变更类型和范围。除非用户明确要求暂不提交、检查失败、dirty 归属不清，或安全边界阻止干净提交，否则不要把已完成切片长期留在未提交状态；延期提交必须写明 no-commit reason、owner 和下一步。
+9. 机械化 Harness 写入优先使用 CLI lifecycle 命令。CLI-owned 写入会加锁、限制 allowlist 并自动提交，也会拒绝 dirty Git 状态；agent-owned 手工编辑仍需要明确任务提交或延期提交理由。
 
 ## 完成任务后
 
@@ -75,7 +76,7 @@ PR 描述必须包含：
 
 - 每个已验证的、有意义的切片默认都要提交。
 - 提交前只 stage 本任务范围内文件，不能顺手带入无关 dirty 文件、私有文件或生成产物。
-- 如果用户明确说不要提交、检查失败、或 diff 归属还没厘清，必须把未提交原因写入 `progress.md` 或交接说明。
+- 如果用户明确说不要提交、检查失败、或 dirty 归属还没厘清，必须把 no-commit reason、owner 和下一步写入 `progress.md` 或交接说明。
 - closeout 时必须列出相关 commit SHA；如果没有 commit，必须说明为什么这是安全的例外。
 
 ## 禁止事项

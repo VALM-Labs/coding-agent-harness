@@ -24,6 +24,7 @@ Task Contract: harness-task/v1
 
 可选子目录按触发条件创建，不作为默认脚手架：
 
+- `lessons/LC-*.md`：进入 `needs-promotion` 的 lesson candidate 的任务本地详情文件。
 - `references/INDEX.md`：任务本地资料、外部链接、reviewer 输入包、跨仓上下文。
 - `artifacts/INDEX.md`：命令输出、截图、fixture、生成报告、审查记录等证据。
 - `slices/<slice-id>/`：多切片任务。每个切片使用 `brief.md`、`evidence.md`、`review.md`。
@@ -68,6 +69,7 @@ Task Contract: harness-task/v1
 | `progress.md` | 执行日志、决策和交接 |
 | `findings.md` | 发现、研究记录和未解决风险 |
 | `lesson_candidates.md` | 任务本地教训候选队列。人工审查确认前必须接受无候选、拒绝候选，或排队 promotion |
+| `lessons/LC-*.md` | 可选的任务本地 lesson 详情文件，趁源任务上下文还新鲜写出，并由 `Detail Artifact` 链接 |
 | `review.md` | Agent Review Submission、对抗性审查、release review、外部 reviewer 结论 |
 | `references/INDEX.md` | complex 任务的资料包和参考索引 |
 | `artifacts/INDEX.md` | complex 任务的生成证据和产物索引 |

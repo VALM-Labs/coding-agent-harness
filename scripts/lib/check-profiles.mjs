@@ -41,6 +41,7 @@ import { validateTaskCompletionConsistency } from "./task-completion-consistency
 import { validatePlanContracts } from "./check-task-contracts.mjs";
 import { validateGovernanceTableBoundaries } from "./governance-table-boundary.mjs";
 import { validateSubagentAuthorization } from "./subagent-authorization-audit.mjs";
+import { summarizeGitState } from "./git-status-summary.mjs";
 export { renderDashboard } from "./status-dashboard-renderer.mjs";
 
 export function runLegacyCheck(target) {
@@ -302,6 +303,7 @@ export function validateContextDocs(target, { strict = true } = {}) {
 
 export function buildStatus(targetInput, options = {}) {
   const target = normalizeTarget(targetInput);
+  const gitState = summarizeGitState(target);
   const capabilityState = validateCapabilities(target);
   const declaredCapabilities = new Set(capabilityState.registry.capabilities.map((capability) => capability.name));
   const safeAdoptionMode = declaredCapabilities.has("safe-adoption");
@@ -316,7 +318,7 @@ export function buildStatus(targetInput, options = {}) {
   const governanceBoundaries = validateGovernanceTableBoundaries(target);
   const subagentAuthorization = validateSubagentAuthorization(target, { strict: contractStrict });
   const failures = [...capabilityState.failures, ...reviews.failures, ...visualMaps.failures, ...planContracts.failures, ...presetContracts.failures, ...contextDocs.failures, ...governanceBoundaries.failures, ...subagentAuthorization.failures];
-  const warnings = [...capabilityState.warnings, ...reviews.warnings, ...visualMaps.warnings, ...planContracts.warnings, ...presetContracts.warnings, ...contextDocs.warnings, ...governanceBoundaries.warnings, ...subagentAuthorization.warnings];
+  const warnings = [...capabilityState.warnings, ...reviews.warnings, ...visualMaps.warnings, ...planContracts.warnings, ...presetContracts.warnings, ...contextDocs.warnings, ...governanceBoundaries.warnings, ...subagentAuthorization.warnings, ...gitState.warnings];
   if (legacy.status === "fail") {
     if (options.strictLegacy) failures.push("legacy check failed");
     else warnings.push(`adoption-needed: legacy check failed: ${(legacy.stderr || legacy.stdout).trim()}`);
@@ -364,6 +366,7 @@ export function buildStatus(targetInput, options = {}) {
       details: { failures, warnings },
       legacy,
     },
+    git: gitState.summary,
     summary: {
       tasks: tasks.length,
       briefCoverage: {

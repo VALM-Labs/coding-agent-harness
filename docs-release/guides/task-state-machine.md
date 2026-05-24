@@ -138,13 +138,14 @@ Review 队列只等人确认。缺材料、阻塞、lesson 沉淀、已确认待
 | --- | --- | --- |
 | 全局表：Feature SSoT、Harness Ledger、Closeout SSoT、Regression SSoT、Cadence Ledger | 当前状态、负责人、任务/模块/详情文档链接、回归 gate、收口或审计摘要 | 模块内步骤、未判定 lesson candidate、完整命令输出、长证据段落、review transcript、临时 repair prompt |
 | 模块层：Module Registry、`module_plan.md` | 模块边界、模块内步骤、handoff、当前阻塞和局部证据索引 | 已 promotion 的全局 lesson 正文、跨模块发布审计总账 |
-| 任务层：`brief.md`、`task_plan.md`、`progress.md`、`review.md`、`lesson_candidates.md`、`artifacts/INDEX.md` | 执行细节、证据、agent review、候选 lesson、修复提示和 raw artifact 路由 | 跨任务总账或 promoted lesson 详情正文 |
+| 任务层：`brief.md`、`task_plan.md`、`progress.md`、`review.md`、`lesson_candidates.md`、`lessons/LC-*.md`、`artifacts/INDEX.md` | 执行细节、证据、agent review、候选 lesson、task-local lesson 详情、修复提示和 raw artifact 路由 | 跨任务总账或 promoted lesson 详情正文 |
 
 Checker 对新增全局表行执行该边界。2026-05-24 之前已经存在的过载行默认作为
 `legacy-report-only` 出现在 Dashboard 迁移建议里，不会被自动删除或批量改写。
 新增行如果把 task/module 局部细节继续塞进全局表，会作为 `governance-table-entropy`
-失败项报告。Lesson candidate 留在 `lesson_candidates.md`，已接受的经验写入
-`docs/01-GOVERNANCE/lessons/*.md` 详情文档。修复方式是保留必要全局摘要行，
+失败项报告。Lesson candidate 留在 `lesson_candidates.md`；进入 `needs-promotion`
+的候选必须链接任务本地 `lessons/LC-*.md` 详情文件，已接受的经验再写入
+`docs/01-GOVERNANCE/lessons/*.md` promoted 详情文档。修复方式是保留必要全局摘要行，
 把细节移动到 module/task/detail 文档并在全局表中链接过去。
 
 ## 人工确认闭环
@@ -184,11 +185,14 @@ sequenceDiagram
 
 严格规则：Agent 可以准备 review evidence，也可以提交审查；但任务只有在 Human Review Confirmation block 存在后，才算人工确认。确认动作必须通过 gated auto-commit：Git 状态不干净、提交身份缺失、hook/preflight 失败，或待写文件超出当前任务 `review.md` / `progress.md` 白名单时，CLI 和 Workbench 都会拒绝并返回恢复建议。
 
+CLI-owned 机械写入和 agent-owned 手工切片是两条边界。`new-task`、`task-*`、`task-phase`、`module-step`、`review-confirm`、`lesson-sediment` 和 `lesson-promote --apply` 会在干净 Git root 中加锁、限制写入范围并自动提交。Agent 手工编辑代码、模板或任务文档时仍要在验证后主动提交；无法提交时必须记录 no-commit reason、owner 和下一步，不能把 unrelated dirty changes 混入任务提交。
+
 ## Lesson 沉淀
 
 Lesson promotion 默认不写共享 Lessons 表。Dashboard 或 CLI 应优先创建 dry-run 或后续沉淀任务，让执行者先完成：
 
 - 分类 scope 和边界原因。
+- 读取候选行的 `Detail Artifact` 指向的任务本地详情文件，不从表格 brief 复写正文。
 - 检查既有 lesson candidate、lesson detail doc、reference standard、template、checker 是否冲突。
 - 给出目标 diff 或 no-action 理由。
 - 由人工批准后再写 promoted lesson 详情文档或标准文档。

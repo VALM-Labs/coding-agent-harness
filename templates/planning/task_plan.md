@@ -40,6 +40,12 @@ enforce it.
 | complex | standard files plus `references/INDEX.md`, `artifacts/INDEX.md` |
 | long-running add-on | `long-running-task-contract.md` when `--long-running` is selected |
 
+Optional subdirectories are created only when triggered:
+
+- `lessons/LC-*.md`: task-local detail artifacts for lesson candidates marked `needs-promotion`.
+- `references/INDEX.md`: complex-task source package and reference index.
+- `artifacts/INDEX.md`: complex-task generated evidence and artifact index.
+
 File purposes:
 
 | Contract File | Purpose |
@@ -51,6 +57,7 @@ File purposes:
 | `progress.md` | Execution log, decisions, and handoff |
 | `findings.md` | Findings, research notes, and unresolved risks |
 | `lesson_candidates.md` | Task-local lesson candidate queue. Human review must accept no-candidate, reject candidates, or queue promotion before review confirmation |
+| `lessons/LC-*.md` | Optional task-local lesson detail artifacts written while source context is fresh and linked from `Detail Artifact` |
 | `review.md` | Agent review submission, adversarial review, or specialist review report |
 | `references/INDEX.md` | Complex-task source package and reference index |
 | `artifacts/INDEX.md` | Complex-task generated evidence and artifact index |
