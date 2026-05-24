@@ -102,7 +102,7 @@ Reviewer 必须以找问题为目标，而不是证明实现正确。
 - Progress:
 - Findings:
 - Regression SSoT:
-- Lessons SSoT:
+- Lesson Candidates / Detail Docs:
 - Walkthrough:
 ```
 
@@ -150,7 +150,7 @@ Review loop 的固定执行形态：
 - `progress.md` 记录审查发生的时间和处理结果摘要
 - `findings.md` 记录审查中产生的技术决策或研究发现
 - `Regression-SSoT.md` 记录新增或调整的 regression surface
-- `Lessons-SSoT.md` 记录可复用的流程、架构或标准改进建议
+- `lesson_candidates.md` 和 `docs/01-GOVERNANCE/lessons/*.md` 记录可复用的流程、架构或标准改进建议
 - `walkthrough` 收口时引用 `review.md` 的 material finding 状态和 no-finding 结论
 - `Harness Ledger` 记录本轮是否完成 review report
 

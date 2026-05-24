@@ -41,20 +41,6 @@ fs.writeFileSync(
 );
 
 fs.writeFileSync(
-  path.join(docsRoot, "01-GOVERNANCE", "Lessons-SSoT.md"),
-  [
-    "# Lessons SSoT",
-    "",
-    "| ID | Pattern | Status | Detail Doc | Source Task | Updated |",
-    "| --- | --- | --- | --- | --- | --- |",
-    "| L-OK-001 | Promoted review routing lesson | approved | `docs/01-GOVERNANCE/lessons/L-OK-001.md` | `docs/09-PLANNING/TASKS/2026-05-24-governance-table-entropy-checker` | 2026-05-24 |",
-    "| LC-BAD-001 | Candidate: maybe the dashboard should show a repair prompt transcript before human decision | pending-human-review | none | `docs/09-PLANNING/TASKS/2026-05-24-governance-table-entropy-checker/lesson_candidates.md` | 2026-05-24 |",
-    "| L-BAD-CANDIDATE | Canonical candidate row with links | candidate | `docs/01-GOVERNANCE/lessons/L-BAD-CANDIDATE.md` | `docs/10-WALKTHROUGH/candidate-walkthrough.md` | 2026-05-24 |",
-    "",
-  ].join("\n"),
-);
-
-fs.writeFileSync(
   path.join(docsRoot, "Harness-Ledger.md"),
   [
     "# Harness Ledger",
@@ -73,13 +59,10 @@ fs.writeFileSync(
 const check = run(["check", "--profile", "target-project", target]);
 assert(check.status !== 0, "new overloaded global table rows should fail target-project check");
 assert(check.stderr.includes("PF-BAD-001"), "Feature SSoT local detail row should be reported as a failure");
-assert(check.stderr.includes("LC-BAD-001"), "Lessons SSoT candidate row should be reported as a failure");
-assert(check.stderr.includes("L-BAD-CANDIDATE"), "canonical Lessons SSoT candidate rows should be reported as failures");
 assert(check.stderr.includes("HL-BAD-001"), "Harness Ledger execution log row should be reported as a failure");
 assert(check.stderr.includes("HL-BAD-REGRESSION-EVIDENCE"), "Harness Ledger Regression Evidence overload should be reported as a failure");
 assert(check.stderr.includes("HL-BAD-REVIEW-EVIDENCE"), "Harness Ledger Review Evidence overload should be reported as a failure");
 assert(!check.stderr.includes("PF-OK-001"), "allowed summary row should not be reported as a failure");
-assert(!check.stderr.includes("L-OK-001"), "promoted lesson summary row should not be reported as a failure");
 assert(check.stdout.includes("HL-LEGACY-001"), "legacy overloaded row should be reported as a warning");
 assert(!check.stderr.includes("HL-LEGACY-001"), "legacy overloaded row should not fail the check");
 
@@ -88,7 +71,7 @@ const dashboard = run(["dashboard", "--out-dir", dashboardDir, target]);
 assert(dashboard.status === 0, `dashboard generation should tolerate report-only legacy rows\n${dashboard.stderr}`);
 const adoption = JSON.parse(fs.readFileSync(path.join(dashboardDir, "data/adoption.json"), "utf8"));
 const entropyWarnings = adoption.warnings.filter((warning) => warning.type === "governance-table-entropy");
-assert(entropyWarnings.length >= 4, "dashboard adoption data should expose governance table entropy warnings");
+assert(entropyWarnings.length >= 3, "dashboard adoption data should expose governance table entropy warnings");
 assert(entropyWarnings.every((warning) => warning.phase === "global-table-boundary"), "entropy warnings should use a stable dashboard phase");
 assert(entropyWarnings.some((warning) => warning.id.includes("HL-LEGACY-001") && warning.status === "legacy-report-only"), "legacy overload should be visible but report-only in dashboard data");
 assert(entropyWarnings.some((warning) => warning.id.includes("PF-BAD-001") && warning.status === "open"), "new violations should be visible as open dashboard warnings");

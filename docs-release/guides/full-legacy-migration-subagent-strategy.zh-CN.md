@@ -120,7 +120,7 @@ harness migrate-verify /tmp/cah-migration-baseline/session.json
 | --- | --- | --- |
 | Task Contract Worker | `docs/09-PLANNING/TASKS/**/brief.md`、`execution_strategy.md`、`visual_map.md`、同任务 `progress.md` 可选追加 | 清掉 task contract failures；在已确认 rewrite 模式下重写薄弱旧表面。 |
 | Review/Capability Worker | `.harness-capabilities.json`、当前 strict review 文件 | 声明真实能力并规范 release-blocking review schema。 |
-| Legacy Governance Worker | `AGENTS.md`、PR template 或 residual、`docs/11-REFERENCE/**`、Ledger、Closeout SSoT、Lessons SSoT、walkthrough template | 清掉 legacy checker failures。 |
+| Legacy Governance Worker | `AGENTS.md`、PR template 或 residual、`docs/11-REFERENCE/**`、Ledger、Closeout SSoT、lesson candidates/detail docs、walkthrough template | 清掉 legacy checker failures。 |
 | Brief Coverage Workers | 按 task 日期段或模块拆分，写缺失或被点名薄弱的 `brief.md` | 达到 dashboard brief coverage 100%，并移除空模板。 |
 | Quality Repair Worker | 只写 reviewer 点名的文件 | 移除弱 brief、自动解析痕迹和 stale dashboard assumptions。 |
 
@@ -235,7 +235,7 @@ Task/review cleanup 后，strict cutover 仍可能因为旧 checker 要求 gover
 - PR template 存在，或有 explicit blocked-with-owner residual。
 - `Harness-Ledger.md` 包含 repo governance / CI-CD 和 Lessons Check 列。
 - `Closeout-SSoT.md` 包含 walkthrough、Lessons Check 和 closeout status。
-- `Lessons-SSoT.md` 包含 ID、status 和 detail doc 列。
+- Promoted lessons 位于 `docs/01-GOVERNANCE/lessons/*.md`；任务本地候选保留在 `lesson_candidates.md`。
 - `_walkthrough-template.md` 包含 Lessons Reflection。
 
 不要覆盖业务事实。尽量 merge 缺失列，或追加 migration section。

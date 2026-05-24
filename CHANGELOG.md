@@ -3,11 +3,11 @@
 ## 1.0.3
 
 - Added lesson sedimentation follow-up task creation through CLI, preset, and
-  Dashboard actions, without writing directly to Lessons SSoT by default.
+  Dashboard actions, using task-local candidates and promoted lesson detail
+  docs instead of a shared Lessons table.
 - Added git-backed review confirmation audit validation so forged committed
   Markdown blocks cannot satisfy human review confirmation.
-- Added governance table entropy checks for Lessons SSoT and Harness Ledger
-  boundaries.
+- Added governance table entropy checks for shared governance table boundaries.
 - Bounded lifecycle queue cards and review document panels for long task and
   review content.
 - Split lifecycle review gates, review-confirm writer, and lifecycle test

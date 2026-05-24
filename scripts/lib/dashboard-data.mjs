@@ -56,7 +56,6 @@ function collectDashboardDocumentPaths(target) {
     "09-PLANNING/Module-Registry.md",
     "05-TEST-QA/Regression-SSoT.md",
     "05-TEST-QA/Cadence-Ledger.md",
-    "01-GOVERNANCE/Lessons-SSoT.md",
     "10-WALKTHROUGH/Closeout-SSoT.md",
   ]) {
     addDocsPath(relativePath);
@@ -104,7 +103,7 @@ function documentKind(source) {
   if (lower.includes("module-registry.md")) return "module-registry";
   if (lower.includes("regression-ssot.md")) return "regression-ssot";
   if (lower.includes("cadence-ledger.md")) return "cadence-ledger";
-  if (lower.includes("lessons-ssot.md")) return "lessons-ssot";
+  if (/\/01-governance\/lessons\/[^/]+\.md$/i.test(lower)) return "lesson-detail";
   if (lower.endsWith("/progress.md")) return "task-progress";
   if (lower.endsWith("/brief.md")) return "task-brief";
   if (lower.endsWith("/review.md")) return "task-review";

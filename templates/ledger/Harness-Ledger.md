@@ -28,7 +28,7 @@ Track whether each meaningful task kept the harness contract intact: planning, s
 2. Link to durable files and commands. Do not rely on chat history as evidence.
 3. If a task changes product behavior, route it through Feature SSoT or Delivery SSoT.
 4. If a task changes regression expectations, route it through Regression SSoT and Cadence Ledger.
-5. If a task changes agent process, documentation standards, or repeatable checks, route it through Lessons SSoT.
+5. If a task changes agent process, documentation standards, or repeatable checks, route it through task-local lesson candidates and promoted lesson detail docs.
 6. A row can move to `closed` only when the walkthrough, regression evidence, review disposition, and lessons check are recorded.
 
 ## Archive Rules

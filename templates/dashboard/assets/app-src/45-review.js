@@ -274,7 +274,7 @@ function lessonSedimentationPrompt(task, candidate) {
     "2. Classify whether the lesson is task-local, module-local, or global.",
     "3. Check conflicts against existing lessons and standards.",
     "4. Propose the smallest diff first.",
-    "5. Do not write Lessons SSoT directly unless the human explicitly approves the target diff.",
+    "5. Do not write a shared Lessons table; use task-local candidates and promoted detail docs.",
   ].join("\n");
 }
 

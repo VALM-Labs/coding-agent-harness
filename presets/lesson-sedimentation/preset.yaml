@@ -1,6 +1,6 @@
 id: lesson-sedimentation
 version: 1
-purpose: Create a follow-up task for reviewing and sedimenting an accepted lesson candidate without direct Lessons SSoT writes.
+purpose: Create a follow-up task for reviewing and sedimenting an accepted lesson candidate into a promoted detail doc.
 compatibleBudgets: [standard, complex]
 localeSupport: [en-US, zh-CN]
 task:

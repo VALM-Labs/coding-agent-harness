@@ -13,6 +13,12 @@ import { createTask, resolveTaskDirectory } from "./task-lifecycle.mjs";
 import { readPresetPackage, buildPresetAudit, renderPresetTemplate } from "./preset-registry.mjs";
 import { firstColumn, updateMarkdownTableRow } from "./markdown-utils.mjs";
 import { taskIdForDirectory } from "./task-scanner.mjs";
+import {
+  beginGovernanceSync,
+  commitGovernanceSync,
+  governanceRelativePaths,
+  releaseGovernanceSync,
+} from "./governance-sync.mjs";
 
 const presetId = "lesson-sedimentation";
 
@@ -122,13 +128,46 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
   const changes = [...taskResult.changes];
 
   if (!dryRun) {
-    appendToFollowUpTask({ followUpDir, sourceTaskId, candidate, prompt, contextPacket, audit });
-    updateSourceFollowUpTask(candidatePath, candidate.id, followUpTaskId);
-    changes.push({
-      destination: toPosix(path.relative(target.projectRoot, candidatePath)),
-      source: lessonCandidatesFile,
-      action: "update-follow-up-task",
-    });
+    const governanceContext = beginGovernanceSync(target, { operation: `lesson-sediment ${sourceTaskId} ${candidate.id}` });
+    try {
+      appendToFollowUpTask({ followUpDir, sourceTaskId, candidate, prompt, contextPacket, audit });
+      updateSourceFollowUpTask(candidatePath, candidate.id, followUpTaskId);
+      changes.push(
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "task_plan.md"))),
+          source: "lesson-sedimentation",
+          action: "append-preset-context",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "progress.md"))),
+          source: "lesson-sedimentation",
+          action: "append-preset-progress",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "artifacts/lesson-sedimentation-prompt.md"))),
+          source: "lesson-sedimentation",
+          action: "create-prompt-artifact",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "artifacts/preset-audit.json"))),
+          source: "lesson-sedimentation",
+          action: "create-preset-audit",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, candidatePath)),
+          source: lessonCandidatesFile,
+          action: "update-follow-up-task",
+        },
+      );
+      taskResult.governance = {
+        ...(taskResult.governance || {}),
+        lessonSedimentationCommit: commitGovernanceSync(governanceContext, governanceRelativePaths(changes), {
+          message: `chore(harness): record lesson sedimentation ${candidate.id}`,
+        }),
+      };
+    } finally {
+      releaseGovernanceSync(governanceContext);
+    }
   }
 
   return {
@@ -144,6 +183,7 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
     },
     prompt,
     changes,
+    governance: taskResult.governance || null,
   };
 }
 

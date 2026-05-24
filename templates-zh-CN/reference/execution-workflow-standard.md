@@ -38,7 +38,7 @@
 5. 确认 `review.md` 没有 open P0/P1 finding；material P2 已修复或写为 `accepted-risk` 并路由。
 6. planned task 必须完成 closeout review，或写明 `skipped-with-reason`。
 7. 写 walkthrough，引用 task plan、review、证据、residual、Regression SSoT 和 commit。
-8. 执行 Lessons 检查：新任务默认先写 `lesson_candidates.md` 并交给人工审查；人工标记后可记录 `queued-promotion`，再由维护命令写 lesson 详情并更新 Lessons SSoT。没有可复用候选时记录 `no-candidate-accepted`；旧任务兼容可记录 `checked-none: <reason>`。
+8. 执行 Lessons 检查：新任务默认先写 `lesson_candidates.md` 并交给人工审查；人工标记后可记录 `queued-promotion`，再由维护命令写 promoted lesson 详情文档。没有可复用候选时记录 `no-candidate-accepted`；旧任务兼容可记录 `checked-none: <reason>`。
 9. 最后更新 Harness Ledger，因为它记录本轮上下文维护的最终状态。
 10. 完成 commit / PR / release note，并确认本任务工作区没有未解释的遗留改动。
 11. 如使用 worker，coordinator 集成 worker commit 后运行最终 gates，并记录 integration evidence。

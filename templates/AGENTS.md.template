@@ -42,7 +42,7 @@ Read the smallest context that can answer the task.
 | Documentation governance or Harness update | `docs/11-REFERENCE/docs-library-standard.md`, `.harness-capabilities.json` |
 | External source material intake | `docs/11-REFERENCE/external-source-intake-standard.md` |
 | Regression SSoT maintenance | `docs/11-REFERENCE/regression-ssot-governance.md` |
-| Walkthrough, closeout, or lessons | `docs/11-REFERENCE/walkthrough-standard.md`, `docs/10-WALKTHROUGH/Closeout-SSoT.md`, `docs/01-GOVERNANCE/Lessons-SSoT.md` |
+| Walkthrough, closeout, or lessons | `docs/11-REFERENCE/walkthrough-standard.md`, `docs/10-WALKTHROUGH/Closeout-SSoT.md`, current task `lesson_candidates.md`, `docs/01-GOVERNANCE/lessons/` |
 | Worktree operations | `docs/11-REFERENCE/worktree-standard.md` |
 
 ## Standard Execution Flow
@@ -72,7 +72,8 @@ Read the smallest context that can answer the task.
 - Module Registry: `docs/09-PLANNING/Module-Registry.md`
 - Regression SSoT: `docs/05-TEST-QA/Regression-SSoT.md`
 - Cadence Ledger: `docs/05-TEST-QA/Cadence-Ledger.md`
-- Lessons SSoT: `docs/01-GOVERNANCE/Lessons-SSoT.md`
+- Lesson Candidates: current task `lesson_candidates.md`
+- Lesson Detail Docs: `docs/01-GOVERNANCE/lessons/`
 - Closeout SSoT: `docs/10-WALKTHROUGH/Closeout-SSoT.md`
 - Harness Ledger: `docs/Harness-Ledger.md`
 

@@ -41,7 +41,7 @@
 | 文档治理或 Harness 更新 | `docs/11-REFERENCE/docs-library-standard.md`、`.harness-capabilities.json` |
 | 外部资料摄取 | `docs/11-REFERENCE/external-source-intake-standard.md` |
 | Regression SSoT 维护 | `docs/11-REFERENCE/regression-ssot-governance.md` |
-| 收口、walkthrough、Lessons | `docs/11-REFERENCE/walkthrough-standard.md`、`docs/10-WALKTHROUGH/Closeout-SSoT.md`、`docs/01-GOVERNANCE/Lessons-SSoT.md` |
+| 收口、walkthrough、Lessons | `docs/11-REFERENCE/walkthrough-standard.md`、`docs/10-WALKTHROUGH/Closeout-SSoT.md`、当前任务 `lesson_candidates.md`、`docs/01-GOVERNANCE/lessons/` |
 | Worktree、并行开发隔离 | `docs/11-REFERENCE/worktree-standard.md` |
 
 ## 标准执行流程
@@ -71,7 +71,8 @@
 - Module Registry：`docs/09-PLANNING/Module-Registry.md`
 - Regression SSoT：`docs/05-TEST-QA/Regression-SSoT.md`
 - Cadence Ledger：`docs/05-TEST-QA/Cadence-Ledger.md`
-- Lessons SSoT：`docs/01-GOVERNANCE/Lessons-SSoT.md`
+- Lesson Candidates：当前任务 `lesson_candidates.md`
+- Lesson Detail Docs：`docs/01-GOVERNANCE/lessons/`
 - Closeout SSoT：`docs/10-WALKTHROUGH/Closeout-SSoT.md`
 - Harness Ledger：`docs/Harness-Ledger.md`
 

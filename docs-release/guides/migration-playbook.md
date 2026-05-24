@@ -275,7 +275,7 @@ Full cutover 的 dashboard smoke 必须验证：
 | --- | --- | --- |
 | Task Contract Worker | `docs/09-PLANNING/TASKS/**/brief.md`、`execution_strategy.md`、`visual_map.md`、同任务 `progress.md` 追加 | 清掉 task contract 缺口；在已确认 rewrite 模式下重写薄弱旧表面。 |
 | Review/Capability Worker | `.harness-capabilities.json`、当前 strict review 文件 | 声明真实 capability，修 release-blocking review schema。 |
-| Legacy Governance Worker | `AGENTS.md`、PR template、`docs/11-REFERENCE/**`、Ledger、Closeout SSoT、Lessons SSoT、walkthrough template | 清掉 legacy checker 聚合错误。 |
+| Legacy Governance Worker | `AGENTS.md`、PR template、`docs/11-REFERENCE/**`、Ledger、Closeout SSoT、lesson candidates/detail docs、walkthrough template | 清掉 legacy checker 聚合错误。 |
 | Brief Coverage Workers | 按日期段或模块划分，写缺失或被点名薄弱的 `brief.md` | 把 dashboard brief coverage 变成 100%，并移除空模板。 |
 | Quality Repair Worker | 只写 reviewer 点名的问题文件 | 修掉自动解析痕迹、空模板、语言不一致和证据薄弱。 |
 

@@ -217,7 +217,7 @@ fs.writeFileSync(
 const promoteDryRun = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", "--dry-run", lifecycleTarget]);
 assert(promoteDryRun.dryRun === true && promoteDryRun.lessonId === "L-2026-05-21-001", "lesson-promote --dry-run should derive the lesson id");
 const promoteDefault = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", lifecycleTarget]);
-assert(promoteDefault.dryRun === true && promoteDefault.applyRequired === true, "lesson-promote without --apply should not write Lessons SSoT");
+assert(promoteDefault.dryRun === true && promoteDefault.applyRequired === true, "lesson-promote without --apply should not write lesson detail docs");
 assert(!fs.existsSync(path.join(lifecycleTarget, "docs/01-GOVERNANCE/lessons/L-2026-05-21-001-commit-contract-must-be-explicit.md")), "lesson-promote default should not create a detail document");
 const promoteRun = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", "--apply", lifecycleTarget]);
 assert(promoteRun.lessonId === "L-2026-05-21-001", "lesson-promote should return the created lesson id");
@@ -226,8 +226,8 @@ assert(
   "lesson-promote should create a detail document",
 );
 assert(
-  fs.readFileSync(path.join(lifecycleTarget, "docs/01-GOVERNANCE/Lessons-SSoT.md"), "utf8").includes("L-2026-05-21-001"),
-  "lesson-promote should append Lessons SSoT",
+  !fs.existsSync(path.join(lifecycleTarget, "docs/01-GOVERNANCE/Lessons-SSoT.md")),
+  "lesson-promote should not create or append a global Lessons table",
 );
 assert(fs.readFileSync(promotableCandidatePath, "utf8").includes("| LC-20260521-001 | promoted |"), "lesson-promote should mark the candidate row promoted");
 const promoteAgain = expectJson(["lesson-promote", "long-running-lifecycle", "LC-20260521-001", "--apply", lifecycleTarget]);
@@ -373,6 +373,7 @@ fs.writeFileSync(
   path.join(lifecycleTarget, "docs/09-PLANNING/MODULES/auth/module_plan.md"),
   `# Auth Module Plan\n\n## Steps\n\n| Step ID | Name | Status | Task Plan | Depends On |\n| --- | --- | --- | --- | --- |\n| AUTH-01 | Setup | planned | docs/09-PLANNING/MODULES/auth/${todayLocal}-module-lifecycle/task_plan.md | none |\n`,
 );
+commitFixtureBaseline(lifecycleTarget, "before module step fixture");
 const moduleStep = expectJson(["module-step", "auth", "AUTH-01", "--state", "done", lifecycleTarget]);
 assert(moduleStep.moduleKey === "auth" && moduleStep.stepId === "AUTH-01", "module-step should report updated module step");
 assert(fs.readFileSync(path.join(lifecycleTarget, "docs/09-PLANNING/MODULES/auth/module_plan.md"), "utf8").includes("| AUTH-01 | Setup | done |"), "module-step should update module_plan status");
@@ -407,6 +408,7 @@ fs.writeFileSync(
   workbenchClosedReviewProgress,
   fs.readFileSync(workbenchClosedReviewProgress, "utf8").replace(/^## 状态：.*$/m, "## 状态：done"),
 );
+commitFixtureBaseline(lifecycleTarget, "before workbench closed review phase fixture");
 expectJson(["task-phase", "workbench-closed-review", "PH-01", "--state", "done", "--completion", "100", "--evidence", "present", lifecycleTarget]);
 const closedReviewWalkthrough = path.join(lifecycleTarget, "docs/10-WALKTHROUGH/workbench-closed-walkthrough.md");
 fs.writeFileSync(
@@ -424,6 +426,7 @@ assert(closedReviewTask?.walkthroughPath?.endsWith("docs/10-WALKTHROUGH/workbenc
 assert(closedReviewTask?.lifecycleState === "closed-review-pending", "closed tasks without human confirmation should remain visible as review debt");
 assert(!closedReviewTask?.taskQueues?.includes("review"), "closed tasks without human confirmation should not enter the canonical review queue");
 assert(closedReviewTask?.taskQueues?.includes("missing-materials"), "closed tasks without review submission should enter missing-materials repair routing");
+commitFixtureBaseline(lifecycleTarget, "before workbench lesson action fixture");
 const workbenchLessonTask = expectJson(["new-task", "workbench-lesson-action", "--title", "Workbench lesson action", "--locale", "en-US", lifecycleTarget]);
 const workbenchLessonCandidatePath = path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-workbench-lesson-action/lesson_candidates.md`);
 fs.writeFileSync(
@@ -434,6 +437,7 @@ fs.writeFileSync(
       "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LC-WORKBENCH-001 | ready-for-review | A very long dashboard lesson action title that should stay bounded inside queue cards and drawers | process | Workbench click path needs product feedback beyond CLI dry-run | Users need the created follow-up task, prompt, and recovery action visible in the Dashboard | pending | task lifecycle review checklist with a deliberately long promotion target | pending | possibly checker or template | pending |",
     ),
 );
+commitFixtureBaseline(lifecycleTarget, "before workbench lesson sedimentation fixture");
 const workbenchDir = path.join(tmpRoot, "review-workbench");
 const workbench = spawn(node, [cli, "dashboard", "--workbench", "--out-dir", workbenchDir, "--host", "127.0.0.1", "--port", "0", lifecycleTarget], {
   cwd: repoRoot,
@@ -514,6 +518,7 @@ try {
     `\n| CL-WORKBENCH-REVIEW | 2026-05-21 | Workbench review gate | \`docs/09-PLANNING/TASKS/${todayLocal}-workbench-review/task_plan.md\` | \`docs/09-PLANNING/TASKS/${todayLocal}-workbench-review/review.md\` | \`docs/10-WALKTHROUGH/workbench-review-walkthrough.md\` | pending human review | none | checked-none | pending |\n`,
   );
   acceptNoLessonCandidate(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-workbench-review`));
+  commitFixtureBaseline(lifecycleTarget, "before workbench review lifecycle fixture");
   expectJson(["task-start", "workbench-review", "--message", "readying workbench review fixture", lifecycleTarget]);
   expectJson(["task-phase", "workbench-review", "PH-01", "--state", "done", "--completion", "100", "--evidence", "present", lifecycleTarget]);
   expectJson(["task-review", "workbench-review", "--message", "submitted for workbench confirmation", "--evidence", "command:TARGET:workbench-smoke:passed", lifecycleTarget]);
@@ -580,6 +585,7 @@ try {
 } finally {
   dev.kill("SIGTERM");
 }
+commitFixtureBaseline(lifecycleTarget, "after dev refresh marker fixture");
 
 const zhRegistryTarget = path.join(tmpRoot, "zh-module-registry-target");
 fs.mkdirSync(zhRegistryTarget);

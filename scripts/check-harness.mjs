@@ -24,7 +24,6 @@ const requiredFiles = [
   "docs/10-WALKTHROUGH/Closeout-SSoT.md",
   "docs/05-TEST-QA/Regression-SSoT.md",
   "docs/05-TEST-QA/Cadence-Ledger.md",
-  "docs/01-GOVERNANCE/Lessons-SSoT.md",
 ];
 
 const legacyPlanningFiles = [
@@ -42,7 +41,6 @@ const agAgentsRefs = [
   "adversarial-review-standard.md",
   "review-routing-standard.md",
   "walkthrough-standard.md",
-  "Lessons-SSoT.md",
   "harness-ledger-standard.md",
   "Closeout-SSoT.md",
 ];
@@ -296,10 +294,6 @@ function findHeaderIndex(rows, pattern) {
   return rows.findIndex((cells) => cells.some((cell) => pattern.test(cell)));
 }
 
-function columnIndex(header, pattern) {
-  return header.findIndex((cell) => pattern.test(cell));
-}
-
 function contentIncludesAny(content, terms) {
   return terms.some((term) => (term instanceof RegExp ? term.test(content) : content.includes(term)));
 }
@@ -381,7 +375,7 @@ function checkCloseoutSsot() {
       if (!createdMatch && !candidateMatch && !lessonsNonePattern.test(lessonsCheck)) {
         fail(`${closeoutPath} row ${id} needs Lessons Check value: checked-created:<lesson-id>, checked-candidate:<candidate-id>, queued-promotion:<candidate-id>, or checked-none:<reason>`);
       } else if (createdMatch && !lessonIds.has(createdMatch[1])) {
-        fail(`${closeoutPath} row ${id} references missing Lessons SSoT id: ${createdMatch[1]}`);
+        fail(`${closeoutPath} row ${id} references missing lesson detail doc id: ${createdMatch[1]}`);
       } else if (candidateMatch && !lessonCandidateIds.has(candidateMatch[1])) {
         fail(`${closeoutPath} row ${id} references missing lesson candidate id: ${candidateMatch[1]}`);
       }
@@ -394,7 +388,7 @@ function checkCloseoutSsot() {
       if (!ledgerCreatedMatch && !ledgerCandidateMatch && !lessonsNonePattern.test(ledgerLessonsCheck)) {
         fail(`docs/Harness-Ledger.md row ${id} needs Lessons Check value: checked-created:<lesson-id>, checked-candidate:<candidate-id>, queued-promotion:<candidate-id>, or checked-none:<reason>`);
       } else if (ledgerCreatedMatch && !lessonIds.has(ledgerCreatedMatch[1])) {
-        fail(`docs/Harness-Ledger.md row ${id} references missing Lessons SSoT id: ${ledgerCreatedMatch[1]}`);
+        fail(`docs/Harness-Ledger.md row ${id} references missing lesson detail doc id: ${ledgerCreatedMatch[1]}`);
       } else if (ledgerCandidateMatch && !lessonCandidateIds.has(ledgerCandidateMatch[1])) {
         fail(`docs/Harness-Ledger.md row ${id} references missing lesson candidate id: ${ledgerCandidateMatch[1]}`);
       }
@@ -403,18 +397,20 @@ function checkCloseoutSsot() {
 }
 
 function collectLessonIds() {
-  const lessonsPath = "docs/01-GOVERNANCE/Lessons-SSoT.md";
-  if (!exists(lessonsPath)) return new Set();
-  const table = markdownTable(read(lessonsPath));
-  const headerIndex = findHeaderIndex(table, /^ID$/i);
-  const header = headerIndex >= 0 ? table[headerIndex] : [];
-  const idColumn = columnIndex(header, /^ID$/i);
-  if (idColumn < 0) return new Set();
-  return new Set(
-    table
-      .map((cells) => cells[idColumn] || "")
-      .filter((id) => /^L-\d{4}(-\d{2}-\d{2})?-\d+/i.test(id)),
-  );
+  const root = filePath("docs/01-GOVERNANCE/lessons");
+  const ids = new Set();
+  if (!fs.existsSync(root)) return ids;
+  for (const entry of fs.readdirSync(root)) {
+    if (!entry.endsWith(".md")) continue;
+    const full = path.join(root, entry);
+    if (!fs.statSync(full).isFile()) continue;
+    const content = fs.readFileSync(full, "utf8");
+    const pathMatch = entry.match(/(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i);
+    const titleMatch = content.match(/#\s*(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i);
+    const id = titleMatch?.[1] || pathMatch?.[1];
+    if (id) ids.add(id);
+  }
+  return ids;
 }
 
 function collectLessonCandidateIds() {
@@ -441,52 +437,16 @@ function collectLessonCandidateIds() {
   return ids;
 }
 
-function checkLessonsSsot() {
-  const lessonsPath = "docs/01-GOVERNANCE/Lessons-SSoT.md";
-  if (!exists(lessonsPath)) return;
-
-  const content = read(lessonsPath);
-  if (!contentIncludesAny(content, [/Detail Doc/i, "详情文档"])) {
-    fail(`${lessonsPath} missing Detail Doc column`);
-  }
-
-  const table = markdownTable(content);
-  const headerIndex = findHeaderIndex(table, /^ID$/i);
-  const header = headerIndex >= 0 ? table[headerIndex] : [];
-  const detailColumn = columnIndexAny(header, [/^(Detail Doc|Detail)$/i, /^详情文档$/i, /^详情文档\s*\/\s*Detail Doc$/i]);
-  const idColumn = columnIndex(header, /^ID$/i);
-  const statusColumn = columnIndexAny(header, [/^Status$/i, /^状态$/i, /^状态\s*\/\s*Status$/i]);
-  if (idColumn < 0) fail(`${lessonsPath} missing ID column`);
-  if (detailColumn < 0) fail(`${lessonsPath} missing Detail Doc column`);
-  if (statusColumn < 0) fail(`${lessonsPath} missing Status column`);
-  if (idColumn < 0 || detailColumn < 0 || statusColumn < 0) return;
-
-  const lessonRows = table.filter((cells) => /^L-\d{4}(-\d{2}-\d{2})?-\d+/i.test(cells[idColumn] || ""));
-  for (const cells of lessonRows) {
-    const id = cells[idColumn] || "";
-    const status = cells[statusColumn] || "";
-    const detail = cells[detailColumn] || "";
-    if (!/pending|approved|merged|rejected|superseded|🟡|🟢|✅|❌|🔀/i.test(status)) {
-      fail(`${lessonsPath} row ${id} has unrecognized status: ${status}`);
-    }
-    const detailMatch = detail.match(/docs\/01-GOVERNANCE\/lessons\/[^|\s`]+\.md/);
-    if (!detailMatch) {
-      fail(`${lessonsPath} row ${id} Detail Doc must point to docs/01-GOVERNANCE/lessons/*.md`);
-      continue;
-    }
-    const detailPath = detailMatch[0];
-    if (!exists(detailPath)) {
-      fail(`${lessonsPath} row ${id} Detail Doc missing file: ${detailPath}`);
-      continue;
-    }
-    const detailContent = read(detailPath);
-    if (!detailContent.includes(id)) {
-      fail(`${detailPath} does not include lesson id ${id}`);
-    }
-    for (const requiredTerm of ["背景", "冲突声明"]) {
-      if (!detailContent.includes(requiredTerm)) {
-        fail(`${detailPath} missing required lesson section: ${requiredTerm}`);
-      }
+function checkLessonDetailDocs() {
+  const root = filePath("docs/01-GOVERNANCE/lessons");
+  if (!fs.existsSync(root)) return;
+  for (const entry of fs.readdirSync(root)) {
+    if (!entry.endsWith(".md")) continue;
+    const relativePath = `docs/01-GOVERNANCE/lessons/${entry}`;
+    const content = read(relativePath);
+    const id = entry.match(/(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i)?.[1];
+    if (id && !content.includes(id)) {
+      fail(`${relativePath} does not include lesson id ${id}`);
     }
   }
 }
@@ -527,7 +487,7 @@ function main() {
   checkReviewTemplate();
   checkHarnessLedger();
   checkCloseoutSsot();
-  checkLessonsSsot();
+  checkLessonDetailDocs();
   checkWalkthroughTemplate();
   checkReferencePlaceholders();
 

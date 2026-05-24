@@ -1,6 +1,6 @@
 # 项目 Harness 总账 - [项目名称]
 
-> 本文件记录非平凡任务是否完成了必要的 harness 上下文回写。它不是变更日志，也不替代 Feature SSoT、Regression SSoT、Lessons SSoT 或 walkthrough。
+> 本文件记录非平凡任务是否完成了必要的 harness 上下文回写。它不是变更日志，也不替代 Feature SSoT、Regression SSoT、lesson detail docs 或 walkthrough。
 
 ## 使用约定
 
@@ -45,6 +45,6 @@
 
 1. 功能进度写入 Feature SSoT，不在本表展开。
 2. 回归覆盖面、证据深度和失败项写入 Regression SSoT / Cadence Ledger。
-3. 复用性流程经验写入 Lessons SSoT，并创建 lesson 详情文档。
+3. 复用性流程经验先写任务本地 candidate，人工确认后创建 promoted lesson 详情文档。
 4. 收口证据写入 `docs/10-WALKTHROUGH/Closeout-SSoT.md`。
 5. 任意 `closed`、`closed-with-residual`、`closed-local-only` 行都必须能从本表追溯到任务计划、证据和 closeout。

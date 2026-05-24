@@ -8,65 +8,97 @@ import {
   datePrefix,
 } from "./core-shared.mjs";
 import { collectTasks } from "./task-scanner.mjs";
+import {
+  beginGovernanceSync,
+  commitGovernanceSync,
+  releaseGovernanceSync,
+} from "./governance-sync.mjs";
 
 export function supersedeTask(targetInput, oldRef, { by = "", reason = "" } = {}) {
   if (!by) throw new Error("task-supersede requires --by <new-task-id>");
   const target = normalizeTarget(targetInput);
   const oldTask = resolveTask(target, oldRef);
   const newTask = resolveTask(target, by);
-  writeTombstone(target, oldTask, {
-    State: "superseded",
-    "Superseded By": newTask.id,
-    Reason: reason || "superseded",
-    Operator: "coordinator",
-    Timestamp: nowTimestamp(),
-    "Reopen Eligible": "yes",
-    "Archive Eligible": "no",
-  });
-  appendProgress(target, oldTask, `task-supersede: superseded by ${newTask.id}`, reason || "superseded");
-  appendSupersedes(target, newTask, oldTask.id);
-  return { taskId: oldTask.id, supersededBy: newTask.id, reason: reason || "superseded" };
+  const governanceContext = beginGovernanceSync(target, { operation: `task-supersede ${oldTask.id}` });
+  try {
+    writeTombstone(target, oldTask, {
+      State: "superseded",
+      "Superseded By": newTask.id,
+      Reason: reason || "superseded",
+      Operator: "coordinator",
+      Timestamp: nowTimestamp(),
+      "Reopen Eligible": "yes",
+      "Archive Eligible": "no",
+    });
+    appendProgress(target, oldTask, `task-supersede: superseded by ${newTask.id}`, reason || "superseded");
+    appendSupersedes(target, newTask, oldTask.id);
+    const commit = commitGovernanceSync(contextFor(target, governanceContext), taskPaths(target, oldTask, newTask), {
+      message: `chore(harness): supersede task ${oldTask.id}`,
+    });
+    return { taskId: oldTask.id, supersededBy: newTask.id, reason: reason || "superseded", governance: { commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
 }
 
 export function softDeleteTask(targetInput, taskRef, { reason = "" } = {}) {
   const target = normalizeTarget(targetInput);
   const task = resolveTask(target, taskRef);
-  writeTombstone(target, task, {
-    State: "soft-deleted",
-    Reason: reason || "soft-delete",
-    Operator: "coordinator",
-    Timestamp: nowTimestamp(),
-    "Reopen Eligible": "yes",
-    "Archive Eligible": "no",
-  });
-  appendProgress(target, task, "task-delete --soft", reason || "soft-delete");
-  return { taskId: task.id, deletionState: "soft-deleted", reason: reason || "soft-delete" };
+  return writeDeletionState(target, task, "soft-deleted", reason || "soft-delete", "task-delete --soft");
 }
 
 export function archiveTask(targetInput, taskRef, { reason = "" } = {}) {
   const target = normalizeTarget(targetInput);
   const task = resolveTask(target, taskRef);
-  writeTombstone(target, task, {
-    State: "archived",
-    Reason: reason || "archive",
-    Operator: "coordinator",
-    Timestamp: nowTimestamp(),
-    "Reopen Eligible": "yes",
-    "Archive Eligible": "yes",
-  });
-  appendProgress(target, task, "task-archive", reason || "archive");
-  return { taskId: task.id, deletionState: "archived", reason: reason || "archive" };
+  return writeDeletionState(target, task, "archived", reason || "archive", "task-archive");
 }
 
 export function reopenTask(targetInput, taskRef, { reason = "" } = {}) {
   const target = normalizeTarget(targetInput);
   const task = resolveTask(target, taskRef);
-  const taskPlanPath = path.join(target.projectRoot, task.taskPlanPath.replace(/^TARGET:/, ""));
-  const content = readFileSafe(taskPlanPath);
-  const next = content.replace(/\n##\s*(?:Task Tombstone|任务墓碑)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, "");
-  fs.writeFileSync(taskPlanPath, next.endsWith("\n") ? next : `${next}\n`);
-  appendProgress(target, task, "task-reopen", reason || "reopened");
-  return { taskId: task.id, deletionState: "active", reason: reason || "reopened" };
+  const governanceContext = beginGovernanceSync(target, { operation: `task-reopen ${task.id}` });
+  try {
+    const taskPlanPath = path.join(target.projectRoot, task.taskPlanPath.replace(/^TARGET:/, ""));
+    const content = readFileSafe(taskPlanPath);
+    const next = content.replace(/\n##\s*(?:Task Tombstone|任务墓碑)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, "");
+    fs.writeFileSync(taskPlanPath, next.endsWith("\n") ? next : `${next}\n`);
+    appendProgress(target, task, "task-reopen", reason || "reopened");
+    const commit = commitGovernanceSync(governanceContext, taskPaths(target, task), {
+      message: `chore(harness): reopen task ${task.id}`,
+    });
+    return { taskId: task.id, deletionState: "active", reason: reason || "reopened", governance: { commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
+}
+
+function writeDeletionState(target, task, deletionState, reason, action) {
+  const governanceContext = beginGovernanceSync(target, { operation: `${action} ${task.id}` });
+  try {
+    writeTombstone(target, task, {
+      State: deletionState,
+      Reason: reason,
+      Operator: "coordinator",
+      Timestamp: nowTimestamp(),
+      "Reopen Eligible": "yes",
+      "Archive Eligible": deletionState === "archived" ? "yes" : "no",
+    });
+    appendProgress(target, task, action, reason);
+    const commit = commitGovernanceSync(governanceContext, taskPaths(target, task), {
+      message: `chore(harness): ${action.replace(/\s+/g, " ")} ${task.id}`,
+    });
+    return { taskId: task.id, deletionState, reason, governance: { commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
+}
+
+function taskPaths(target, ...tasks) {
+  return [...new Set(tasks.flatMap((task) => [task.taskPlanPath, task.progressPath]).filter(Boolean).map((item) => toPosix(item.replace(/^TARGET:/, ""))))];
+}
+
+function contextFor(_target, context) {
+  return context;
 }
 
 function resolveTask(target, ref) {

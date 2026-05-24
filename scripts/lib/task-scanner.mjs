@@ -35,6 +35,7 @@ import {
   parseReviewConfirmation,
   parseTaskIdentity,
   parseTaskTombstone,
+  requiresReviewMaterials,
   taskReviewStatus,
   taskScannerVersion,
 } from "./task-review-model.mjs";
@@ -47,6 +48,7 @@ export {
   parseReviewConfirmation,
   parseTaskIdentity,
   parseTaskTombstone,
+  requiresReviewMaterials,
   taskReviewStatus,
   taskScannerVersion,
 } from "./task-review-model.mjs";
@@ -366,6 +368,11 @@ export function collectTasks(target) {
       lessonCandidates,
       phases,
       longRunningContractPath,
+      reviewSurfaceRequired: requiresReviewMaterials({
+        state: stateInfo.state,
+        lifecycleState,
+        closeoutStatus: closeoutInfo.status,
+      }),
     });
     const stateConflicts = collectStateConflicts({ state: stateInfo.state, reviewStatus, closeoutStatus: closeoutInfo.status, lifecycleState });
     const reviewQueueState = deriveReviewQueueState({

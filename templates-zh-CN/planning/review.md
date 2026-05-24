@@ -119,7 +119,7 @@ Scanner 会根据必需文件、章节、证据和这个严格提交块派生 `m
 - Progress：[对应 `progress.md` 条目]
 - 发现记录：[是否需要写入 `findings.md`]
 - Regression SSoT：[新增 / 调整 / 无]
-- Lessons SSoT：[checked-created: L-YYYY-MM-DD-NNN / checked-none: 一句话原因]
+- Lessons：[checked-created: L-YYYY-MM-DD-NNN / checked-candidate: LC-YYYYMMDD-NNN / queued-promotion: LC-YYYYMMDD-NNN / checked-none: 一句话原因]
 - 收口记录：[收口时引用路径]
 
 ## 最终信心依据（Final Confidence Basis）

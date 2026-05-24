@@ -103,11 +103,17 @@ const lessonPath = path.join(taskDir, "lesson_candidates.md");
 
 let missingStatus = expectJson(["status", "--json", target]);
 let missingTask = missingStatus.tasks.find((task) => task.id === taskId);
-assert(missingTask.taskQueues.includes("missing-materials"), "planned complex task should enter missing-materials until review is submitted");
-assert(missingTask.queueReasons.some((reason) => reason.code === "missing-review-submission"), "missing queue should explain missing review submission");
-assert(missingTask.repairPrompt.includes("Do not write Human Review Confirmation"), "repair prompt should forbid agent human confirmation");
+assert(!missingTask.taskQueues.includes("missing-materials"), "planned complex task should not enter missing-materials before review is requested");
+assert(missingTask.reviewQueueState === "not-in-queue", "planned complex task should stay outside the review queue");
+assert(!missingTask.queueReasons.some((reason) => reason.code === "missing-review-submission"), "planned task should not demand review submission before review is requested");
+assert(!missingTask.repairPrompt.includes("Do not write Human Review Confirmation"), "planned task should not receive a review repair prompt");
 
 expectJson(["task-start", "queue-ready", "--message", "implementation started", target]);
+const activeStatus = expectJson(["status", "--json", target]);
+const activeTask = activeStatus.tasks.find((task) => task.id === taskId);
+assert(!activeTask.taskQueues.includes("missing-materials"), "in-progress complex task should not enter missing-materials before review is requested");
+assert(activeTask.reviewQueueState === "not-in-queue", "in-progress complex task should stay outside the review queue");
+
 expectJson(["task-phase", "queue-ready", "PH-01", "--state", "done", "--completion", "100", "--evidence", "present", target]);
 acceptNoLessonCandidate(taskDir);
 expectJson(["task-review", "queue-ready", "--message", "ready for human review", "--evidence", "command:TARGET:npm-test:passed", target]);
@@ -238,7 +244,7 @@ fs.writeFileSync(
     "",
     "| ID | Row Status | Title | Review Decision | Promotion Target | Follow-up Task |",
     "| --- | --- | --- | --- | --- | --- |",
-    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | approved | Lessons SSoT | pending |",
+    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | approved | lesson detail docs | pending |",
     "",
   ].join("\n"),
 );
@@ -267,10 +273,11 @@ fs.writeFileSync(
     "",
     "| ID | Row Status | Title | Scope | Boundary Reason | Why It Might Matter | Review Decision | Promotion Target | Conflict Check | Required Standard Update | Follow-up Task |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | global | Queue model affects all harness users | Prevents Review queue from absorbing lesson work | approved | Lessons SSoT | no matching lesson found | task-state-machine docs | pending |",
+    "| LC-QUEUE-LESSON | needs-promotion | Preserve queue lifecycle lesson | global | Queue model affects all harness users | Prevents Review queue from absorbing lesson work | approved | lesson detail docs | no matching lesson found | task-state-machine docs | pending |",
     "",
   ].join("\n"),
 );
+commitFixtureBaseline(target, "before queue lesson review");
 expectJson(["task-review", "queue-lesson", "--message", "ready except lesson promotion", "--evidence", "command:TARGET:npm-test:passed", target]);
 fs.appendFileSync(
   path.join(target, "docs/10-WALKTHROUGH/Closeout-SSoT.md"),
@@ -291,6 +298,7 @@ assert(lessonSedimentDryRun.prompt.includes("Source candidate: LC-QUEUE-LESSON")
 const lessonSedimentationPreset = expectJson(["preset", "inspect", "lesson-sedimentation", "--json"]);
 assert(lessonSedimentationPreset.id === "lesson-sedimentation", "lesson-sedimentation preset should be inspectable");
 assert(expectJson(["preset", "check", "lesson-sedimentation", "--json"]).status === "pass", "lesson-sedimentation preset check should pass");
+commitFixtureBaseline(target, "before lesson sediment follow-up task");
 const lessonSediment = expectJson(["lesson-sediment", lessonTask.task.id, "LC-QUEUE-LESSON", target]);
 assert(lessonSediment.preset === "lesson-sedimentation", "lesson-sediment should report preset");
 assert(lessonSediment.followUpTask.id.startsWith("TASKS/"), "lesson-sediment should create a follow-up task");
@@ -331,6 +339,7 @@ const supersededTask = supersededStatus.tasks.find((task) => task.id === superse
 assert(supersededTask.deletionState === "superseded", "tombstone should set deletionState superseded");
 assert(supersededTask.hiddenByDefault === true, "superseded task should be hidden by default");
 assert(supersededTask.taskQueues.includes("soft-deleted-superseded"), "superseded task should enter soft-deleted/superseded queue");
+commitFixtureBaseline(target, "before queue delete fixture");
 
 const deleteFixture = expectJson(["new-task", "queue-delete", "--title", "Queue Delete", "--locale", "en-US", target]);
 const hardDelete = run(["task-delete", "queue-delete", "--reason", "wrong duplicate", target]);

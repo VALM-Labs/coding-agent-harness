@@ -138,23 +138,37 @@ function pager(kind, page, pageCount, group = "") {
 }
 
 function lessonPanel() {
-  const lessons = (bundle.tables?.tables || [])
-    .filter((table) => table.kind === "lessons-ssot")
-    .flatMap((table) => table.rows);
+  const lessons = lessonDocuments();
   return `<section class="lesson-panel">
     <div class="section-head"><h2>${t("lessons")}</h2><span>${lessons.length}</span></div>
     <div class="lesson-list" style="padding-top: 10px;">
-      ${lessons.map((row) => {
-        const cells = row.cells || {};
-        const lessonId = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
-        const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
-        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lessonId)}">
-          <strong>${escapeHtml(lessonId)}</strong>
-          <p>${escapeHtml(summary)}</p>
+      ${lessons.map((lesson) => {
+        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lesson.id)}">
+          <strong>${escapeHtml(lesson.id)}</strong>
+          <p>${escapeHtml(lesson.title || lesson.path)}</p>
         </div>`;
       }).join("") || emptyState(t("noLessons"))}
     </div>
   </section>`;
+}
+
+function lessonDocuments() {
+  return (bundle.documents?.documents || [])
+    .filter((doc) => doc.type === "lesson-detail" || /\/01-GOVERNANCE\/lessons\/[^/]+\.md$/i.test(doc.path || ""))
+    .map((doc) => {
+      const id = lessonIdFromDocument(doc);
+      return { id, title: (doc.title || "").replace(new RegExp(`^${id}\\s*-\\s*`, "i"), ""), path: doc.path, doc };
+    })
+    .filter((lesson) => lesson.id)
+    .sort((left, right) => String(right.id).localeCompare(String(left.id)));
+}
+
+function lessonIdFromDocument(doc) {
+  const content = doc?.content || "";
+  const path = doc?.path || "";
+  return content.match(/#\s*(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i)?.[1]
+    || path.match(/(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i)?.[1]
+    || "";
 }
 
 function healthPanel() {

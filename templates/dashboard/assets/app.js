@@ -1353,7 +1353,7 @@ function lessonSedimentationPrompt(task, candidate) {
     "2. Classify whether the lesson is task-local, module-local, or global.",
     "3. Check conflicts against existing lessons and standards.",
     "4. Propose the smallest diff first.",
-    "5. Do not write Lessons SSoT directly unless the human explicitly approves the target diff.",
+    "5. Do not write a shared Lessons table; use task-local candidates and promoted detail docs.",
   ].join("\n");
 }
 
@@ -1562,23 +1562,37 @@ function pager(kind, page, pageCount, group = "") {
 }
 
 function lessonPanel() {
-  const lessons = (bundle.tables?.tables || [])
-    .filter((table) => table.kind === "lessons-ssot")
-    .flatMap((table) => table.rows);
+  const lessons = lessonDocuments();
   return `<section class="lesson-panel">
     <div class="section-head"><h2>${t("lessons")}</h2><span>${lessons.length}</span></div>
     <div class="lesson-list" style="padding-top: 10px;">
-      ${lessons.map((row) => {
-        const cells = row.cells || {};
-        const lessonId = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
-        const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
-        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lessonId)}">
-          <strong>${escapeHtml(lessonId)}</strong>
-          <p>${escapeHtml(summary)}</p>
+      ${lessons.map((lesson) => {
+        return `<div class="lesson" data-open-lesson-drawer="${escapeAttr(lesson.id)}">
+          <strong>${escapeHtml(lesson.id)}</strong>
+          <p>${escapeHtml(lesson.title || lesson.path)}</p>
         </div>`;
       }).join("") || emptyState(t("noLessons"))}
     </div>
   </section>`;
+}
+
+function lessonDocuments() {
+  return (bundle.documents?.documents || [])
+    .filter((doc) => doc.type === "lesson-detail" || /\/01-GOVERNANCE\/lessons\/[^/]+\.md$/i.test(doc.path || ""))
+    .map((doc) => {
+      const id = lessonIdFromDocument(doc);
+      return { id, title: (doc.title || "").replace(new RegExp(`^${id}\\s*-\\s*`, "i"), ""), path: doc.path, doc };
+    })
+    .filter((lesson) => lesson.id)
+    .sort((left, right) => String(right.id).localeCompare(String(left.id)));
+}
+
+function lessonIdFromDocument(doc) {
+  const content = doc?.content || "";
+  const path = doc?.path || "";
+  return content.match(/#\s*(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i)?.[1]
+    || path.match(/(L-\d{4}(?:-\d{2}-\d{2})?-\d+)/i)?.[1]
+    || "";
 }
 
 function healthPanel() {
@@ -2024,14 +2038,9 @@ async function copyText(text) {
 }
 
 function renderLessonDrawerContent(lessonId) {
-  const lessonTable = (bundle.tables?.tables || []).find((table) => table.kind === "lessons-ssot");
-  const row = (lessonTable?.rows || []).find((r) => {
-    const cells = r.cells || {};
-    const id = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
-    return id === lessonId;
-  });
+  const lesson = lessonDocuments().find((item) => item.id === lessonId);
 
-  if (!row) {
+  if (!lesson) {
     return `<div class="task-drawer-header">
       <h2>${escapeHtml(lessonId)}</h2>
       <button class="btn-close" data-close-drawer>×</button>
@@ -2041,23 +2050,13 @@ function renderLessonDrawerContent(lessonId) {
     </div>`;
   }
 
-  const cells = row.cells || {};
-  const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
-  const docPath = cells["\u8be6\u60c5\u6587\u6863"] || cells.Document || cells.document || "";
-
-  let doc = null;
-  if (docPath) {
-    doc = findDocument(docPath);
-  }
-  if (!doc) {
-    doc = (bundle.documents?.documents || []).find((d) => d.path.includes(lessonId) || d.path.endsWith(`${lessonId}.md`));
-  }
+  const doc = lesson.doc || findDocument(lesson.path);
 
   const header = `
     <div class="task-drawer-header">
       <div>
         <h2>${escapeHtml(lessonId)}</h2>
-        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(summary)}</p>
+        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(lesson.title || lesson.path)}</p>
       </div>
       <button class="btn-close" data-close-drawer>×</button>
     </div>
@@ -2067,16 +2066,10 @@ function renderLessonDrawerContent(lessonId) {
   if (doc && doc.content) {
     markdownBody = `<div class="markdown">${window.HarnessMarkdown.render(doc.content, "rendered")}</div>`;
   } else {
-    const rowsHtml = Object.entries(cells)
-      .map(([key, val]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(val)}</td></tr>`)
-      .join("");
     markdownBody = `
       <div style="margin-bottom: 20px; background: var(--paper-2); padding: 16px; border-radius: 8px; border: 1px dashed var(--line);">
         <p style="margin: 0; font-size: 13px; color: var(--muted);">${t("lessonDocMissing")}</p>
       </div>
-      <table class="rendered-table" style="width: 100%;">
-        <tbody>${rowsHtml}</tbody>
-      </table>
     `;
   }
 

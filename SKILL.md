@@ -5,7 +5,7 @@ description: >
   做长程项目开发的团队，在用户的项目上构建一套完整的 harness 工程体系。
   包括：项目诊断、AGENTS.md + CLAUDE.md 入口文件生成、docs/ 目录搭建、Planning Loop、SSoT 治理、
   Delivery Operating Model、Repository Governance、CI/CD、Long-Running Task Protocol、Adversarial Review Report、Review Routing、Worktree 并行开发、
-  Regression SSoT 与 Evidence Depth 分级回归、Walkthrough / Closeout SSoT 收口、Cadence Ledger、经验沉淀回流（Lessons SSoT）、
+  Regression SSoT 与 Evidence Depth 分级回归、Walkthrough / Closeout SSoT 收口、Cadence Ledger、任务本地 lesson 候选与 promoted lesson 详情文档、
   Harness Ledger 全局上下文回写总账。
   当用户要求设置 coding agent 的开发流程、建立回归测试体系、设计 AGENTS.md / CLAUDE.md、
   规划长程 agent 任务的执行框架、子代理审查循环、对抗性 review 报告、搭建 harness、或者提到 harness engineering 时，使用此技能。
@@ -42,13 +42,13 @@ coding-agent-harness"，不要重新 bootstrap 覆盖整个项目。先执行增
 2. 扫描目标项目现有 `AGENTS.md`、`CLAUDE.md`、`docs/` 和 SSoT / Ledger 文件。
 3. 输出 delta plan：哪些 harness 骨架、reference、template、SSoT、Ledger 项缺失或过期。
 4. 只补齐新增标准和缺失结构；不得用模板覆盖已有业务事实、历史 walkthrough、
-   task progress、Feature SSoT、Regression SSoT 或 Lessons SSoT。
+   task progress、Feature SSoT、Regression SSoT 或 lesson detail docs。
 5. 对已有文档采用 merge / append / residual-with-reason；只有全新缺失文件才从模板创建。
-6. 如果引入 Lessons SSoT、Harness Ledger 或新的 reference/template，同步更新入口索引。
+6. 如果引入 Harness Ledger、lesson detail docs 或新的 reference/template，同步更新入口索引。
 7. 收口时写 walkthrough，必须包含 Lessons Reflection；新任务先写并审查
    `lesson_candidates.md`。如人工标记值得沉淀，默认先用 dry-run 或后续
    lesson sedimentation 任务完成分类、冲突检查和建议 diff；只有人工明确批准后，
-   维护命令才写 `docs/01-GOVERNANCE/lessons/` 详情文档和 Lessons SSoT；最后在
+   维护命令才写 `docs/01-GOVERNANCE/lessons/` 详情文档；最后在
    `docs/Harness-Ledger.md` 与 `docs/10-WALKTHROUGH/Closeout-SSoT.md` 记录本次 harness update 的 delta 和 Lessons Check。
 
 一句话：harness update 是 delta merge，不是重新搭一遍。
@@ -175,7 +175,7 @@ harness task-list --json /path/to/project
 - 缺文件、缺章节、缺证据、缺 lesson decision 或未执行 `task-review` 的任务进入 Missing Materials 队列，不进入 Review queue。
 - open blocking finding、状态矛盾、审计失败或需要 human waiver 的任务进入 Blocked 队列，不进入 Review queue。
 - 已 Human Review Confirmation 但 closeout / ledger / lesson routing 未完成的任务属于 Confirmed / Finalized 队列，不应显示成“仍在审查”。
-- lesson candidate 进入 Lessons 队列后，默认先 dry-run 或创建后续沉淀任务；不要在 Dashboard 或普通 closeout 中直接写 Lessons SSoT，除非人工明确批准目标 diff。
+- lesson candidate 进入 Lessons 队列后，默认先 dry-run 或创建后续沉淀任务；不要在 Dashboard 或普通 closeout 中直接写共享 Lessons 表。
 - soft delete / supersede / archive 是只读可追溯生命周期，默认不 hard delete 任务目录；保留 tombstone、替代任务、原因和审计记录。
 - 证据必须进入 `task-log` 或 `progress.md`，并继续遵守 `type:PATH:summary` 格式。
 
@@ -250,7 +250,6 @@ harness bootstrap 完成后，项目中至少应存在以下文件：
 - [ ] `docs/05-TEST-QA/Cadence-Ledger.md`
 - [ ] `docs/10-WALKTHROUGH/_walkthrough-template.md`
 - [ ] `docs/10-WALKTHROUGH/Closeout-SSoT.md`
-- [ ] `docs/01-GOVERNANCE/Lessons-SSoT.md`
 - [ ] `docs/01-GOVERNANCE/lessons/`（空目录 + .gitkeep）
 - [ ] `docs/01-GOVERNANCE/_archive/`（空目录 + .gitkeep）
 - [ ] `docs/Harness-Ledger.md`
@@ -288,7 +287,7 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 11. **Merge + 自动回归** — Cadence Ledger 触发对应回归面；coordinator 只集成 worker commit，不混合多个 worker 的未提交改动
 12. **Walkthrough 收口** — 写收口记录并引用 review report
 13. **Closeout SSoT 回写** — 每个 closed 任务必须记录 walkthrough 路径或受控 skip reason
-14. **Lessons Reflection** — 写 walkthrough 时主动反思共性/反复问题；新任务用 `lesson_candidates.md` 承载人工判定，`queued-promotion` 进入 Lessons 队列；默认先 dry-run 或创建沉淀任务，不直接写 Lessons SSoT；`checked-created` 必须有详情文档和 SSoT 表行，旧任务兼容的 `checked-none` 必须写明原因
+14. **Lessons Reflection** — 写 walkthrough 时主动反思共性/反复问题；新任务用 `lesson_candidates.md` 承载人工判定，`queued-promotion` 进入 Lessons 队列；默认先 dry-run 或创建沉淀任务，不直接写共享 Lessons 表；`checked-created` 必须有 promoted lesson 详情文档，旧任务兼容的 `checked-none` 必须写明原因
 15. **Harness Ledger 回写** — 记录本轮上下文维护是否完成
 16. **Worktree 清理** — 删除已 merge 的 worktree
 
@@ -312,7 +311,7 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 | Long-Running Task | `references/long-running-task-standard.md` | 任务需要连续执行、长上下文或 stop condition 时 |
 | Adversarial Review | `references/adversarial-review-standard.md` | 需要独立审查报告、信心挑战或 material finding 分级时 |
 | Review Routing | `references/review-routing-standard.md` | 决定 self-review、subagent、外部 reviewer 或人工审查时 |
-| SSoT 治理 | `references/ssot-governance.md` | 维护 Feature / Delivery / Regression / Lessons 等当前事实时 |
+| SSoT 治理 | `references/ssot-governance.md` | 维护 Feature / Delivery / Regression 等当前事实时 |
 | 经验沉淀 | `references/lessons-governance.md` | walkthrough 收口后判断是否沉淀 lesson 时 |
 | Harness Ledger | `references/harness-ledger.md` | 记录本轮 harness 上下文维护、证据和 residual 时 |
 | Regression | `references/regression-system.md` | 设计或更新回归面、evidence depth 和 gate 时 |
@@ -328,7 +327,6 @@ harness 搭建完成后，每个 feature 从想法到代码的标准流程：
 | CLAUDE.md | `templates/CLAUDE.md.template` | Claude Code 兼容 shim，指向 AGENTS.md |
 | Feature SSoT | `templates/ssot/Feature-SSoT.md` | 功能、wave、当前实施状态 |
 | Regression SSoT | `templates/ssot/Regression-SSoT.md` | 回归面、证据深度、gate 状态 |
-| Lessons SSoT | `templates/ssot/Lessons-SSoT.md` | 经验沉淀候选、审批和归档 |
 | Delivery SSoT | `templates/ssot/Delivery-SSoT.md` | 多人、多仓、阶段性交付计划 |
 | Harness Ledger | `templates/ledger/Harness-Ledger.md` | 全局 harness 上下文维护总账 |
 | Lesson (ref-change) | `templates/lessons/lesson-ref-change.md` | Walkthrough 收口后 |

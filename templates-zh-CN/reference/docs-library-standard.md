@@ -9,7 +9,7 @@
 | 位置 | 职责 |
 | --- | --- |
 | `docs/Harness-Ledger.md` | 全局上下文维护总账，记录非平凡任务是否完成计划、审查、回归、Lessons 和收口回写。 |
-| `docs/01-GOVERNANCE/` | Lessons SSoT、经验详情、治理记录、归档。 |
+| `docs/01-GOVERNANCE/` | promoted lesson 详情、治理记录、归档。 |
 | `docs/03-ARCHITECTURE/` | ADR、架构设计、接口决策、关键技术方案。 |
 | `docs/04-DEVELOPMENT/` | 本地开发、代码地图、外部服务开发上下文、mock/stub、跨仓调试。 |
 | `docs/05-TEST-QA/` | Regression SSoT、Cadence Ledger、测试策略和回归证据索引。 |

@@ -106,10 +106,10 @@ docs/10-WALKTHROUGH/Closeout-SSoT.md
 
 如果任何一条答案是“有”：
 
-1. 完整读一遍 `docs/01-GOVERNANCE/Lessons-SSoT.md`
+1. 查找任务本地 `lesson_candidates.md` 和 `docs/01-GOVERNANCE/lessons/*.md`
 2. 按 `references/lessons-governance.md` 中的规则处理冲突
 3. 先在任务目录 `lesson_candidates.md` 中登记候选并等待人工 review
-4. 人工确认后，如需沉淀，使用 maintenance CLI 写入 `docs/01-GOVERNANCE/lessons/` 和 Lessons SSoT
+4. 人工确认后，如需沉淀，使用 maintenance CLI 写入 `docs/01-GOVERNANCE/lessons/` 详情文档
 5. 在 Closeout SSoT 和 Harness Ledger 中记录 `queued-promotion: LC-...` 或 `checked-created: L-YYYY-MM-DD-NNN`
 
 如果所有答案都是“没有”，不能静默跳过；在 Closeout SSoT 和 Harness Ledger 中记录

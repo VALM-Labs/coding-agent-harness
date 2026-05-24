@@ -45,13 +45,9 @@ export function promoteLessonCandidate(targetInput, taskId, candidateId, { dryRu
   const title = row.title || lessonId;
   const detailRelative = `docs/01-GOVERNANCE/lessons/${lessonId}-${slug(title)}.md`;
   const detailPath = path.join(target.projectRoot, detailRelative);
-  const ssotPath = path.join(target.docsRoot, "01-GOVERNANCE/Lessons-SSoT.md");
-  const ssotContent = readFileSafe(ssotPath);
-  if (!ssotContent.trim()) throw new Error("Lessons SSoT not found");
 
   const changes = [];
   if (!fs.existsSync(detailPath)) changes.push({ action: dryRun ? "would-create" : "create", path: `TARGET:${detailRelative}` });
-  if (!ssotContent.includes(lessonId)) changes.push({ action: dryRun ? "would-append" : "append", path: "TARGET:docs/01-GOVERNANCE/Lessons-SSoT.md" });
   if (row.status !== "promoted" || parsed.status !== "promoted") changes.push({ action: dryRun ? "would-update" : "update", path: task.lessonCandidatePath || `TARGET:${toPosix(path.relative(target.projectRoot, candidatePath))}` });
 
   const effectiveDryRun = dryRun || !apply;
@@ -70,7 +66,6 @@ export function promoteLessonCandidate(targetInput, taskId, candidateId, { dryRu
 
   fs.mkdirSync(path.dirname(detailPath), { recursive: true });
   if (!fs.existsSync(detailPath)) fs.writeFileSync(detailPath, renderLessonDetail({ lessonId, candidate: row, task, detailRelative }));
-  if (!ssotContent.includes(lessonId)) fs.writeFileSync(ssotPath, appendLessonSsotRow(ssotContent, { lessonId, candidate: row, task, detailRelative }));
   fs.writeFileSync(candidatePath, markCandidatePromoted(candidateContent, row.id, lessonId));
 
   return { dryRun: false, taskId: task.id, candidateId: row.id, lessonId, detailDoc: `TARGET:${detailRelative}`, changes };
@@ -105,24 +100,6 @@ function renderLessonDetail({ lessonId, candidate, task }) {
     "- State: pending governance integration",
     "",
   ].join("\n");
-}
-
-function appendLessonSsotRow(content, { lessonId, candidate, task, detailRelative }) {
-  const lines = String(content || "").split(/\r?\n/);
-  const headerIndex = lines.findIndex((line) => /^\|\s*(ID|Lesson ID)\s*\|/.test(line));
-  if (headerIndex < 0) throw new Error("Lessons SSoT active table not found");
-  const columnCount = splitSimpleRow(lines[headerIndex]).length;
-  const date = lessonId.match(/^L-(\d{4}-\d{2}-\d{2})-/)?.[1] || new Date().toISOString().slice(0, 10);
-  const detail = `\`${detailRelative}\``;
-  const source = `\`${task.path.replace(/^TARGET:/, "docs/").replace(/^docs\/docs\//, "docs/")}/task_plan.md\``;
-  const row =
-    columnCount === 10
-      ? `| ${lessonId} | ${escapeCell(candidate.title || lessonId)} | ${source} | process-change | coordinator | candidate | ${escapeCell(candidate.promotionTarget || "governance review")} | ${detail} | ${escapeCell(candidate.id)} | ${date} |`
-      : `| ${lessonId} | ${date} | ${source} | process-change | ${escapeCell(candidate.promotionTarget || "governance review")} | ${escapeCell(candidate.title || lessonId)} | ${detail} | pending | ${escapeCell(candidate.id)} |`;
-  let insertAt = headerIndex + 1;
-  while (insertAt < lines.length && lines[insertAt].trim().startsWith("|")) insertAt += 1;
-  lines.splice(insertAt, 0, row);
-  return `${lines.join("\n").trimEnd()}\n`;
 }
 
 function markCandidatePromoted(content, candidateId, lessonId) {

@@ -368,14 +368,9 @@ async function copyText(text) {
 }
 
 function renderLessonDrawerContent(lessonId) {
-  const lessonTable = (bundle.tables?.tables || []).find((table) => table.kind === "lessons-ssot");
-  const row = (lessonTable?.rows || []).find((r) => {
-    const cells = r.cells || {};
-    const id = cells.ID || cells.Lesson || cells["Lesson ID"] || cells["ID"] || "";
-    return id === lessonId;
-  });
+  const lesson = lessonDocuments().find((item) => item.id === lessonId);
 
-  if (!row) {
+  if (!lesson) {
     return `<div class="task-drawer-header">
       <h2>${escapeHtml(lessonId)}</h2>
       <button class="btn-close" data-close-drawer>×</button>
@@ -385,23 +380,13 @@ function renderLessonDrawerContent(lessonId) {
     </div>`;
   }
 
-  const cells = row.cells || {};
-  const summary = cells.Summary || cells["\u6458\u8981"] || cells.Pattern || cells.Status || "";
-  const docPath = cells["\u8be6\u60c5\u6587\u6863"] || cells.Document || cells.document || "";
-
-  let doc = null;
-  if (docPath) {
-    doc = findDocument(docPath);
-  }
-  if (!doc) {
-    doc = (bundle.documents?.documents || []).find((d) => d.path.includes(lessonId) || d.path.endsWith(`${lessonId}.md`));
-  }
+  const doc = lesson.doc || findDocument(lesson.path);
 
   const header = `
     <div class="task-drawer-header">
       <div>
         <h2>${escapeHtml(lessonId)}</h2>
-        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(summary)}</p>
+        <p style="font-size: 12px; margin: 4px 0 0; color: var(--muted); font-weight: 600;">${escapeHtml(lesson.title || lesson.path)}</p>
       </div>
       <button class="btn-close" data-close-drawer>×</button>
     </div>
@@ -411,16 +396,10 @@ function renderLessonDrawerContent(lessonId) {
   if (doc && doc.content) {
     markdownBody = `<div class="markdown">${window.HarnessMarkdown.render(doc.content, "rendered")}</div>`;
   } else {
-    const rowsHtml = Object.entries(cells)
-      .map(([key, val]) => `<tr><th>${escapeHtml(key)}</th><td>${escapeHtml(val)}</td></tr>`)
-      .join("");
     markdownBody = `
       <div style="margin-bottom: 20px; background: var(--paper-2); padding: 16px; border-radius: 8px; border: 1px dashed var(--line);">
         <p style="margin: 0; font-size: 13px; color: var(--muted);">${t("lessonDocMissing")}</p>
       </div>
-      <table class="rendered-table" style="width: 100%;">
-        <tbody>${rowsHtml}</tbody>
-      </table>
     `;
   }
 

@@ -7,7 +7,6 @@ const newRuleCutoff = "2026-05-24";
 
 const globalTableSpecs = [
   { key: "feature-ssot", relativePath: "09-PLANNING/Feature-SSoT.md", allowed: "index-state-route-summary", evaluate: evaluateFeatureRow },
-  { key: "lessons-ssot", relativePath: "01-GOVERNANCE/Lessons-SSoT.md", allowed: "promoted-lesson-summary-route", evaluate: evaluateLessonRow },
   { key: "harness-ledger", relativePath: "Harness-Ledger.md", allowed: "task-audit-summary-route", evaluate: evaluateLedgerRow },
   { key: "closeout-ssot", relativePath: "10-WALKTHROUGH/Closeout-SSoT.md", allowed: "closeout-index-review-route-summary", evaluate: evaluateCloseoutRow },
   { key: "regression-ssot", relativePath: "05-TEST-QA/Regression-SSoT.md", allowed: "gate-index-current-state", evaluate: evaluateRegressionRow },
@@ -64,30 +63,6 @@ function evaluateFeatureRow(row) {
   return findings;
 }
 
-function evaluateLessonRow(row) {
-  const cells = row.cells || {};
-  const text = rowText(row);
-  const rowKey = governanceRowKey(row);
-  const hasLessonIdentity = getCell(cells, ["ID", "Lesson", "Lesson ID"], "");
-  if (!hasLessonIdentity) return [];
-  const status = getCell(cells, ["Status", "状态", "Review Decision"], "");
-  const detailDoc = getCell(cells, ["Detail Doc", "Detail", "详情文档"], "");
-  const findings = [];
-  if (!isPromotedLessonStatus(status) || !isRealDetailDoc(detailDoc)) {
-    findings.push({
-      reason: "unpromoted lesson candidate belongs in task-local lesson_candidates.md before Lessons SSoT",
-      route: "task-local-lesson-candidates",
-    });
-  }
-  if (longEvidencePattern().test(text) || temporaryPromptPattern().test(text)) {
-    findings.push({
-      reason: "lesson detail evidence belongs in a lesson detail document, not the Lessons SSoT row",
-      route: "lesson-detail-doc",
-    });
-  }
-  return findings;
-}
-
 function evaluateLedgerRow(row) {
   const text = rowText(row);
   const evidence = ledgerEvidenceText(row);
@@ -98,15 +73,6 @@ function evaluateLedgerRow(row) {
     }];
   }
   return [];
-}
-
-function isPromotedLessonStatus(status) {
-  return /^(promoted|approved|merged|superseded)$/i.test(String(status || "").trim());
-}
-
-function isRealDetailDoc(detailDoc) {
-  const value = String(detailDoc || "").replace(/`/g, "").trim();
-  return Boolean(value) && !/^(none|n\/a|na|-|—|–|无|pending)$/i.test(value) && /\.md(?:\b|$)/i.test(value);
 }
 
 function ledgerEvidenceText(row) {

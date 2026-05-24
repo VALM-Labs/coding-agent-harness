@@ -120,7 +120,7 @@ Use small, bounded worker roles. These roles can run sequentially or in parallel
 | --- | --- | --- |
 | Task Contract Worker | `docs/09-PLANNING/TASKS/**/brief.md`, `execution_strategy.md`, `visual_map.md`, optional same-task `progress.md` log | Remove task contract failures; in a confirmed rewrite mode, rewrite weak old surfaces. |
 | Review/Capability Worker | `.harness-capabilities.json`, current strict review files | Declare real capabilities and normalize release-blocking review schema. |
-| Legacy Governance Worker | `AGENTS.md`, PR template or residual, `docs/11-REFERENCE/**`, Ledger, Closeout SSoT, Lessons SSoT, walkthrough template | Clear legacy checker failures. |
+| Legacy Governance Worker | `AGENTS.md`, PR template or residual, `docs/11-REFERENCE/**`, Ledger, Closeout SSoT, lesson candidates/detail docs, walkthrough template | Clear legacy checker failures. |
 | Brief Coverage Workers | disjoint task-date or module ranges, missing or explicitly weak `brief.md` files | Reach dashboard brief coverage 100 percent and remove empty templates. |
 | Quality Repair Worker | only files named by reviewer | Remove weak brief patterns and stale dashboard assumptions. |
 
@@ -235,7 +235,7 @@ Fix or route:
 - PR template exists or an explicit blocked-with-owner residual exists.
 - `Harness-Ledger.md` includes repo governance / CI-CD and Lessons Check columns.
 - `Closeout-SSoT.md` includes walkthrough, Lessons Check, and closeout status.
-- `Lessons-SSoT.md` includes ID, status, and detail doc columns.
+- Promoted lessons live in `docs/01-GOVERNANCE/lessons/*.md`; task-local candidates stay in `lesson_candidates.md`.
 - `_walkthrough-template.md` includes Lessons Reflection.
 
 Do not overwrite business facts. Merge missing columns or append a migration section when possible.

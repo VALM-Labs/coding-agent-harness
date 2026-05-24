@@ -69,8 +69,8 @@ Closeout SSoT 中：
 任一答案为“有”时：
 
 - 先在任务目录 `lesson_candidates.md` 写候选。
-- 人工审查后，如需沉淀，再由维护命令写 lesson 详情文档并追加 Lessons SSoT。
-- Lessons SSoT 的详情文档列必须指向该详情文档。
+- 人工审查后，如需沉淀，再由维护命令写 promoted lesson 详情文档。
+- `checked-created:<L-ID>` 必须能追溯到该详情文档。
 
 三个答案都为“没有”时，Closeout SSoT 和 Harness Ledger 仍要记录：
 

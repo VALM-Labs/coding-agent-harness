@@ -39,7 +39,7 @@ Describe the recurring architecture, ownership, phase-gate, or operating-process
 ## Acceptance Criteria
 
 - The new rule has a durable home in a reference, template, checker, or project operating model.
-- The Lessons SSoT row links this detail doc and the applied change.
+- This promoted lesson detail doc links the applied change and the closeout record.
 - Existing active tasks know whether the new rule applies immediately or only to future work.
 
 ## Disposition

@@ -1,6 +1,6 @@
 # {{TASK_TITLE}} - Lesson Candidates
 
-This file is the task-local lesson candidate queue. It is not the Lessons SSoT. Human review decides whether any candidate should stay task-local, be rejected, enter dry-run promotion, or become a separate sedimentation task.
+This file is the task-local lesson candidate queue. Human review decides whether any candidate should stay task-local, be rejected, enter dry-run promotion, become a promoted lesson detail doc, or become a separate sedimentation task.
 
 ## Candidate Status
 
@@ -56,7 +56,7 @@ Not decided yet. Fill this only when review accepts that the task produced no re
 - If human review decides a candidate is worth preserving, mark the row `needs-promotion` and record the target governance location.
 - If human review rejects a candidate, mark the row `rejected` and keep the reason in the review decision.
 - `needs-promotion` does not block task closeout, but it must remain visible in the maintenance queue and closeout record.
-- Default promotion behavior is dry-run or follow-up-task first. Do not write Lessons SSoT directly unless the human explicitly approves the target diff.
+- Default promotion behavior is dry-run or follow-up-task first. Do not write a shared Lessons table; accepted candidates become promoted lesson detail docs.
 - A sedimentation task must classify scope, check conflicts against existing lessons and standards, propose the target change, and report verification before applying.
 
 ## Queue Routing

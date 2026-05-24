@@ -16,7 +16,7 @@
 | Tests and regression | yes / no | commands, CI runs, logs, screenshots |
 | SSoT and ledger updates | yes / no | Feature, Delivery, Regression, Closeout, or Harness Ledger links |
 | Review disposition | yes / no | review path, finding IDs, or no-finding statement |
-| Lessons and references | yes / no | Lessons SSoT, detail doc, or checked-none reason |
+| Lessons and references | yes / no | lesson_candidates.md, detail doc, or checked-none reason |
 
 ## Explicit Exclusions
 

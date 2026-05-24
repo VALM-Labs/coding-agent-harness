@@ -37,7 +37,7 @@ ref-change
 ## Acceptance Criteria
 
 - The target reference, template, or checker is updated.
-- The update is linked from Lessons SSoT.
+- The update is linked from this promoted lesson detail doc and the closeout record.
 - Any active task affected by the rule has a migration or no-impact note.
 
 ## Disposition

@@ -120,7 +120,7 @@ export function parseAgentReviewSubmission(reviewContent, { taskKey = "" } = {})
   };
 }
 
-export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, reviewSubmission, lessonCandidates, phases, longRunningContractPath }) {
+export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, reviewSubmission, lessonCandidates, phases, longRunningContractPath, reviewSurfaceRequired = true }) {
   const issues = [];
   const addIssue = (code, message, sourcePath, extra = {}) => {
     issues.push({
@@ -147,6 +147,8 @@ export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, re
   if (budget !== "simple") {
     if (brief.source !== "standalone") addIssue("missing-brief", "Standard and complex tasks require standalone brief.md.", "TARGET:brief.md");
     if (visualMap.status === "missing") addIssue("missing-visual-map", "Standard and complex tasks require canonical visual_map.md.", `TARGET:${visualMapFile}`);
+  }
+  if (budget !== "simple" && reviewSurfaceRequired) {
     if (!reviewSubmission?.submitted) {
       const message = reviewSubmission?.taskKeyMismatch
         ? "Agent Review Submission Task Key does not match this task."
@@ -168,6 +170,15 @@ export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, re
     }
   }
   return { ready: issues.length === 0, issues };
+}
+
+export function requiresReviewMaterials({ state = "unknown", lifecycleState = "unknown", closeoutStatus = "missing" } = {}) {
+  return (
+    state === "review" ||
+    state === "done" ||
+    ["in_review", "review-blocked", "closing", "closed-review-pending"].includes(lifecycleState) ||
+    closeoutStatus === "closed"
+  );
 }
 
 export function deriveTaskQueues({ id, title, reviewStatus, reviewSubmission, reviewConfirmation, reviewQueueState, materialIssues, risks, stateConflicts, lessonCandidates, closeoutStatus, tombstone, taskDir, target }) {
@@ -332,11 +343,7 @@ export function deriveReviewQueueState({ state = "unknown", lifecycleState = "un
   if (deletionState !== "active") return "not-in-queue";
   if (reviewStatus === "blocked-open-findings") return "blocked";
   if (["not_started", "planned", "in_progress"].includes(state)) return "not-in-queue";
-  const reviewSurface =
-    state === "review" ||
-    state === "done" ||
-    ["in_review", "review-blocked", "closing", "closed-review-pending"].includes(lifecycleState) ||
-    closeoutStatus === "closed";
+  const reviewSurface = requiresReviewMaterials({ state, lifecycleState, closeoutStatus });
   if (!reviewSurface) return "not-in-queue";
   if (reviewStatus === "confirmed") return closeoutStatus === "closed" ? "not-in-queue" : "confirmed";
   if (budget === "simple" && reviewStatus === "missing") return "not-in-queue";

@@ -64,7 +64,7 @@ docs/09-PLANNING/TASKS/<YYYY-MM-DD-任务名>/review.md
 - `not-reproducible`
 - `out-of-scope`
 
-`accepted-risk` 必须写明为什么不阻塞本轮目标，并路由到 task、SSoT、Regression SSoT、Lessons SSoT 或后续 PR。
+`accepted-risk` 必须写明为什么不阻塞本轮目标，并路由到 task、SSoT、Regression SSoT、lesson candidates/detail docs 或后续 PR。
 
 ## 无发现结论
 

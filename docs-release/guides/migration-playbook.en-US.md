@@ -271,7 +271,7 @@ Full migration should not let one agent edit everything from start to finish. Us
 | --- | --- | --- |
 | Task Contract Worker | `docs/09-PLANNING/TASKS/**/brief.md`, `execution_strategy.md`, `visual_map.md`, same-task `progress.md` append | Clear task contract gaps; in a confirmed rewrite mode, rewrite weak old surfaces. |
 | Review/Capability Worker | `.harness-capabilities.json`, current strict review files | Declare real capabilities and repair release-blocking review schema. |
-| Legacy Governance Worker | `AGENTS.md`, PR template, `docs/11-REFERENCE/**`, Ledger, Closeout SSoT, Lessons SSoT, walkthrough template | Clear legacy checker aggregate failures. |
+| Legacy Governance Worker | `AGENTS.md`, PR template, `docs/11-REFERENCE/**`, Ledger, Closeout SSoT, lesson candidates/detail docs, walkthrough template | Clear legacy checker aggregate failures. |
 | Brief Coverage Workers | date or module slices, missing or explicitly weak `brief.md` files | Bring dashboard brief coverage to 100 percent and remove empty templates. |
 | Quality Repair Worker | only files named by reviewers | Remove parser residue, empty templates, language mismatch, and weak evidence. |
 

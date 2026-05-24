@@ -33,13 +33,13 @@ SSoT（Single Source of Truth，单一事实源）是长程项目的命脉。没
 - 职责：哪些回归面存在、每条的标准入口、当前证据深度、residual
 - 规则：新增固定 gate 或 evidence depth 变化时必须更新
 
-### Lessons SSoT（经验沉淀）
+### Lessons Governance（经验沉淀）
 
 管理 Agent 在开发过程中发现的经验、改进建议和规范演进。
 
-- 文件：`docs/01-GOVERNANCE/Lessons-SSoT.md`
-- 职责：哪些经验值得沉淀、当前审批状态、冲突关系
-- 规则：Walkthrough 收口后检查是否有沉淀建议；写之前必须完整读 SSoT
+- 文件：任务本地 `lesson_candidates.md` 与 `docs/01-GOVERNANCE/lessons/*.md`
+- 职责：哪些经验值得沉淀、人工如何判定、哪些 lesson 已提升为详情文档
+- 规则：Walkthrough 收口后检查是否有沉淀建议；promotion 前必须查重 candidate 和 detail doc
 - 详细治理规范：`references/lessons-governance.md`
 
 ### Harness Ledger（全局上下文回写总账）
@@ -47,7 +47,7 @@ SSoT（Single Source of Truth，单一事实源）是长程项目的命脉。没
 管理每个非平凡任务对 harness 文档骨架的回写情况。
 
 - 文件：`docs/Harness-Ledger.md`
-- 职责：本轮任务是否回写 task plan、Feature SSoT、Regression SSoT、walkthrough、Lessons SSoT 和 reference/template
+- 职责：本轮任务是否回写 task plan、Feature SSoT、Regression SSoT、walkthrough、lesson candidates/detail docs 和 reference/template
 - 规则：任务收口时最后更新；只记录任务级 compliance，不记录逐行 diff
 - 详细规范：`references/harness-ledger.md`
 
@@ -56,9 +56,9 @@ SSoT（Single Source of Truth，单一事实源）是长程项目的命脉。没
 - Feature SSoT 不替代 Regression SSoT
 - Delivery SSoT 不替代 Feature SSoT；它管交付组织和集成顺序，不管功能细节
 - Regression SSoT 也不替代 Feature SSoT
-- Lessons SSoT 不替代前两者，它管的是规范本身的演进
+- Lessons Governance 不替代前两者，它管的是规范本身的演进
 - Harness Ledger 不替代任何 SSoT，它只记录本轮任务是否维护了对应事实
-- 四张 SSoT 和 Harness Ledger 必须各司其职，不能彼此吞并
+- SSoT、lesson 详情文档和 Harness Ledger 必须各司其职，不能彼此吞并
 
 ### Module Registry 与 Feature SSoT 的分工
 
@@ -90,7 +90,7 @@ SSoT（Single Source of Truth，单一事实源）是长程项目的命脉。没
 | Delivery SSoT | 当前交付 block、集成顺序和阻塞项 | wave 结束或 completed/superseded blocks 超过 20 条 | `docs/09-PLANNING/_archive/` |
 | Module Registry | 活跃 / 暂停不久的模块 | 模块 completed 或 paused 超过 60 天 | `docs/09-PLANNING/MODULES/_archive/<key>/` |
 | Regression SSoT | active gates | gate 废弃或长期不再运行 | `docs/05-TEST-QA/_archive/` |
-| Lessons SSoT | pending / approved / superseded 条目 | merged/rejected 超过 20 条 | `docs/01-GOVERNANCE/_archive/` |
+| Lesson detail docs | pending / approved / superseded 详情文档 | merged/rejected 超过 20 条 | `docs/01-GOVERNANCE/_archive/` |
 | Harness Ledger | 最近 50 条 active/closed 任务记录 | closed/superseded 超过 50 条 | `docs/01-GOVERNANCE/_archive/` |
 
 归档不改变 ID，不删除证据文件；Active 文件必须留下 archive index 或指向归档文件。

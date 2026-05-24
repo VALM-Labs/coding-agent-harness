@@ -12,8 +12,7 @@ docs/
 ├── 00-RAW-PRDS/              ← 原始需求文档、PRD、用户故事
 │   └── _archive/              ← 本层历史文档归档（如该层会增长）
 ├── 01-GOVERNANCE/             ← 项目治理规则、决策记录、经验沉淀
-│   ├── Lessons-SSoT.md        ← 经验沉淀建议表
-│   ├── lessons/               ← 具体沉淀内容
+│   ├── lessons/               ← promoted lesson 详情文档
 │   └── _archive/              ← 已处理条目归档
 ├── 02-PRODUCT/                ← 产品设计、用户流程、功能规格
 │   └── _archive/              ← 本层历史文档归档（如该层会增长）
@@ -137,7 +136,7 @@ Checker 规则：
 | Delivery SSoT | 集成 wave 结束或 completed/superseded blocks 超过 20 条 | `09-PLANNING/_archive/` |
 | Module Registry / module_plan | 模块 completed 或 paused 超过 60 天 | `09-PLANNING/MODULES/_archive/<key>/` |
 | Regression SSoT | gate 废弃或长期不再运行 | `05-TEST-QA/_archive/` |
-| Lessons SSoT | merged/rejected 条目超过 20 条 | `01-GOVERNANCE/_archive/` |
+| Lesson detail docs | merged/rejected/superseded 详情文档超过 20 条 | `01-GOVERNANCE/_archive/` |
 | Harness Ledger | closed/superseded 超过 50 条 | `01-GOVERNANCE/_archive/` |
 | Walkthrough | 年度/阶段迁移或目录过大 | `10-WALKTHROUGH/_archive/` |
 

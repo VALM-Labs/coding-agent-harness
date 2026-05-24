@@ -1,6 +1,6 @@
 # {{TASK_TITLE}} - 教训候选
 
-本文件是任务本地 lesson candidate queue。它不是 Lessons SSoT；人工审查需要决定候选是留在任务内、拒绝、进入 dry-run promotion，还是创建单独的沉淀任务。
+本文件是任务本地 lesson candidate queue。人工审查需要决定候选是留在任务内、拒绝、进入 dry-run promotion、创建 promoted lesson 详情文档，还是创建单独的沉淀任务。
 
 ## Candidate Status
 
@@ -56,7 +56,7 @@
 - 如果人工审查认为候选值得沉淀，把对应行标记为 `needs-promotion`，并记录目标治理位置。
 - 如果人工审查拒绝候选，把对应行标记为 `rejected`，并在 review decision 中保留理由。
 - `needs-promotion` 不阻止任务 closeout，但必须继续出现在维护队列和收口记录里。
-- 默认 promotion 行为是先 dry-run 或创建后续沉淀任务。除非人工明确批准目标 diff，不要直接写 Lessons SSoT。
+- 默认 promotion 行为是先 dry-run 或创建后续沉淀任务。不要写共享 Lessons 表；被接受的候选应成为 promoted lesson 详情文档。
 - 沉淀任务必须先分类 scope、检查既有 lessons 和 standards 冲突、提出目标改动，并在 apply 前报告验证证据。
 
 ## Queue Routing

@@ -50,6 +50,14 @@ import {
 } from "./task-lifecycle/review-gates.mjs";
 import { confirmTaskReview as confirmTaskReviewWithContext } from "./task-lifecycle/review-confirm.mjs";
 import { appendProgressLog, markdownCell } from "./task-lifecycle/text-utils.mjs";
+import {
+  beginGovernanceSync,
+  commitGovernanceSync,
+  governanceRelativePaths,
+  releaseGovernanceSync,
+  syncModuleStepGovernance,
+  syncTaskGovernance,
+} from "./governance-sync.mjs";
 
 function taskTemplateFiles({ locale = "en-US" } = {}) {
   return [
@@ -221,6 +229,8 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
     ? legacyMigrationPresetContext({ presetPackage, target, taskDir: directory, taskId: normalizedTaskId, session: migrationSession })
     : null;
   const changes = [];
+  const governanceContext = beginGovernanceSync(target, { operation: `new-task ${normalizedTaskId}`, dryRun });
+  try {
   if (normalizedModuleKey) {
     const moduleDirectory = path.dirname(directory);
     for (const [destination, source] of moduleTemplateFiles({ locale: normalizedLocale })) {
@@ -280,27 +290,37 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
       fs.writeFileSync(destinationPath, evidence.content);
     }
   }
+  const task = {
+    id: taskIdForDirectory(target, directory),
+    shortId: normalizedTaskId,
+    title: taskTitle,
+    module: normalizedModuleKey || null,
+    path: `TARGET:${toPosix(path.relative(target.projectRoot, directory))}`,
+    locale: normalizedLocale,
+    budget: normalizedBudget,
+    kind: presetContext?.kind || "general",
+    preset: normalizedPreset,
+    presetVersion: presetContext?.presetVersion || "",
+    presetAudit: presetContext?.audit || null,
+    migrationTargetLevel: presetContext?.migrationTargetLevel || "",
+    migrationAchievedLevel: presetContext?.migrationAchievedLevel || "",
+    evidenceBundle: presetContext?.evidenceBundle || "",
+    longRunning,
+  };
+  const governance = syncTaskGovernance(target, task, { event: "new-task", state: "planned", message: "task registered by CLI", dryRun });
+  changes.push(...governance.changes);
+  const commit = commitGovernanceSync(governanceContext, governanceRelativePaths(changes), {
+    message: `chore(harness): register task ${task.id}`,
+  });
   return {
     dryRun,
-    task: {
-      id: taskIdForDirectory(target, directory),
-      shortId: normalizedTaskId,
-      title: taskTitle,
-      module: normalizedModuleKey || null,
-      path: `TARGET:${toPosix(path.relative(target.projectRoot, directory))}`,
-      locale: normalizedLocale,
-      budget: normalizedBudget,
-      kind: presetContext?.kind || "general",
-      preset: normalizedPreset,
-      presetVersion: presetContext?.presetVersion || "",
-      presetAudit: presetContext?.audit || null,
-      migrationTargetLevel: presetContext?.migrationTargetLevel || "",
-      migrationAchievedLevel: presetContext?.migrationAchievedLevel || "",
-      evidenceBundle: presetContext?.evidenceBundle || "",
-      longRunning,
-    },
+    task,
     changes,
+    governance: { ...governance, commit },
   };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
 }
 
 export function updateTaskLifecycle(targetInput, taskId, { event = "task-log", state = "", message = "", evidence = "" } = {}) {
@@ -323,31 +343,53 @@ export function updateTaskLifecycle(targetInput, taskId, { event = "task-log", s
     taskDir,
   });
   if (event === "task-review") validateReviewEntryGate(taskDir, budget);
-  let content = readFileSafe(progressPath);
-  if (normalizedState) content = updateProgressState(content, normalizedState, registry.locale);
-  content = appendProgressLog(content, { event, message, evidence });
-  fs.writeFileSync(progressPath, content.endsWith("\n") ? content : `${content}\n`);
-  if (event === "task-review") {
-    const reviewPath = path.join(taskDir, "review.md");
-    const reviewContent = readFileSafe(reviewPath);
-    fs.writeFileSync(
-      reviewPath,
-      replaceAgentReviewSubmission(
-        reviewContent,
-        renderAgentReviewSubmission({
-          target,
-          taskDir,
-          canonicalTaskId,
-          message,
-          evidence,
-        }),
-      ),
-    );
+  const governanceContext = beginGovernanceSync(target, { operation: `${event} ${canonicalTaskId}` });
+  try {
+    let content = readFileSafe(progressPath);
+    if (normalizedState) content = updateProgressState(content, normalizedState, registry.locale);
+    content = appendProgressLog(content, { event, message, evidence });
+    fs.writeFileSync(progressPath, content.endsWith("\n") ? content : `${content}\n`);
+    const allowedPaths = [toPosix(path.relative(target.projectRoot, progressPath))];
+    if (event === "task-review") {
+      const reviewPath = path.join(taskDir, "review.md");
+      const reviewContent = readFileSafe(reviewPath);
+      fs.writeFileSync(
+        reviewPath,
+        replaceAgentReviewSubmission(
+          reviewContent,
+          renderAgentReviewSubmission({
+            target,
+            taskDir,
+            canonicalTaskId,
+            message,
+            evidence,
+          }),
+        ),
+      );
+      allowedPaths.push(toPosix(path.relative(target.projectRoot, reviewPath)));
+    }
+    const task =
+      findTaskByDirectory(target, taskDir) ||
+      {
+        id: canonicalTaskId,
+        shortId: path.basename(taskDir),
+        title: canonicalTaskId,
+        path: `TARGET:${toPosix(path.relative(target.projectRoot, taskDir))}`,
+        state: normalizedState || currentTask?.state || "unknown",
+      };
+    const governanceState = normalizedState || task.state || currentTask?.state || "planned";
+    const governance = syncTaskGovernance(target, task, { event, state: governanceState, message, dryRun: false });
+    const commit = commitGovernanceSync(governanceContext, [...allowedPaths, ...governanceRelativePaths(governance.changes)], {
+      message: `chore(harness): advance task ${canonicalTaskId} to ${governanceState}`,
+    });
+    return {
+      event,
+      task,
+      governance: { ...governance, commit },
+    };
+  } finally {
+    releaseGovernanceSync(governanceContext);
   }
-  return {
-    event,
-    task: findTaskByDirectory(target, taskDir) || { id: taskIdForDirectory(target, taskDir), state: normalizedState || "unknown" },
-  };
 }
 
 export function confirmTaskReview(targetInput, taskId, { reviewer = "Human Reviewer", message = "", confirmText = "", evidence = "" } = {}) {
@@ -430,9 +472,17 @@ export function updateTaskPhase(targetInput, taskId, phaseId, { state = "", comp
     return next;
   });
   if (!phaseUpdate.matched) throw new Error(`Phase not found: ${phaseId}`);
-  content = phaseUpdate.content;
-  fs.writeFileSync(visualMapPath, content);
-  return { event: "task-phase", task: findTaskByDirectory(target, taskDir), phaseId };
+  const governanceContext = beginGovernanceSync(target, { operation: `task-phase ${taskId} ${phaseId}` });
+  try {
+    content = phaseUpdate.content;
+    fs.writeFileSync(visualMapPath, content);
+    const commit = commitGovernanceSync(governanceContext, [toPosix(path.relative(target.projectRoot, visualMapPath))], {
+      message: `chore(harness): update task phase ${taskId} ${phaseId}`,
+    });
+    return { event: "task-phase", task: findTaskByDirectory(target, taskDir), phaseId, governance: { commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
+  }
 }
 
 export function updateModuleStep(targetInput, moduleKey, stepId, { state = "" } = {}) {
@@ -452,36 +502,51 @@ export function updateModuleStep(targetInput, moduleKey, stepId, { state = "" } 
     return next;
   });
   if (!stepUpdate.matched) throw new Error(`Module step not found: ${stepId}`);
-  content = stepUpdate.content;
-  fs.writeFileSync(modulePlanPath, content);
+  const governanceContext = beginGovernanceSync(target, { operation: `module-step ${normalizedModuleKey} ${stepId}` });
+  try {
+    content = stepUpdate.content;
+    fs.writeFileSync(modulePlanPath, content);
 
-  const registryPath = path.join(target.docsRoot, "09-PLANNING/Module-Registry.md");
-  if (fs.existsSync(registryPath)) {
-    let registry = readFileSafe(registryPath);
-    const registryUpdate = updateMarkdownTableRow(registry, /^(ID|模块 Key)$/i, (header, row) => {
-      const moduleIndex = firstColumn(header, ["Module", "模块", "模块 Key"]);
-      const taskPlanIndex = getColumn(header, "Task Plan");
-      const matchesModule = normalizeTaskId(row[moduleIndex] || "") === normalizedModuleKey;
-      const matchesPlan = taskPlanIndex >= 0 && String(row[taskPlanIndex] || "").includes(`/MODULES/${normalizedModuleKey}/`);
-      if (!matchesModule && !matchesPlan) return null;
-      const next = [...row];
-      const statusIndex = firstColumn(header, ["Status", "状态"]);
-      const updatedIndex = firstColumn(header, ["Updated", "更新时间"]);
-      const currentStepIndex = firstColumn(header, ["Current Step", "当前步骤"]);
-      const chineseRegistry = header.some((cell) => /模块 Key|模块名称|状态|更新时间/.test(cell));
-      if (statusIndex >= 0) {
-        next[statusIndex] = normalizedState === "done"
-          ? chineseRegistry ? "completed" : "merged"
-          : normalizedState === "in-progress" ? chineseRegistry ? "in-progress" : "active" : normalizedState;
-      }
-      if (currentStepIndex >= 0) next[currentStepIndex] = stepId;
-      if (updatedIndex >= 0) next[updatedIndex] = todayDate();
-      return next;
-    });
-    registry = registryUpdate.content;
-    fs.writeFileSync(registryPath, registry);
+    const registryPath = path.join(target.docsRoot, "09-PLANNING/Module-Registry.md");
+    if (fs.existsSync(registryPath)) {
+      let registry = readFileSafe(registryPath);
+      const registryUpdate = updateMarkdownTableRow(registry, /^(ID|模块 Key)$/i, (header, row) => {
+        const moduleIndex = firstColumn(header, ["Module", "模块", "模块 Key"]);
+        const taskPlanIndex = getColumn(header, "Task Plan");
+        const matchesModule = normalizeTaskId(row[moduleIndex] || "") === normalizedModuleKey;
+        const matchesPlan = taskPlanIndex >= 0 && String(row[taskPlanIndex] || "").includes(`/MODULES/${normalizedModuleKey}/`);
+        if (!matchesModule && !matchesPlan) return null;
+        const next = [...row];
+        const statusIndex = firstColumn(header, ["Status", "状态"]);
+        const updatedIndex = firstColumn(header, ["Updated", "更新时间"]);
+        const currentStepIndex = firstColumn(header, ["Current Step", "当前步骤"]);
+        const chineseRegistry = header.some((cell) => /模块 Key|模块名称|状态|更新时间/.test(cell));
+        if (statusIndex >= 0) {
+          next[statusIndex] = normalizedState === "done"
+            ? chineseRegistry ? "completed" : "merged"
+            : normalizedState === "in-progress" ? chineseRegistry ? "in-progress" : "active" : normalizedState;
+        }
+        if (currentStepIndex >= 0) next[currentStepIndex] = stepId;
+        if (updatedIndex >= 0) next[updatedIndex] = todayDate();
+        return next;
+      });
+      registry = registryUpdate.content;
+      fs.writeFileSync(registryPath, registry);
+    }
+    const governance = syncModuleStepGovernance(target, { moduleKey: normalizedModuleKey, stepId, state: normalizedState });
+    const commit = commitGovernanceSync(
+      governanceContext,
+      [
+        toPosix(path.relative(target.projectRoot, modulePlanPath)),
+        toPosix(path.relative(target.projectRoot, registryPath)),
+        ...governanceRelativePaths(governance.changes),
+      ],
+      { message: `chore(harness): update module ${normalizedModuleKey} step ${stepId}` },
+    );
+    return { event: "module-step", moduleKey: normalizedModuleKey, stepId, state: normalizedState, governance: { ...governance, commit } };
+  } finally {
+    releaseGovernanceSync(governanceContext);
   }
-  return { event: "module-step", moduleKey: normalizedModuleKey, stepId, state: normalizedState };
 }
 
 export function listLifecycleTasks(targetInput, { state = "", moduleKey = "" } = {}) {

@@ -43,7 +43,7 @@ Describe the missing reference document, template, checklist, or operating guide
 
 - The new document exists at the target path and is linked from the relevant index or entrypoint.
 - The document contains operational rules, not background essay content.
-- The Lessons SSoT row links this detail doc and the new document.
+- This promoted lesson detail doc links the new document and the closeout record.
 
 ## Disposition
 
