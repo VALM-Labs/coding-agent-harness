@@ -21,6 +21,28 @@ import {
 const lifecycleTarget = path.join(tmpRoot, "lifecycle-target");
 fs.mkdirSync(lifecycleTarget);
 expectJson(["init", "--locale", "zh-CN", "--capabilities", "core,dashboard", lifecycleTarget]);
+const automaticTaskDryRun = expectJson(["new-task", "--title", "Automatic ID Collision Guard", "--dry-run", lifecycleTarget]);
+assert(automaticTaskDryRun.task?.shortId?.startsWith(`${todayLocal}-automatic-id-collision-guard-`), "title-only new-task should derive a semantic automatic id");
+assert(/[0-9a-f]{8}$/.test(automaticTaskDryRun.task.shortId), "automatic task id should end with an 8-hex random suffix");
+assert(automaticTaskDryRun.task.id === `TASKS/${automaticTaskDryRun.task.shortId}`, "automatic task id should be reported as a project task id");
+assert(automaticTaskDryRun.task.shortId.length <= `${todayLocal}-`.length + 48 + "-".length + 8, "automatic task id should keep the random suffix visible after slug truncation");
+assert(!fs.existsSync(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${automaticTaskDryRun.task.shortId}`)), "automatic dry-run should not mutate target");
+const firstAutomaticTask = expectJson(["new-task", "--title", "Automatic ID Collision Guard", lifecycleTarget]);
+const secondAutomaticTask = expectJson(["new-task", "--title", "Automatic ID Collision Guard", lifecycleTarget]);
+assert(firstAutomaticTask.task.shortId !== secondAutomaticTask.task.shortId, "same-title automatic tasks should not collide");
+for (const task of [firstAutomaticTask, secondAutomaticTask]) {
+  assert(task.task.shortId.startsWith(`${todayLocal}-automatic-id-collision-guard-`), "created automatic task should use title slug");
+  assert(/[0-9a-f]{8}$/.test(task.task.shortId), "created automatic task should include random suffix");
+  assert(
+    fs.existsSync(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${task.task.shortId}/brief.md`)),
+    "created automatic task should write files under the target project",
+  );
+}
+const firstAutomaticBrief = fs.readFileSync(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${firstAutomaticTask.task.shortId}/brief.md`), "utf8");
+assert(firstAutomaticBrief.includes("harness new-task --budget standard"), "automatic task scaffold command should preserve title-only command shape");
+assert(!firstAutomaticBrief.includes(`harness new-task ${firstAutomaticTask.task.shortId}`), "automatic task scaffold command should not pretend the generated id was explicit input");
+const explicitDocsId = expectJson(["new-task", "docs", "--title", "Bare Docs Explicit ID", "--dry-run", lifecycleTarget]);
+assert(explicitDocsId.task?.shortId === `${todayLocal}-docs`, "bare explicit task ids should stay explicit even if they look like local directories");
 const lifecycleDryRun = expectJson(["new-task", "phase-2-lifecycle", "--title", "阶段二任务生命周期", "--locale", "zh-CN", "--dry-run", lifecycleTarget]);
 assert(lifecycleDryRun.dryRun === true, "new-task dry-run should report dryRun true");
 assert(
@@ -266,9 +288,11 @@ fs.writeFileSync(
 );
 const legacyPresetDryRun = expectJson(["new-task", "--budget", "complex", "--preset", "legacy-migration", "--from-session", legacyPresetSessionPath, "--dry-run"]);
 assert(legacyPresetDryRun.task?.preset === "legacy-migration", "new-task legacy-migration dry-run should report preset");
-assert(!fs.existsSync(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-harness-v1-migration`)), "legacy-migration dry-run should not mutate target");
+assert(legacyPresetDryRun.task?.shortId?.startsWith(`${todayLocal}-harness-v1-migration-`), "new-task legacy-migration dry-run should derive an automatic preset id");
+assert(/[0-9a-f]{8}$/.test(legacyPresetDryRun.task.shortId), "preset automatic task id should include a random suffix");
+assert(!fs.existsSync(path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${legacyPresetDryRun.task.shortId}`)), "legacy-migration dry-run should not mutate target");
 const legacyPresetDryRunWithTarget = expectJson(["new-task", "--budget", "complex", "--preset", "legacy-migration", "--from-session", legacyPresetSessionPath, "--dry-run", lifecycleTarget]);
-assert(legacyPresetDryRunWithTarget.task?.id === `TASKS/${todayLocal}-harness-v1-migration`, "new-task --from-session with explicit target should still derive the preset task id");
+assert(legacyPresetDryRunWithTarget.task?.shortId?.startsWith(`${todayLocal}-harness-v1-migration-`), "new-task --from-session with explicit target should derive an automatic preset id");
 const legacyPresetDryRunWithExplicitId = expectJson(["new-task", "explicit-harness-migration", "--budget", "complex", "--preset", "legacy-migration", "--from-session", legacyPresetSessionPath, "--dry-run"]);
 assert(legacyPresetDryRunWithExplicitId.task?.id === `TASKS/${todayLocal}-explicit-harness-migration`, "new-task --from-session with an explicit task id should keep that id and derive the target from the session");
 const legacyPresetInspect = expectJson(["preset", "inspect", "legacy-migration", "--json"]);
@@ -282,13 +306,14 @@ const legacyPresetCheck = expectJson(["preset", "check", "legacy-migration", "--
 assert(legacyPresetCheck.status === "pass", "preset check legacy-migration should pass");
 assert(legacyPresetCheck.entrypoints?.newTask?.type === "template", "preset check should validate the newTask entrypoint manifest");
 const legacyPresetTask = expectJson(["new-task", "--budget", "complex", "--preset", "legacy-migration", "--from-session", legacyPresetSessionPath]);
-assert(legacyPresetTask.task?.id === `TASKS/${todayLocal}-harness-v1-migration`, "legacy-migration preset should derive a default task id");
+assert(legacyPresetTask.task?.shortId?.startsWith(`${todayLocal}-harness-v1-migration-`), "legacy-migration preset should derive an automatic default task id");
+assert(/[0-9a-f]{8}$/.test(legacyPresetTask.task.shortId), "legacy-migration default task id should include a random suffix");
 assert(legacyPresetTask.task?.kind === "project-migration", "legacy-migration preset should report project-migration kind");
 assert(legacyPresetTask.task?.preset === "legacy-migration", "legacy-migration preset should report preset");
 assert(legacyPresetTask.task?.presetVersion === "2", "legacy-migration preset should use version from preset.yaml");
 assert(legacyPresetTask.task?.presetAudit?.manifestPath.endsWith(".coding-agent-harness/presets/legacy-migration/preset.yaml"), "legacy-migration preset should report seeded project manifest audit path");
 assert(legacyPresetTask.task?.evidenceBundle, "legacy-migration preset should report evidence bundle");
-const legacyPresetTaskDir = path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${todayLocal}-harness-v1-migration`);
+const legacyPresetTaskDir = path.join(lifecycleTarget, `docs/09-PLANNING/TASKS/${legacyPresetTask.task.shortId}`);
 const legacyPresetTaskPlan = fs.readFileSync(path.join(legacyPresetTaskDir, "task_plan.md"), "utf8");
 assert(legacyPresetTaskPlan.includes("Task Preset: legacy-migration"), "legacy-migration task plan should persist preset metadata");
 assert(legacyPresetTaskPlan.includes("Migration Achieved Level: migration-deferred"), "strict-deferred session should start as migration-deferred");
@@ -314,7 +339,7 @@ assert(legacyMigrationLedger.phases.some((phase) => phase.id === "semantic-recon
 assert(legacyMigrationLedger.workbenchRole === "human-confirmation-control-plane", "migration ledger should mark workbench as human confirmation control plane");
 assert(legacyMigrationLedger.staticDashboardRole === "evidence-snapshot", "migration ledger should mark static dashboard as evidence snapshot");
 const legacyPresetStatus = expectJson(["status", "--json", lifecycleTarget]);
-const legacyPresetStatusTask = legacyPresetStatus.tasks.find((task) => task.id === `TASKS/${todayLocal}-harness-v1-migration`);
+const legacyPresetStatusTask = legacyPresetStatus.tasks.find((task) => task.id === legacyPresetTask.task.id);
 assert(legacyPresetStatusTask?.taskKind === "project-migration", "status should expose taskKind");
 assert(legacyPresetStatusTask?.taskPreset === "legacy-migration", "status should expose taskPreset");
 assert(legacyPresetStatusTask?.migrationSnapshot?.strictDeferred === true, "status should expose migration snapshot strictDeferred");

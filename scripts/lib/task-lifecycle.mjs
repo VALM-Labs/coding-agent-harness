@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import {
   visualMapFile,
   legacyVisualRoadmapFile,
@@ -201,7 +202,31 @@ function bareSlug(datedId) {
   return datedId;
 }
 
-export function createTask(targetInput, taskId, { title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard", longRunning = false, preset = "", fromSession = "", presetArgs = [] } = {}) {
+function automaticTaskSlug(seed) {
+  return normalizeTaskId(seed || "task").slice(0, 48).replace(/-+$/g, "") || "task";
+}
+
+function randomTaskSuffix() {
+  return crypto.randomBytes(4).toString("hex");
+}
+
+function resolveTaskIdentity({ target, taskId, title, presetPackage, moduleKey, automaticTaskId }) {
+  if (!automaticTaskId) {
+    const rawNormalized = normalizeTaskId(taskId || (presetPackage?.task?.defaultTaskId || ""));
+    const normalizedTaskId = ensureDatePrefix(rawNormalized);
+    if (!normalizedTaskId) throw new Error("Missing task id");
+    return { normalizedTaskId, semanticSlug: bareSlug(normalizedTaskId) };
+  }
+
+  const semanticSlug = automaticTaskSlug(title || presetPackage?.task?.defaultTaskId || "task");
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const normalizedTaskId = `${localDate()}-${semanticSlug}-${randomTaskSuffix()}`;
+    if (!fs.existsSync(taskRoot(target, normalizedTaskId, { moduleKey }))) return { normalizedTaskId, semanticSlug };
+  }
+  throw new Error(`Unable to allocate automatic task id for: ${semanticSlug}`);
+}
+
+export function createTask(targetInput, taskId, { title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard", longRunning = false, preset = "", fromSession = "", presetArgs = [], automaticTaskId = false } = {}) {
   const requestedPreset = preset || (moduleKey ? "module" : "");
   const normalizedPreset = normalizeTaskPresetInput(requestedPreset, { targetInput });
   const presetPackage = normalizedPreset === "none" ? null : readPresetPackage(normalizedPreset, { targetInput });
@@ -214,11 +239,10 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
   if (presetPackage && !presetPackage.compatibleBudgets.includes(normalizedBudget)) throw new Error(`${normalizedPreset} preset requires --budget ${presetPackage.compatibleBudgets.join("|")}`);
   if (presetPackage?.task?.projectLevelOnly === true && moduleKey) throw new Error(`${normalizedPreset} preset is project-level and cannot be combined with --module`);
   if (presetPackage?.task?.requiresFromSession === true && !fromSession) throw new Error(`${normalizedPreset} preset requires --from-session`);
-  const rawNormalized = normalizeTaskId(taskId || (presetPackage?.task?.defaultTaskId || ""));
-  const normalizedTaskId = ensureDatePrefix(rawNormalized);
-  if (!normalizedTaskId) throw new Error("Missing task id");
-  const semanticSlug = bareSlug(normalizedTaskId);
   const normalizedModuleKey = moduleKey ? normalizeTaskId(moduleKey) : "";
+  const identity = resolveTaskIdentity({ target, taskId, title, presetPackage, moduleKey: normalizedModuleKey, automaticTaskId });
+  const normalizedTaskId = identity.normalizedTaskId;
+  const semanticSlug = identity.semanticSlug;
   const normalizedLocale = normalizeLocale(locale || readCapabilityRegistry(target).locale);
   const taskTitle = title || (normalizedPreset === "legacy-migration" ? "Harness v1 legacy migration" : semanticSlug);
   const directory = taskRoot(target, normalizedTaskId, { moduleKey: normalizedModuleKey });
@@ -234,6 +258,7 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
     preset: normalizedPreset,
     fromSession,
     targetInput: presetInputs?.targetInput || targetInput,
+    automaticTaskId,
   });
   const evaluatedPresetValues = presetPackage ? evaluateTemplateValues(presetPackage, presetInputs.inputs, { taskId: normalizedTaskId, taskTitle, moduleKey: normalizedModuleKey }) : null;
   const presetContext = presetPackage

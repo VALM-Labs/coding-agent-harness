@@ -184,7 +184,7 @@ export function renderTaskTemplate(content, { taskId, title, locale, budget = "s
   const date = todayDate();
   const provenance = {
     createdBy: scaffoldProvenance.createdBy || "harness new-task",
-    command: scaffoldProvenance.command || "harness new-task <task-id> <target>",
+    command: scaffoldProvenance.command || "harness new-task [task-id] <target>",
     createdAt: scaffoldProvenance.createdAt || date,
     budget: scaffoldProvenance.budget || budget,
     templateSource: scaffoldProvenance.templateSource || "templates/planning/brief.md",

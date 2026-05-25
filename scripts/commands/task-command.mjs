@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import {
   confirmTaskReview,
   createTask,
@@ -28,12 +27,7 @@ export function runTaskCommand(command, { args, takeFlag, takeOption, targetArg 
     const longRunning = takeFlag("--long-running");
     try {
       const parsed = parseNewTaskArgs(args, { preset, fromSession });
-      const taskId = parsed.taskId;
-      if (!taskId) {
-        console.error("Missing task id");
-        process.exit(2);
-      }
-      console.log(JSON.stringify(createTask(parsed.target, taskId, { title, locale, dryRun, moduleKey, budget, longRunning, preset, fromSession, presetArgs: parsed.presetArgs }), null, 2));
+      console.log(JSON.stringify(createTask(parsed.target, parsed.taskId, { title, locale, dryRun, moduleKey, budget, longRunning, preset, fromSession, presetArgs: parsed.presetArgs, automaticTaskId: parsed.automaticTaskId }), null, 2));
     } catch (error) {
       console.error(error.message);
       process.exit(1);
@@ -229,20 +223,15 @@ export function runTaskCommand(command, { args, takeFlag, takeOption, targetArg 
   throw new Error(`Unsupported task command: ${command}`);
 }
 
-function parseNewTaskArgs(args, { preset = "", fromSession = "" } = {}) {
+function parseNewTaskArgs(args, { preset = "" } = {}) {
   const values = [...args];
-  let taskId = "";
-  if (!fromSession) {
-    taskId = values.shift() || "";
-  } else if (values.length > 0 && !values[0].startsWith("-") && !(values.length === 1 && fs.existsSync(values[0]))) {
-    taskId = values.shift();
-  }
   const presetPackage = preset ? readPresetPackageForNewTask(preset, values) : null;
-  if (!taskId && fromSession) taskId = presetPackage?.task?.defaultTaskId || "harness-v1-migration";
-  const parsed = splitPresetArgsAndTarget(values, presetPackage);
+  const parsed = splitPresetArgsAndPositionals(values, presetPackage);
+  const resolved = resolveNewTaskPositionals(parsed.positionals);
   return {
-    taskId,
-    target: parsed.target || ".",
+    taskId: resolved.taskId,
+    target: resolved.target || ".",
+    automaticTaskId: !resolved.taskId,
     presetArgs: parsed.presetArgs,
   };
 }
@@ -275,9 +264,9 @@ function presetDiscoveryTargetCandidates(values) {
   return candidates;
 }
 
-function splitPresetArgsAndTarget(values, presetPackage) {
+function splitPresetArgsAndPositionals(values, presetPackage) {
   const presetArgs = [];
-  const targetCandidates = [];
+  const positionals = [];
   const declaredFlags = new Map(Object.values(presetPackage?.inputs || {}).filter((input) => input.flag).map((input) => [input.flag, input]));
   for (let index = 0; index < values.length; index += 1) {
     const value = values[index];
@@ -295,16 +284,28 @@ function splitPresetArgsAndTarget(values, presetPackage) {
         index += 1;
       }
     } else {
-      targetCandidates.push(value);
+      positionals.push(value);
     }
   }
-  if (targetCandidates.length > 1) {
-    throw new Error(`Too many positional arguments for new-task: ${targetCandidates.join(", ")}`);
-  }
   return {
-    target: targetCandidates[0] || "",
+    positionals,
     presetArgs,
   };
+}
+
+function isPathLikePositional(value) {
+  return value === "." || value === ".." || value.startsWith("/") || value.startsWith("~/") || value.includes("/") || value.includes("\\");
+}
+
+function resolveNewTaskPositionals(positionals) {
+  if (positionals.length === 0) return { taskId: "", target: "" };
+  if (positionals.length === 1) {
+    const [value] = positionals;
+    if (isPathLikePositional(value)) return { taskId: "", target: value };
+    return { taskId: value, target: "" };
+  }
+  if (positionals.length === 2) return { taskId: positionals[0], target: positionals[1] };
+  throw new Error(`Too many positional arguments for new-task: ${positionals.join(", ")}`);
 }
 
 function formatTaskCommandError(error) {

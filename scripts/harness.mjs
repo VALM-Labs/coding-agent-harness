@@ -96,7 +96,7 @@ Usage:
   harness preset install <folder|zip|builtin-id> [--project] [--force] [--json] [target]
   harness preset seed [--project] [--force] [--dry-run] [--json] [target]
   harness preset uninstall <id> [--project] [--json] [target]
-  harness new-task <task-id> [--module key] [--budget simple|standard|complex] [--preset id] [--from-session session.json] [--long-running] [--title title] [--locale zh-CN|en-US] [--dry-run] [target]
+  harness new-task [task-id] [--module key] [--budget simple|standard|complex] [--preset id] [--from-session session.json] [--long-running] [--title title] [--locale zh-CN|en-US] [--dry-run] [target]
   harness task-start <task-id> [--message text] [target]
   harness task-phase <task-id> <phase-id> [--state done] [--completion 100] [--evidence present] [target]
   harness task-log <task-id> --message text [--evidence type:PATH:summary] [target]

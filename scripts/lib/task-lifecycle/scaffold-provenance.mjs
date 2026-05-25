@@ -15,7 +15,9 @@ function commandPathArg(value, fallback) {
 }
 
 function renderNewTaskCommand({ taskId, title, locale, budget, longRunning, moduleKey, preset, fromSession, targetInput }) {
-  const parts = ["harness", "new-task", taskId, "--budget", budget, "--locale", locale];
+  const parts = ["harness", "new-task"];
+  if (taskId) parts.push(taskId);
+  parts.push("--budget", budget, "--locale", locale);
   if (title) parts.push("--title", title);
   if (moduleKey) parts.push("--module", moduleKey);
   if (preset && preset !== "none") parts.push("--preset", preset);
@@ -25,11 +27,11 @@ function renderNewTaskCommand({ taskId, title, locale, budget, longRunning, modu
   return parts.map(shellArg).join(" ");
 }
 
-export function buildScaffoldProvenance({ taskId, normalizedTaskId, title, locale, budget, longRunning, moduleKey, preset, fromSession, targetInput }) {
+export function buildScaffoldProvenance({ taskId, normalizedTaskId, title, locale, budget, longRunning, moduleKey, preset, fromSession, targetInput, automaticTaskId = false }) {
   return {
     createdBy: "harness new-task",
     command: markdownCell(renderNewTaskCommand({
-      taskId: taskId || normalizedTaskId,
+      taskId: automaticTaskId ? "" : taskId || normalizedTaskId,
       title,
       locale,
       budget,

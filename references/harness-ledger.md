@@ -48,7 +48,7 @@ Harness Ledger 不记录：
 触发任务生命周期变化时，优先使用 CLI：
 
 ```bash
-harness new-task <task-id>
+harness new-task --title "<title>"
 harness task-start <task-id>
 harness task-phase <task-id> <phase-id> --state done
 harness task-review <task-id>

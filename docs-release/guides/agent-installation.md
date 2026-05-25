@@ -204,26 +204,26 @@ harness migrate-verify \
 初始化或迁移完成后，agent 不应手工复制任务目录。使用生命周期命令创建和推进任务：
 
 ```bash
-harness new-task phase-2-lifecycle \
+harness new-task \
   --title "阶段二任务生命周期" \
   --locale zh-CN \
   /path/to/project
 
-harness task-start phase-2-lifecycle \
+harness task-start <new-task 输出的 task-id> \
   --message "开始实现生命周期切片" \
   /path/to/project
 
-harness task-log phase-2-lifecycle \
+harness task-log <new-task 输出的 task-id> \
   --message "完成 CLI 与模板更新" \
   --evidence "command:TARGET:npm-test:passed" \
   /path/to/project
 
-harness review-confirm TASKS/phase-2-lifecycle \
+harness review-confirm <new-task 输出的 task-id> \
   --reviewer "Human Reviewer" \
-  --confirm phase-2-lifecycle \
+  --confirm <new-task 输出的 task-id> \
   /path/to/project
 
-harness task-complete phase-2-lifecycle \
+harness task-complete <new-task 输出的 task-id> \
   --message "验证闭环完成" \
   /path/to/project
 ```
@@ -232,6 +232,8 @@ harness task-complete phase-2-lifecycle \
 
 - 不要手工复制任务模板，也不要创建不完整任务目录。`harness check` 会按
   `new-task` 创建的预算文件集校验。
+- `new-task --title "..."` 默认生成类似 `YYYY-MM-DD-phase-2-task-lifecycle-a1b2c3d4`
+  的任务 ID，避免多人或多 agent 同仓协作时重名；只有需要固定兼容 ID 时才传显式 `<task-id>`。
 - `new-task --budget simple` 创建 `brief.md`、`task_plan.md`、`visual_map.md`
   和 `progress.md`。
 - `new-task` 默认 `standard`，创建 simple 文件，并额外创建

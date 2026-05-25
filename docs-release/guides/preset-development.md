@@ -214,7 +214,7 @@ harness preset seed
 harness preset seed --project /path/to/project
 harness preset list --json /path/to/project
 harness preset inspect custom-review --json /path/to/project
-harness new-task custom-review-task --preset custom-review --subject "API contracts" /path/to/project
+harness new-task --title "Custom review task" --preset custom-review --subject "API contracts" /path/to/project
 harness preset uninstall custom-review
 ```
 

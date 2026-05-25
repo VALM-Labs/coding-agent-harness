@@ -185,26 +185,26 @@ The agent must read `session.json` and `migrate-plan.json`, then migrate active 
 After initialization or migration, agents should not manually copy task folders. Use lifecycle commands:
 
 ```bash
-harness new-task phase-2-lifecycle \
+harness new-task \
   --title "Phase 2 task lifecycle" \
   --locale en-US \
   /path/to/project
 
-harness task-start phase-2-lifecycle \
+harness task-start <task-id-from-new-task-output> \
   --message "Start lifecycle slice implementation" \
   /path/to/project
 
-harness task-log phase-2-lifecycle \
+harness task-log <task-id-from-new-task-output> \
   --message "Completed CLI and template updates" \
   --evidence "command:TARGET:npm-test:passed" \
   /path/to/project
 
-harness review-confirm TASKS/phase-2-lifecycle \
+harness review-confirm <task-id-from-new-task-output> \
   --reviewer "Human Reviewer" \
-  --confirm phase-2-lifecycle \
+  --confirm <task-id-from-new-task-output> \
   /path/to/project
 
-harness task-complete phase-2-lifecycle \
+harness task-complete <task-id-from-new-task-output> \
   --message "Verification loop completed" \
   /path/to/project
 ```
@@ -212,6 +212,7 @@ harness task-complete phase-2-lifecycle \
 Rules:
 
 - Do not manually copy task templates or create partial task folders. `harness check` enforces the file set created by `new-task`.
+- `new-task --title "..."` generates a default ID like `YYYY-MM-DD-phase-2-task-lifecycle-a1b2c3d4` to reduce collisions when multiple people or agents create tasks in the same repository. Pass an explicit `<task-id>` only when a coordinator needs a stable compatibility ID.
 - `new-task --budget simple` creates `brief.md`, `task_plan.md`, `visual_map.md`, and `progress.md`.
 - `new-task` defaults to `standard` and creates the simple files plus `execution_strategy.md`, `findings.md`, `lesson_candidates.md`, and `review.md`.
 - `new-task --budget complex` creates the standard files plus `references/INDEX.md` and `artifacts/INDEX.md`.
