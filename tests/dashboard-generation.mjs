@@ -38,6 +38,7 @@ assert(dashboardHtml.includes("window.__HARNESS_DASHBOARD__"), "dashboard HTML m
 assert(dashboardHtml.includes("Human Visibility Dashboard"), "dashboard HTML missing v2 visibility copy");
 assert(dashboardHtml.includes("#/tasks"), "dashboard HTML missing task index route");
 assert(dashboardHtml.includes("#/review"), "dashboard HTML missing review queue route");
+assert(dashboardHtml.includes("#/presets"), "dashboard HTML missing preset catalog route");
 assert(dashboardHtml.includes("function reviewQueue()"), "dashboard HTML missing review queue page implementation");
 
 const dashboardDir = path.join(tmpRoot, "dashboard-folder");
@@ -125,6 +126,12 @@ assert(dashboardApp.includes("fullCutoverEligible"), "dashboard missing full cut
 assert(dashboardApp.includes("legacyVisualOnlyCount"), "dashboard missing legacy visual-only summary field");
 assert(dashboardApp.includes("weakBriefCount"), "dashboard missing weak brief summary field");
 assert(dashboardApp.includes("warningQueue()"), "dashboard missing warning queue workbench");
+assert(dashboardApp.includes("function presetsView()"), "dashboard missing preset catalog page implementation");
+assert(dashboardApp.includes("data-preset-source-filter"), "dashboard missing preset source filter controls");
+assert(dashboardApp.includes("data-preset-install"), "dashboard missing preset install workbench action");
+assert(dashboardApp.includes("data-preset-seed"), "dashboard missing preset seed workbench action");
+assert(dashboardApp.includes("data-preset-uninstall"), "dashboard missing preset uninstall workbench action");
+assert(dashboardApp.includes("canUseWorkbenchAction(\"preset-install\")"), "dashboard preset writes must be gated by workbench actions");
 assert(dashboardApp.includes("reviewWorkspace("), "dashboard missing review workspace route implementation");
 assert(dashboardApp.includes("reviewQueueState"), "dashboard review queue must use status-level review queue state");
 assert(dashboardApp.includes("[\"lessonCandidates\", \"lesson_candidates.md\"]"), "dashboard should expose lesson candidate documents");
@@ -149,6 +156,9 @@ assert(dashboardCss.includes(".brief-scroll"), "dashboard missing scrollable act
 assert(dashboardMarkdown.includes("rendered-table"), "dashboard missing rendered markdown table support");
 assert(dashboardMermaid.includes("mermaid-rendered"), "dashboard missing rendered mermaid output");
 assert(dashboardCss.includes(".runtime-banner"), "dashboard missing static read-only banner styling");
+assert(dashboardCss.includes(".preset-catalog-grid"), "dashboard missing preset catalog layout");
+assert(dashboardCss.includes(".preset-action-panel"), "dashboard missing preset action panel styling");
+assert(dashboardCss.includes(".preset-manifest-path"), "dashboard preset paths should have bounded wrapping styles");
 assert(dashboardCss.includes("max-height: min(68vh, 620px)"), "dashboard missing mermaid viewport containment");
 assert(dashboardCss.includes(".review-workspace-grid"), "dashboard missing review workspace layout");
 assert(dashboardCss.includes(".review-queue-toolbar input,"), "review queue controls should use scoped dashboard input styling");
