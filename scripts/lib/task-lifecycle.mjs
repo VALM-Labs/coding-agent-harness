@@ -30,6 +30,7 @@ import {
   buildPresetContext,
   evaluateTemplateValues,
   resolvePresetInputs,
+  renderPresetResourceIndex,
   renderPresetTaskTemplate,
 } from "./preset-engine.mjs";
 import {
@@ -301,6 +302,34 @@ export function createTask(targetInput, taskId, { title = "", locale = "en-US", 
       if (dryRun) continue;
       fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
       fs.writeFileSync(destinationPath, evidence.content);
+    }
+    for (const resource of presetContext.resourceFiles || []) {
+      const destinationPath = path.join(target.projectRoot, resource.relativePath);
+      changes.push({
+        destination: toPosix(resource.relativePath),
+        source: resource.source,
+        action: dryRun ? "would-create" : "create",
+      });
+      assertPresetWriteScope(presetPackage, toPosix(resource.relativePath));
+      if (dryRun) continue;
+      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+      fs.writeFileSync(destinationPath, resource.content);
+    }
+    for (const [kind, rows] of Object.entries(presetContext.resourceIndexRows || {})) {
+      if (!rows.length) continue;
+      const destination = kind === "references" ? "references/INDEX.md" : "artifacts/INDEX.md";
+      const destinationPath = path.join(directory, destination);
+      const relativePath = toPosix(path.relative(target.projectRoot, destinationPath));
+      changes.push({
+        destination: relativePath,
+        source: `preset-${kind}-index`,
+        action: dryRun ? "would-update" : "update",
+      });
+      assertPresetWriteScope(presetPackage, relativePath);
+      if (dryRun) continue;
+      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
+      const existing = fs.existsSync(destinationPath) ? fs.readFileSync(destinationPath, "utf8") : "";
+      fs.writeFileSync(destinationPath, renderPresetResourceIndex(existing, kind, rows));
     }
   }
   const task = {

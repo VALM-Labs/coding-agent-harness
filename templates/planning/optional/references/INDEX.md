@@ -2,9 +2,9 @@
 
 Use this index for sources the task depends on but does not own.
 
-| Reference | Type | Why It Matters | Source |
-| --- | --- | --- | --- |
-| [name] | doc / link / transcript / code | [why this source is relevant] | [path or URL] |
+| ID | Type | Path | Summary | Used By |
+| --- | --- | --- | --- | --- |
+| [reference-id] | doc / link / transcript / code | TARGET:path or URL:https://example.com | [why this source is relevant] | coordinator |
 
 ## Source Rules
 

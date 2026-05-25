@@ -27,6 +27,7 @@ import {
   validateCapabilities,
 } from "./capability-registry.mjs";
 import { readPresetPackage } from "./preset-registry.mjs";
+import { validatePresetResourcesForTask } from "./preset-resource-contracts.mjs";
 import {
   collectTasks,
   listTaskPlanPaths,
@@ -215,6 +216,7 @@ export function validateTaskPresetContracts(target) {
         failures.push(`${task.path} ${task.taskPreset} preset Evidence Bundle missing: ${task.evidenceBundle}`);
       }
     }
+    failures.push(...validatePresetResourcesForTask(target, task, presetPackage));
     if (task.taskPreset === "lesson-sedimentation") {
       if (!["standard", "complex"].includes(task.budget)) failures.push(`${task.path} lesson-sedimentation preset requires Selected budget: standard or complex`);
       if (!task.taskPlanPath) failures.push(`${task.path} lesson-sedimentation preset missing task plan`);
