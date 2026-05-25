@@ -9,6 +9,8 @@ Use this skill when a user wants to create, review, improve, or install a Harnes
 
 A good preset is not just a folder template. It is a reusable task method package: it captures when a class of tasks should exist, what inputs the agent must ask for, what task metadata must be visible, what shared references must be read, what evidence must be produced, and how the created task proves it is using the preset correctly.
 
+This skill is standalone. Do not assume the agent already knows Harness task contracts. Before creating a preset for complex tasks, read the included complex task skeleton reference and design the preset as an overlay on that skeleton.
+
 ## Preset Methodology
 
 Create a preset when at least two future tasks should share the same method or context. Good examples:
@@ -37,11 +39,12 @@ Before writing files, answer these in the task notes or your response:
 
 ## Package Layout
 
-Use the reference skeleton before writing files:
+Use the bundled references before writing files:
 
+- `references/complex-task-skeleton/`
 - `references/preset-package-skeleton.md`
 
-That reference contains a copyable package tree, a complete `preset.yaml`, starter Markdown resources, and the verification checklist. Keep this `SKILL.md` focused on method and judgment; use the reference when the task has moved from design to file creation.
+The complex task skeleton reference contains the base `brief.md`, `task_plan.md`, `execution_strategy.md`, `visual_map.md`, `findings.md`, `lesson_candidates.md`, `progress.md`, `review.md`, `references/INDEX.md`, and `artifacts/INDEX.md` contracts. The preset package skeleton contains a copyable package tree, a complete `preset.yaml`, starter Markdown resources, and the verification checklist. Keep this `SKILL.md` focused on method and judgment; use the references when the task has moved from design to file creation.
 
 Use a simple package:
 
@@ -72,8 +75,10 @@ my-preset/
 - `resources.references`: shared task-local reference files, when tasks share context.
 - `resources.artifacts`: preset-provided fixtures or input packets, when needed.
 - `context.requiredReads`: reference IDs the agent must read before implementation.
-- `evidence.files`: generated audit/evidence files.
+- `evidence.bundleDir`: task-local directory for preset audit/evidence files, usually `artifacts/preset`.
+- `evidence.files`: optional custom generated files inside the evidence bundle.
 - `audit.manifestRequired`: must be `true`.
+- `audit.evidenceFiles`: built-in audit files to generate, usually `preset-audit.json`, `preset-manifest.json`, and `write-scope.json`.
 - `writeScopes`: narrow paths the preset may write.
 
 ## Manifest Format
@@ -83,6 +88,10 @@ Use the Harness manifest subset only: nested mappings, scalar strings/numbers/bo
 `templateValues` and `metadata` may use literal `value`, `default`, or dot-path `from` references such as `inputs.subject` or `task.title`. Do not use expressions or inline code.
 
 Templates and resource index summaries can use `{{valueName}}` placeholders from `templateValues`.
+
+Supported input types are `text`, `flag`, and `json-file`. Resource `index.type`, `usedBy`, and `producedBy` are labels for readers; use stable simple words such as `code`, `runbook`, `doc`, `fixture`, `preset`, `worker`, `reviewer`, and `coordinator`.
+
+Every value in `entrypoints.newTask.writes` must exactly match one `writeScopes.*.path` entry. Do not rely on partial overlap.
 
 ## Reference Bundle Pattern
 
@@ -112,6 +121,8 @@ context:
 ```
 
 Use `template` for Markdown that needs substitution. Use `source` for static files copied from the preset package. The created task should read like this: `task_plan.md` tells the agent which `REF-*` entries to read, `references/INDEX.md` explains why each file matters, and the actual `references/*.md` files contain the context.
+
+When `context.requiredReads` is set, Harness appends a `## Preset Required Reads` table to `task_plan.md`. Each row must resolve to the reference ID and exact `TARGET:<task-relative-reference-path>` that also appears in `references/INDEX.md`.
 
 ## Artifact Bundle Pattern
 
@@ -145,15 +156,16 @@ Do not confuse artifacts with evidence. Artifacts can be input packets or fixtur
 ## Creation Workflow
 
 1. Ask or infer the preset purpose, task family, target budget, task kind, required inputs, shared references, and evidence needs.
-2. Open `references/preset-package-skeleton.md` and copy only the files the preset actually needs.
-3. Create the preset directory with `preset.yaml`, templates, and resources.
-4. Keep task creation declarative: manifest inputs, `templateValues`, `metadata`, Markdown templates, `resources`, evidence declarations, and `writeScopes`.
-5. Run `harness preset check <path>`.
-6. Install with `harness preset install <path> --force` in a disposable or user-approved environment.
-7. Smoke test with `harness new-task <id> --budget <budget> --preset <preset-id> ... <target>`.
-8. For reference-bundle presets, create two different tasks from the same preset and verify both contain the same shared references but independent audit/evidence bundles.
-9. Run `harness status --json <target>`, `harness task-index --json <target>`, and `harness check --profile target-project <target>`.
-10. Inspect the generated `task_plan.md`, `references/INDEX.md`, and `artifacts/INDEX.md` manually before declaring success.
+2. For complex presets, open `references/complex-task-skeleton/README.md` and inspect the base task files the preset will overlay.
+3. Open `references/preset-package-skeleton.md` and copy only the files the preset actually needs.
+4. Create the preset directory with `preset.yaml`, templates, and resources.
+5. Keep task creation declarative: manifest inputs, `templateValues`, `metadata`, Markdown templates, `resources`, evidence declarations, and `writeScopes`.
+6. Run `harness preset check <path>`.
+7. Install with `harness preset install <path> --force` in a disposable or user-approved environment.
+8. Smoke test with `harness new-task <id> --budget <budget> --preset <preset-id> ... <target>`.
+9. For reference-bundle presets, create two different tasks from the same preset and verify both contain the same shared references but independent audit/evidence bundles.
+10. Run `harness status --json <target>`, `harness task-index --json <target>`, and `harness check --profile target-project <target>`.
+11. Inspect the generated `task_plan.md`, `references/INDEX.md`, and `artifacts/INDEX.md` manually before declaring success.
 
 ## Quality Checklist
 

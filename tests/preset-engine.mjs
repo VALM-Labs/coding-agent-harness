@@ -15,6 +15,29 @@ assert(fs.existsSync(path.join(repoRootFromTest(), "docs-release/guides/preset-d
 assert(fs.existsSync(path.join(repoRootFromTest(), "skills/preset-creator/SKILL.md")), "preset creator skill should exist");
 assert(fs.existsSync(path.join(repoRootFromTest(), "skills/preset-creator/references/preset-package-skeleton.md")), "preset creator skill should include a package skeleton reference");
 assert(fs.readFileSync(path.join(repoRootFromTest(), "skills/preset-creator/SKILL.md"), "utf8").includes("references/preset-package-skeleton.md"), "preset creator skill should route agents to the package skeleton reference");
+const complexSkillSkeletonFiles = [
+  "README.md",
+  "brief.md",
+  "task_plan.md",
+  "execution_strategy.md",
+  "visual_map.md",
+  "findings.md",
+  "lesson_candidates.md",
+  "progress.md",
+  "review.md",
+  "references/INDEX.md",
+  "artifacts/INDEX.md",
+  "long-running-task-contract.md",
+];
+for (const file of complexSkillSkeletonFiles) {
+  assert(fs.existsSync(path.join(repoRootFromTest(), "skills/preset-creator/references/complex-task-skeleton", file)), `preset creator skill should include complex task skeleton file: ${file}`);
+}
+assert(fs.readFileSync(path.join(repoRootFromTest(), "skills/preset-creator/SKILL.md"), "utf8").includes("references/complex-task-skeleton/"), "preset creator skill should route agents to the complex task skeleton reference");
+const presetCreatorSkill = fs.readFileSync(path.join(repoRootFromTest(), "skills/preset-creator/SKILL.md"), "utf8");
+const presetPackageSkeleton = fs.readFileSync(path.join(repoRootFromTest(), "skills/preset-creator/references/preset-package-skeleton.md"), "utf8");
+for (const requiredPhrase of ["Supported input types", "exactly match one `writeScopes", "Preset Required Reads", "evidence.bundleDir", "Do not write `evidence.files` as an array"]) {
+  assert(presetCreatorSkill.includes(requiredPhrase) || presetPackageSkeleton.includes(requiredPhrase), `preset creator references should clarify: ${requiredPhrase}`);
+}
 
 const home = path.join(tmpRoot, "preset-home");
 const env = { ...process.env, HOME: home };
@@ -366,6 +389,34 @@ assert(badScopeCheck.status !== 0, "preset check should reject evidence bundles 
 assert(`${badScopeCheck.stdout}\n${badScopeCheck.stderr}`.includes("evidence.bundleDir escapes task directory"), "bad preset check should explain the escaping evidence bundle");
 const badScopeInstall = run(["preset", "install", blockedSource, "--force", "--json"], { env });
 assert(badScopeInstall.status !== 0, "preset install should reject write-scope-violating manifests before task creation");
+
+const badEvidenceFilesSource = path.join(tmpRoot, "bad-evidence-files-preset");
+fs.mkdirSync(badEvidenceFilesSource, { recursive: true });
+fs.writeFileSync(
+  path.join(badEvidenceFilesSource, "preset.yaml"),
+  `id: bad-evidence-files
+version: 1
+purpose: Bad evidence files fixture
+compatibleBudgets: [standard]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+evidence:
+  bundleDir: artifacts/preset
+  files: [summary.json]
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const badEvidenceFilesCheck = run(["preset", "check", badEvidenceFilesSource, "--json"], { env });
+assert(badEvidenceFilesCheck.status !== 0, "preset check should reject evidence.files arrays");
+assert(`${badEvidenceFilesCheck.stdout}\n${badEvidenceFilesCheck.stderr}`.includes("evidence file 0 must be a mapping"), "bad evidence.files rejection should explain the mapping requirement");
 
 const badResourceSource = path.join(tmpRoot, "bad-resource-preset");
 fs.mkdirSync(badResourceSource, { recursive: true });

@@ -5,6 +5,7 @@ import { builtinPresetRoot, repoRoot, toPosix, userPresetRoot } from "./core-sha
 
 const allowedEntrypoints = new Set(["newTask", "plan", "scaffold", "check"]);
 const allowedEntrypointTypes = new Set(["template", "script", "check"]);
+const allowedEvidenceTypes = new Set(["text", "json", "input-json", "preset-audit", "preset-manifest", "write-scope", "migration-verify", "migration-ledger", "dashboard-hash", "target-git-status", "target-commit", "harness-version", "generated-at"]);
 
 export function listPresetPackages() {
   const seen = new Set();
@@ -130,8 +131,16 @@ export function validatePresetPackage(preset) {
     if (!input.flag && input.type !== "flag") warnings.push(`${name} input has no CLI flag`);
   }
   if (preset.evidence?.bundleDir && unsafeRelativePresetPath(preset.evidence.bundleDir)) failures.push(`evidence.bundleDir escapes task directory: ${preset.evidence.bundleDir}`);
+  if (preset.evidence?.files && (Array.isArray(preset.evidence.files) || typeof preset.evidence.files !== "object")) {
+    failures.push("evidence.files must be a mapping");
+  }
   for (const [name, evidence] of Object.entries(preset.evidence?.files || {})) {
+    if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) {
+      failures.push(`evidence file ${name} must be a mapping`);
+      continue;
+    }
     if (evidence.path && unsafeRelativePresetPath(evidence.path)) failures.push(`evidence file ${name} path escapes evidence bundle: ${evidence.path}`);
+    if (evidence.type && !allowedEvidenceTypes.has(String(evidence.type))) failures.push(`evidence file ${name} has unsupported type: ${evidence.type}`);
   }
   const resourcePaths = new Set();
   validateResourceCollection(preset, "reference", "references", "references/", resourcePaths, failures);

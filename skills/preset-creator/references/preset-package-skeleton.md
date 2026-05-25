@@ -2,6 +2,8 @@
 
 Use this reference when creating a Coding Agent Harness preset package. Start from the smallest useful subset, then delete files and manifest sections the preset does not need.
 
+Before designing a complex-task preset, inspect `references/complex-task-skeleton/`. That folder shows the base task contract the preset overlays. Presets should add method-specific context and resources; they should not silently replace the complex task skeleton itself.
+
 ## Copyable Package Tree
 
 ```text
@@ -78,6 +80,11 @@ context:
   requiredReads: [REF-001, REF-002]
 evidence:
   bundleDir: artifacts/preset
+  files:
+    subject:
+      path: subject.txt
+      type: text
+      value: inputs.subject
 audit:
   manifestRequired: true
   evidenceFiles: [preset-audit.json, preset-manifest.json, write-scope.json]
@@ -196,6 +203,8 @@ writeScopes:
 ## File And Field Rules
 
 - `id` uses lowercase letters, numbers, and hyphens only.
+- Supported `inputs.*.type` values are `text`, `flag`, and `json-file`.
+- `entrypoints.newTask.writes` entries must exactly match declared `writeScopes.*.path` entries.
 - `path` for references must stay under `references/`.
 - `path` for artifacts must stay under `artifacts/`.
 - Do not target `references/INDEX.md`, `artifacts/INDEX.md`, `task_plan.md`, or any canonical task contract file.
@@ -203,8 +212,65 @@ writeScopes:
 - Resource `index.id` values must be unique inside references or artifacts.
 - Resource destination paths must be unique across references and artifacts.
 - `context.requiredReads` can only list declared reference IDs.
+- `context.requiredReads` generates `## Preset Required Reads` in `task_plan.md`; each generated row must contain the reference ID and the exact `TARGET:<task-relative-reference-path>`.
+- `evidence.bundleDir` names the task-local audit/evidence directory; `evidence.files` is an optional mapping of named custom evidence declarations, while `audit.evidenceFiles` names built-in audit files.
+- Do not write `evidence.files` as an array. Each custom evidence file must be a mapping with `path`, `type`, and `value`.
+- Supported custom evidence types are `text`, `json`, `input-json`, `preset-audit`, `preset-manifest`, `write-scope`, `migration-verify`, `migration-ledger`, `dashboard-hash`, `target-git-status`, `target-commit`, `harness-version`, and `generated-at`.
+- Resource `index.type`, `usedBy`, and `producedBy` are reader-facing labels, not strict enums. Prefer stable simple words: `code`, `doc`, `runbook`, `fixture`, `preset`, `coordinator`, `worker`, `reviewer`.
 - Keep `entrypoints.newTask.type` as `template`; do not add JavaScript for task creation.
 - Keep `writeScopes` narrow and task-doc scoped.
+
+## Custom Evidence Shape
+
+Use a mapping, not an array:
+
+```yaml
+evidence:
+  bundleDir: artifacts/preset
+  files:
+    subject:
+      path: subject.txt
+      type: text
+      value: inputs.subject
+    resolvedInputs:
+      path: resolved-inputs.json
+      type: json
+      value: inputs
+audit:
+  manifestRequired: true
+  evidenceFiles: [preset-audit.json, preset-manifest.json, write-scope.json]
+```
+
+This creates named files under the generated task's preset evidence bundle. Arrays such as `evidence.files: [summary.json]` are invalid.
+
+## Generated Required Reads Shape
+
+For a declared reference like:
+
+```yaml
+resources:
+  references:
+    upstreamContract:
+      path: references/upstream-contract.md
+      index:
+        id: REF-001
+context:
+  requiredReads: [REF-001]
+```
+
+The generated `task_plan.md` must include:
+
+```markdown
+## Preset Required Reads
+
+Open `references/INDEX.md`, then read these preset-provided references before implementation.
+
+| Reference | Path | Why |
+| --- | --- | --- |
+| REF-001 | TARGET:docs/09-PLANNING/TASKS/<task-folder>/references/upstream-contract.md | [rendered summary] |
+```
+
+The same `REF-001` and exact `TARGET:` path must also appear in `references/INDEX.md`.
 
 ## Verification Checklist
 
