@@ -2,15 +2,14 @@
 
 ## Purpose
 
-A pull request must be a concise review handoff. A maintainer should understand
-the intent, changed surfaces, version impact, verification evidence, review
-state, and residual risk without reading the full agent conversation.
+Every non-trivial PR must be reviewable without reading the full agent
+conversation. The PR body is a handoff packet for maintainers: what changed,
+why it changed, how it was verified, which version is affected, and what risks
+remain.
 
-## Required Sections
+## Required Shape
 
-Use a bilingual PR body when the repository works across English and Chinese or
-when the task discussion is Chinese. In an English template, keep the canonical
-section names English and add the localized section after the English one.
+The PR body must include:
 
 1. Summary
 2. What Changed
@@ -19,54 +18,63 @@ section names English and add the localized section after the English one.
 5. Review Evidence
 6. Residual Risk
 7. References
-8. Localized Summary, when required by the project
 
-## Rules
+Use a bilingual PR body when the repository has Chinese and English users or
+the task discussion is Chinese. English comes first for public GitHub readers,
+then the localized section follows after the English section.
 
-- Include the package, app, or release version impact when applicable.
-- Summarize changed behavior by module or user surface.
-- List real verification commands and evidence. Explain skipped checks.
-- Link the task plan, review, walkthrough, SSoT row, issue, PR, commit, or
-  dashboard evidence that matters.
-- Do not hide release-blocking findings in the summary. Close, route, or label
-  them as accepted risk with an owner.
+## Content Rules
+
+- State the target version explicitly. If `package.json` changes from `1.0.2`
+  to `1.0.3`, say so in Version Impact.
+- List changed surfaces by user-visible area or module, not by dumping every
+  file path.
+- Verification must name the real commands, browser checks, CI runs, or
+  evidence artifacts. If a check was not run, say why.
+- Review Evidence must mention self-review, subagent review, human review, or
+  code-quality review status. Release-blocking findings must be closed or
+  routed before merge.
+- Residual Risk must distinguish accepted risk, deferred follow-up, and
+  unrelated local/private debt.
+- References must link relevant task docs, SSoT rows, review files, commits,
+  issues, or PRs.
 
 ## Template
 
 ```markdown
 ## Summary
 
-[Intent and outcome.]
+[One or two sentences explaining the intent and outcome.]
 
 ## What Changed
 
-- [Change.]
+- [User-facing or module-level change.]
+- [Governance, CLI, dashboard, docs, or template change.]
 
 ## Version Impact
 
-- Version: `[old]` -> `[new]` / no version change because [reason]
+- Package version: `[old]` -> `[new]`
+- Release notes: [CHANGELOG entry or reason no release note is needed]
 
 ## Verification
 
-- `[command or evidence]`: pass
+- `[command]`: pass
+- `[browser/runtime/CI evidence]`: pass
 - Not run: [reason]
 
 ## Review Evidence
 
 - Self-review: [summary]
-- Additional review: [summary]
+- Additional review: [reviewer/subagent/human result]
 - Blocking findings: [none / closed / routed]
 
 ## Residual Risk
 
-- [none / accepted / deferred]
+- [none / accepted / deferred / unrelated debt]
 
 ## References
 
-- Task: [path]
-- Evidence: [path / commit / workflow / screenshot]
-
-## Localized Summary
-
-[Add the project-required localized PR sections here when needed.]
+- Task: [path or issue]
+- Review: [path or PR review]
+- Evidence: [path, commit, screenshot, workflow, or dashboard]
 ```

@@ -1,6 +1,8 @@
 # Preset Development
 
-Harness presets are declarative task method packages. A preset can add task metadata, render Markdown templates, require CLI inputs, and generate evidence files without writing JavaScript.
+Harness presets are declarative task method packages. A preset can add task metadata, render Markdown templates, require CLI inputs, generate evidence files, and pre-load shared reference bundles without writing JavaScript.
+
+Use a preset when multiple tasks should start from the same method, evidence contract, or shared context. Do not create a preset for one-off prose. Good presets encode repeatable task behavior: required inputs, task kind, review/evidence expectations, shared references, and a small amount of task-plan guidance that tells the next agent what to read first.
 
 `preset.yaml` uses the Harness manifest subset: nested mappings, scalar strings/numbers/booleans, and inline arrays such as `[standard, complex]`. Do not use block strings or dash-list YAML forms in preset manifests.
 
@@ -21,6 +23,10 @@ my-preset/
   preset.yaml
   templates/
     task_plan.append.md
+    references/
+      upstream-contract.md
+  resources/
+    service-runbook.md
 ```
 
 ## Minimal Manifest
@@ -67,6 +73,52 @@ writeScopes:
   taskDocs:
     path: docs/09-PLANNING/TASKS/**
     access: write
+```
+
+## Reference Bundles
+
+Use `resources.references` when a family of tasks shares the same outside context, such as another microservice, API contract, migration packet, reviewer input, or local verification runbook. Harness copies or renders these files into each created task directory, appends `references/INDEX.md` rows, and can add a required-read section to `task_plan.md`.
+
+```yaml
+resources:
+  references:
+    upstreamContract:
+      path: references/upstream-contract.md
+      template: templates/references/upstream-contract.md
+      index:
+        id: REF-001
+        type: code
+        summary: Shared upstream {{service}} contract for every task created by this preset.
+        usedBy: coordinator,worker,reviewer
+    serviceRunbook:
+      path: references/service-runbook.md
+      source: resources/service-runbook.md
+      index:
+        id: REF-002
+        type: runbook
+        summary: Local verification notes for the shared upstream service.
+        usedBy: worker
+context:
+  requiredReads: [REF-001, REF-002]
+```
+
+Use `template` when the file needs `{{valueName}}` substitution. Use `source` when the file should be copied as static Markdown. `path`, `source`, and `template` must stay inside the preset package and generated task directory boundaries.
+
+## Artifact Bundles
+
+Use `resources.artifacts` for preset-provided fixtures, generated input packets, or review material that supports the task but is not a reference source of truth. Harness writes these files into the task's `artifacts/` area and appends `artifacts/INDEX.md`.
+
+```yaml
+resources:
+  artifacts:
+    inputPacket:
+      path: artifacts/input-packet.md
+      source: resources/artifacts/input-packet.md
+      index:
+        id: ART-001
+        type: fixture
+        summary: Shared fixture packet copied by the preset.
+        producedBy: preset
 ```
 
 ## Template Rendering
@@ -127,9 +179,21 @@ harness new-task custom-review-task --preset custom-review --subject "API contra
 harness preset uninstall custom-review
 ```
 
+## Validation Method
+
+For every preset, prove both the manifest and downstream task behavior:
+
+1. Run `harness preset check ./my-preset`.
+2. Install into an isolated HOME or disposable environment.
+3. Create at least one task with `harness new-task --preset`.
+4. For reference bundles, create two different tasks from the same preset and verify both contain the same shared `references/` files and independent audit/evidence bundles.
+5. Run `harness status --json`, `harness task-index --json`, and `harness check --profile target-project <target>`.
+6. Inspect `task_plan.md` to confirm required reads are visible before implementation starts.
+
 ## Boundaries
 
 - Presets cannot write outside declared `writeScopes`.
 - Presets do not run arbitrary JavaScript during `new-task`.
+- Reference bundles are task-local snapshots. If the shared upstream context changes later, create a new preset version or a follow-up task rather than silently mutating historical tasks.
 - Script and check entrypoints may exist in bundled packages, but the task creation path is YAML + templates + built-in processors.
 - Use a new built-in processor only when multiple presets need the same capability and the behavior can be tested centrally.

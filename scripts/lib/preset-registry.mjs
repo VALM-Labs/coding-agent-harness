@@ -57,6 +57,8 @@ export function checkPresetPackage(id) {
     inputs: preset.inputs,
     templateValues: preset.templateValues,
     metadata: preset.metadata,
+    resources: preset.resources,
+    context: preset.context,
     entrypoints: preset.entrypoints,
     writeScopes: preset.writeScopes,
   };
@@ -130,6 +132,13 @@ export function validatePresetPackage(preset) {
   if (preset.evidence?.bundleDir && unsafeRelativePresetPath(preset.evidence.bundleDir)) failures.push(`evidence.bundleDir escapes task directory: ${preset.evidence.bundleDir}`);
   for (const [name, evidence] of Object.entries(preset.evidence?.files || {})) {
     if (evidence.path && unsafeRelativePresetPath(evidence.path)) failures.push(`evidence file ${name} path escapes evidence bundle: ${evidence.path}`);
+  }
+  const resourcePaths = new Set();
+  validateResourceCollection(preset, "reference", "references", "references/", resourcePaths, failures);
+  validateResourceCollection(preset, "artifact", "artifacts", "artifacts/", resourcePaths, failures);
+  const referenceIds = new Set(Object.values(preset.resources?.references || {}).map((resource) => resource.index.id).filter(Boolean));
+  for (const requiredRead of preset.context?.requiredReads || []) {
+    if (!referenceIds.has(requiredRead)) failures.push(`required read ${requiredRead} does not match a declared reference`);
   }
   for (const [name, entrypoint] of Object.entries(preset.entrypoints)) {
     if (!allowedEntrypoints.has(name)) failures.push(`unsupported entrypoint: ${name}`);
@@ -227,6 +236,8 @@ function normalizePresetManifest(manifest, { id, manifestPath, raw, source }) {
     inputs: normalizeInputs(manifest.inputs || {}),
     templateValues: normalizeTemplateValues(manifest.templateValues || {}),
     metadata: normalizeTemplateValues(manifest.metadata || {}),
+    resources: normalizeResources(manifest.resources || {}),
+    context: normalizeContext(manifest.context || {}),
     entrypoints,
     workbench: manifest.workbench || {},
     evidence: manifest.evidence || {},
@@ -262,6 +273,35 @@ function normalizeTemplateValues(rawValues) {
   return Object.fromEntries(Object.entries(rawValues || {}).map(([name, value]) => [name, typeof value === "object" && value !== null ? value : { value }]));
 }
 
+function normalizeResources(rawResources) {
+  return {
+    references: normalizeResourceGroup(rawResources.references || {}),
+    artifacts: normalizeResourceGroup(rawResources.artifacts || {}),
+  };
+}
+
+function normalizeResourceGroup(rawGroup) {
+  return Object.fromEntries(Object.entries(rawGroup || {}).map(([name, value]) => [name, {
+    name,
+    path: String(value.path || "").trim(),
+    source: String(value.source || "").trim(),
+    template: String(value.template || "").trim(),
+    index: {
+      id: String(value.index?.id || "").trim(),
+      type: String(value.index?.type || "").trim(),
+      summary: String(value.index?.summary || "").trim(),
+      usedBy: String(value.index?.usedBy || "").trim(),
+      producedBy: String(value.index?.producedBy || "").trim(),
+    },
+  }]));
+}
+
+function normalizeContext(rawContext) {
+  return {
+    requiredReads: asArray(rawContext.requiredReads),
+  };
+}
+
 function normalizeEntryPoints(rawEntryPoints) {
   const result = {};
   for (const [name, value] of Object.entries(rawEntryPoints || {})) {
@@ -294,10 +334,46 @@ function publicPresetShape(preset) {
     inputs: preset.inputs,
     templateValues: preset.templateValues,
     metadata: preset.metadata,
+    resources: preset.resources,
+    context: preset.context,
     source: preset.source,
     manifestPath: preset.manifestRelativePath,
     manifestSha256: preset.manifestSha256,
   };
+}
+
+function validateResourceCollection(preset, label, groupName, requiredPrefix, resourcePaths, failures) {
+  const seen = new Set();
+  for (const [name, resource] of Object.entries(preset.resources?.[groupName] || {})) {
+    const normalizedPath = toPosix(path.normalize(resource.path || ""));
+    if (!resource.path) failures.push(`${label} resource ${name} missing path`);
+    else if (hasMarkdownTableDelimiter(resource.path)) failures.push(`${label} resource ${name} path cannot contain Markdown table delimiters: ${resource.path}`);
+    else if (unsafeRelativePresetPath(resource.path)) failures.push(`resource ${name} path escapes task directory: ${resource.path}`);
+    else if (String(resource.path).endsWith("/") || String(resource.path).endsWith("\\") || normalizedPath.endsWith("/")) {
+      failures.push(`${label} resource ${name} path must be a file under ${requiredPrefix}: ${resource.path}`);
+    }
+    else if (!normalizedPath.startsWith(requiredPrefix) || normalizedPath === requiredPrefix.slice(0, -1) || normalizedPath === `${requiredPrefix}INDEX.md`) {
+      failures.push(`${label} resource ${name} path must be under ${requiredPrefix}: ${resource.path}`);
+    } else if (resourcePaths.has(normalizedPath)) {
+      failures.push(`duplicate resource path: ${normalizedPath}`);
+    } else {
+      resourcePaths.add(normalizedPath);
+    }
+    if (!resource.source && !resource.template) failures.push(`${label} resource ${name} missing source or template`);
+    if (resource.source && resource.template) failures.push(`${label} resource ${name} cannot declare both source and template`);
+    for (const field of ["source", "template"]) {
+      if (!resource[field]) continue;
+      const resourcePath = path.join(preset.directory, resource[field]);
+      if (!isInside(preset.directory, resourcePath)) failures.push(`${label} resource ${name} ${field} escapes preset package`);
+      else if (!fs.existsSync(resourcePath)) failures.push(`${label} resource ${name} ${field} missing: ${resource[field]}`);
+      else if (!fs.statSync(resourcePath).isFile()) failures.push(`${label} resource ${name} ${field} must be a file: ${resource[field]}`);
+    }
+    const id = resource.index?.id || "";
+    if (!id) failures.push(`${label} resource ${name} missing index.id`);
+    if (id && hasMarkdownTableDelimiter(id)) failures.push(`${label} resource ${name} index.id cannot contain Markdown table delimiters: ${id}`);
+    if (id && seen.has(id)) failures.push(`duplicate ${label} resource id: ${id}`);
+    if (id) seen.add(id);
+  }
 }
 
 export function parseSimpleYaml(source) {
@@ -355,6 +431,10 @@ function unsafeRelativePresetPath(value) {
   const raw = String(value || "");
   const normalized = toPosix(path.normalize(raw));
   return path.isAbsolute(raw) || normalized === ".." || normalized.startsWith("../") || normalized.includes("/../");
+}
+
+function hasMarkdownTableDelimiter(value) {
+  return /[|\r\n]/.test(String(value || ""));
 }
 
 function getValue(values, key) {

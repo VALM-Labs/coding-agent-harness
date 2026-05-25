@@ -121,6 +121,146 @@ assert(customIndexedTask?.preset === "custom-review", "task-index should expose 
 assert(customIndexedTask?.kind === "review-task", "task-index should expose installed custom preset task kind");
 assert(customIndexedTask?.evidenceBundle === `TARGET:${created.task.evidenceBundle}`, "task-index should expose installed custom preset evidence bundle");
 
+const contextSource = path.join(tmpRoot, "context-bundle-preset");
+fs.mkdirSync(path.join(contextSource, "templates/references"), { recursive: true });
+fs.mkdirSync(path.join(contextSource, "resources/artifacts"), { recursive: true });
+fs.writeFileSync(
+  path.join(contextSource, "preset.yaml"),
+  `id: context-bundle
+version: 1
+purpose: Create tasks with shared upstream service references
+compatibleBudgets: [complex]
+localeSupport: [en-US]
+task:
+  kind: service-integration
+  defaultTaskId: service-integration-task
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+inputs:
+  service:
+    type: text
+    flag: --service
+    required: true
+templateValues:
+  service:
+    from: inputs.service
+metadata:
+  UpstreamService:
+    label: Upstream Service
+    from: inputs.service
+resources:
+  references:
+    upstreamContract:
+      path: references/upstream-contract.md
+      template: templates/references/upstream-contract.md
+      index:
+        id: REF-001
+        type: code
+        summary: Shared upstream {{service}} contract for every task created by this preset.
+        usedBy: coordinator,worker,reviewer
+    serviceRunbook:
+      path: references/service-runbook.md
+      source: resources/service-runbook.md
+      index:
+        id: REF-002
+        type: runbook
+        summary: Local verification notes for the shared upstream service.
+        usedBy: worker
+  artifacts:
+    inputPacket:
+      path: artifacts/input-packet.md
+      source: resources/artifacts/input-packet.md
+      index:
+        id: ART-001
+        type: fixture
+        summary: Shared fixture packet | copied by the preset.
+        producedBy: preset
+context:
+  requiredReads: [REF-001, REF-002]
+evidence:
+  bundleDir: artifacts/preset
+audit:
+  manifestRequired: true
+  evidenceFiles: [preset-audit.json, preset-manifest.json, write-scope.json]
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+fs.writeFileSync(path.join(contextSource, "templates/references/upstream-contract.md"), "# {{service}} Contract\n\nShared contract for {{service}}.\n");
+fs.writeFileSync(path.join(contextSource, "resources/service-runbook.md"), "# Service Runbook\n\nStart the shared service before running integration checks.\n");
+fs.writeFileSync(path.join(contextSource, "resources/artifacts/input-packet.md"), "# Input Packet\n\nFixture shared by all preset-created tasks.\n");
+
+const contextCheck = expectJson(["preset", "check", contextSource, "--json"], { env });
+assert(contextCheck.resources.references.upstreamContract.index.id === "REF-001", "preset check should expose declared reference resources");
+assert(contextCheck.context.requiredReads.includes("REF-001"), "preset check should expose required reads");
+expectJson(["preset", "install", contextSource, "--force", "--json"], { env });
+const firstContextTask = expectJson(["new-task", "payment-api", "--budget", "complex", "--preset", "context-bundle", "--service", "payment-service", "--title", "Payment API integration", target], { env });
+const secondContextTask = expectJson(["new-task", "refund-api", "--budget", "complex", "--preset", "context-bundle", "--service", "payment-service", "--title", "Refund API integration", target], { env });
+for (const taskName of ["payment-api", "refund-api"]) {
+  const taskDir = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-${taskName}`);
+  const taskPlan = fs.readFileSync(path.join(taskDir, "task_plan.md"), "utf8");
+  assert(taskPlan.includes("Upstream Service: payment-service"), `${taskName} should persist preset metadata`);
+  assert(taskPlan.includes("## Preset Required Reads"), `${taskName} should tell agents to read preset-provided references`);
+  assert(taskPlan.includes("| Reference | Path | Why |"), `${taskName} should include concrete paths in required reads`);
+  assert(taskPlan.includes("REF-001") && taskPlan.includes("references/upstream-contract.md"), `${taskName} should include declared required reads and paths`);
+  assert(fs.readFileSync(path.join(taskDir, "references/upstream-contract.md"), "utf8").includes("payment-service Contract"), `${taskName} should render templated shared reference`);
+  assert(fs.existsSync(path.join(taskDir, "references/service-runbook.md")), `${taskName} should copy source shared reference`);
+  assert(fs.existsSync(path.join(taskDir, "artifacts/input-packet.md")), `${taskName} should copy source shared artifact`);
+  const referenceIndex = fs.readFileSync(path.join(taskDir, "references/INDEX.md"), "utf8");
+  assert(referenceIndex.includes("| ID | Type | Path | Summary | Used By |"), `${taskName} should keep reference index table schema aligned`);
+  assert(referenceIndex.includes("REF-001") && referenceIndex.includes("Shared upstream payment-service contract"), `${taskName} should index rendered shared references`);
+  const artifactIndex = fs.readFileSync(path.join(taskDir, "artifacts/INDEX.md"), "utf8");
+  assert(artifactIndex.includes("| ID | Type | Path | Summary | Produced By |"), `${taskName} should keep artifact index table schema aligned`);
+  assert(artifactIndex.includes("ART-001") && artifactIndex.includes("Shared fixture packet &#124; copied by the preset."), `${taskName} should index shared artifacts and escape Markdown table cells`);
+}
+const pipeContextTask = expectJson(["new-task", "pipe-api", "--budget", "complex", "--preset", "context-bundle", "--service", "payment | service", "--title", "Pipe API integration", target], { env });
+const pipeTaskDir = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-pipe-api`);
+const pipeReferenceIndex = fs.readFileSync(path.join(pipeTaskDir, "references/INDEX.md"), "utf8");
+const pipeTaskPlan = fs.readFileSync(path.join(pipeTaskDir, "task_plan.md"), "utf8");
+assert(pipeReferenceIndex.includes("payment &#124; service"), "resource index rows should escape CLI-derived pipe characters");
+assert(pipeTaskPlan.includes("payment &#124; service"), "required-read rows should escape CLI-derived pipe characters");
+const contextStatus = expectJson(["status", "--json", target], { env });
+assert(contextStatus.checkState.status === "pass", `target status should accept preset-provided shared references\n${JSON.stringify(contextStatus.checkState, null, 2)}`);
+const contextTaskIndex = expectJson(["task-index", "--json", target], { env });
+assert(contextTaskIndex.tasks.some((task) => task.id === `TASKS/${todayLocal}-payment-api` && task.preset === "context-bundle"), "task-index should include first context preset task");
+assert(contextTaskIndex.tasks.some((task) => task.id === `TASKS/${todayLocal}-refund-api` && task.preset === "context-bundle"), "task-index should include second context preset task");
+assert(contextTaskIndex.tasks.some((task) => task.id === `TASKS/${todayLocal}-pipe-api` && task.preset === "context-bundle"), "task-index should include pipe context preset task");
+assert(firstContextTask.task.evidenceBundle !== secondContextTask.task.evidenceBundle, "each preset-created task should retain an independent audit/evidence bundle");
+assert(pipeContextTask.task.evidenceBundle !== firstContextTask.task.evidenceBundle, "pipe context task should retain an independent audit/evidence bundle");
+const generatedReferencePath = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-payment-api/references/upstream-contract.md`);
+const generatedReferenceContent = fs.readFileSync(generatedReferencePath, "utf8");
+fs.unlinkSync(generatedReferencePath);
+const missingGeneratedReference = run(["check", "--profile", "target-project", target], { env });
+assert(missingGeneratedReference.status !== 0, "target check should fail when a preset-declared reference file is missing");
+assert(`${missingGeneratedReference.stdout}\n${missingGeneratedReference.stderr}`.includes("context-bundle preset resource missing"), "missing preset resource failure should name the preset contract");
+fs.writeFileSync(generatedReferencePath, generatedReferenceContent);
+const generatedReferenceIndexPath = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-payment-api/references/INDEX.md`);
+const generatedReferenceIndexContent = fs.readFileSync(generatedReferenceIndexPath, "utf8");
+fs.writeFileSync(generatedReferenceIndexPath, generatedReferenceIndexContent.split(/\r?\n/).filter((line) => !line.includes("| REF-001 |")).join("\n"));
+const missingGeneratedReferenceIndex = run(["check", "--profile", "target-project", target], { env });
+assert(missingGeneratedReferenceIndex.status !== 0, "target check should fail when a preset-declared reference index row is missing");
+assert(`${missingGeneratedReferenceIndex.stdout}\n${missingGeneratedReferenceIndex.stderr}`.includes("context-bundle preset reference index missing REF-001"), "missing preset reference index failure should name the resource id");
+fs.writeFileSync(generatedReferenceIndexPath, generatedReferenceIndexContent);
+const generatedArtifactIndexPath = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-payment-api/artifacts/INDEX.md`);
+const generatedArtifactIndexContent = fs.readFileSync(generatedArtifactIndexPath, "utf8");
+fs.writeFileSync(generatedArtifactIndexPath, generatedArtifactIndexContent.split(/\r?\n/).filter((line) => !line.includes("| ART-001 |")).join("\n"));
+const missingGeneratedArtifactIndex = run(["check", "--profile", "target-project", target], { env });
+assert(missingGeneratedArtifactIndex.status !== 0, "target check should fail when a preset-declared artifact index row is missing");
+assert(`${missingGeneratedArtifactIndex.stdout}\n${missingGeneratedArtifactIndex.stderr}`.includes("context-bundle preset artifact index missing ART-001"), "missing preset artifact index failure should name the resource id");
+fs.writeFileSync(generatedArtifactIndexPath, generatedArtifactIndexContent);
+const generatedTaskPlanPath = path.join(target, `docs/09-PLANNING/TASKS/${todayLocal}-payment-api/task_plan.md`);
+const generatedTaskPlanContent = fs.readFileSync(generatedTaskPlanPath, "utf8");
+fs.writeFileSync(generatedTaskPlanPath, generatedTaskPlanContent.replace(/\| REF-001 \| TARGET:[^|]+ \| [^|\n]+ \|/, "| REF-001 | references/INDEX.md | Mentioned without the concrete reference path |"));
+const missingRequiredReadPath = run(["check", "--profile", "target-project", target], { env });
+assert(missingRequiredReadPath.status !== 0, "target check should fail when a preset required-read row loses its concrete path");
+assert(`${missingRequiredReadPath.stdout}\n${missingRequiredReadPath.stderr}`.includes("context-bundle preset required read missing from task plan: REF-001"), "missing required-read path failure should name the resource id");
+fs.writeFileSync(generatedTaskPlanPath, generatedTaskPlanContent);
+
 const currentTarget = path.join(tmpRoot, "preset-engine-current-target");
 fs.mkdirSync(currentTarget);
 expectJson(["init", "--locale", "en-US", "--capabilities", "core", currentTarget], { env });
@@ -224,6 +364,354 @@ assert(badScopeCheck.status !== 0, "preset check should reject evidence bundles 
 assert(`${badScopeCheck.stdout}\n${badScopeCheck.stderr}`.includes("evidence.bundleDir escapes task directory"), "bad preset check should explain the escaping evidence bundle");
 const badScopeInstall = run(["preset", "install", blockedSource, "--force", "--json"], { env });
 assert(badScopeInstall.status !== 0, "preset install should reject write-scope-violating manifests before task creation");
+
+const badResourceSource = path.join(tmpRoot, "bad-resource-preset");
+fs.mkdirSync(badResourceSource, { recursive: true });
+fs.writeFileSync(
+  path.join(badResourceSource, "preset.yaml"),
+  `id: bad-resource
+version: 1
+purpose: Bad resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    escaped:
+      path: ../../outside.md
+      source: resources/missing.md
+      index:
+        id: REF-001
+        type: code
+        summary: Bad escaped path.
+        usedBy: worker
+context:
+  requiredReads: [REF-999]
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const badResourceCheck = run(["preset", "check", badResourceSource, "--json"], { env });
+assert(badResourceCheck.status !== 0, "preset check should reject invalid resource bundle declarations");
+const badResourceOutput = `${badResourceCheck.stdout}\n${badResourceCheck.stderr}`;
+assert(badResourceOutput.includes("resource escaped path escapes task directory"), "bad resource path should be reported");
+assert(badResourceOutput.includes("required read REF-999 does not match a declared reference"), "bad required read should be reported");
+
+const overwriteResourceSource = path.join(tmpRoot, "overwrite-resource-preset");
+fs.mkdirSync(path.join(overwriteResourceSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(overwriteResourceSource, "resources/task-plan.md"), "# overwritten\n");
+fs.writeFileSync(
+  path.join(overwriteResourceSource, "preset.yaml"),
+  `id: overwrite-resource
+version: 1
+purpose: Overwrite resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    overwrite:
+      path: task_plan.md
+      source: resources/task-plan.md
+      index:
+        id: REF-001
+        type: code
+        summary: This should not overwrite task plan.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const overwriteResourceCheck = run(["preset", "check", overwriteResourceSource, "--json"], { env });
+assert(overwriteResourceCheck.status !== 0, "preset check should reject resource destinations that can overwrite task contracts");
+assert(`${overwriteResourceCheck.stdout}\n${overwriteResourceCheck.stderr}`.includes("reference resource overwrite path must be under references/"), "overwrite resource rejection should explain the allowed reference directory");
+
+const duplicateResourceSource = path.join(tmpRoot, "duplicate-resource-preset");
+fs.mkdirSync(path.join(duplicateResourceSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(duplicateResourceSource, "resources/a.md"), "A\n");
+fs.writeFileSync(path.join(duplicateResourceSource, "resources/b.md"), "B\n");
+fs.writeFileSync(
+  path.join(duplicateResourceSource, "preset.yaml"),
+  `id: duplicate-resource
+version: 1
+purpose: Duplicate resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    first:
+      path: references/first.md
+      source: resources/a.md
+      index:
+        id: REF-001
+        type: code
+        summary: First reference.
+        usedBy: worker
+    second:
+      path: references/second.md
+      source: resources/b.md
+      index:
+        id: REF-001
+        type: code
+        summary: Second reference.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const duplicateResourceCheck = run(["preset", "check", duplicateResourceSource, "--json"], { env });
+assert(duplicateResourceCheck.status !== 0, "preset check should reject duplicate reference IDs");
+assert(`${duplicateResourceCheck.stdout}\n${duplicateResourceCheck.stderr}`.includes("duplicate reference resource id: REF-001"), "duplicate resource ID rejection should explain the conflict");
+
+const duplicatePathSource = path.join(tmpRoot, "duplicate-resource-path-preset");
+fs.mkdirSync(path.join(duplicatePathSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(duplicatePathSource, "resources/a.md"), "A\n");
+fs.writeFileSync(path.join(duplicatePathSource, "resources/b.md"), "B\n");
+fs.writeFileSync(
+  path.join(duplicatePathSource, "preset.yaml"),
+  `id: duplicate-resource-path
+version: 1
+purpose: Duplicate resource path fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    first:
+      path: references/shared.md
+      source: resources/a.md
+      index:
+        id: REF-001
+        type: code
+        summary: First reference.
+        usedBy: worker
+    second:
+      path: references/shared.md
+      source: resources/b.md
+      index:
+        id: REF-002
+        type: code
+        summary: Second reference.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const duplicatePathCheck = run(["preset", "check", duplicatePathSource, "--json"], { env });
+assert(duplicatePathCheck.status !== 0, "preset check should reject duplicate resource destination paths");
+assert(`${duplicatePathCheck.stdout}\n${duplicatePathCheck.stderr}`.includes("duplicate resource path: references/shared.md"), "duplicate resource path rejection should explain the conflict");
+
+const directoryPathResourceSource = path.join(tmpRoot, "directory-path-resource-preset");
+fs.mkdirSync(path.join(directoryPathResourceSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(directoryPathResourceSource, "resources/reference.md"), "Reference\n");
+fs.writeFileSync(
+  path.join(directoryPathResourceSource, "preset.yaml"),
+  `id: directory-path-resource
+version: 1
+purpose: Directory path resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    directoryPath:
+      path: references/
+      source: resources/reference.md
+      index:
+        id: REF-001
+        type: code
+        summary: This should not be a directory.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const directoryPathResourceCheck = run(["preset", "check", directoryPathResourceSource, "--json"], { env });
+assert(directoryPathResourceCheck.status !== 0, "preset check should reject directory-like resource destinations");
+assert(`${directoryPathResourceCheck.stdout}\n${directoryPathResourceCheck.stderr}`.includes("reference resource directoryPath path must be a file under references/"), "directory-like path rejection should explain the file requirement");
+
+const directorySourceResourceSource = path.join(tmpRoot, "directory-source-resource-preset");
+fs.mkdirSync(path.join(directorySourceResourceSource, "resources"), { recursive: true });
+fs.writeFileSync(
+  path.join(directorySourceResourceSource, "preset.yaml"),
+  `id: directory-source-resource
+version: 1
+purpose: Directory source resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    directorySource:
+      path: references/source.md
+      source: resources
+      index:
+        id: REF-001
+        type: code
+        summary: This source points at a directory.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const directorySourceResourceCheck = run(["preset", "check", directorySourceResourceSource, "--json"], { env });
+assert(directorySourceResourceCheck.status !== 0, "preset check should reject directory source resources");
+assert(`${directorySourceResourceCheck.stdout}\n${directorySourceResourceCheck.stderr}`.includes("reference resource directorySource source must be a file"), "directory source rejection should explain the file requirement");
+
+const directoryTemplateResourceSource = path.join(tmpRoot, "directory-template-resource-preset");
+fs.mkdirSync(path.join(directoryTemplateResourceSource, "templates/references"), { recursive: true });
+fs.writeFileSync(
+  path.join(directoryTemplateResourceSource, "preset.yaml"),
+  `id: directory-template-resource
+version: 1
+purpose: Directory template resource fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    directoryTemplate:
+      path: references/template.md
+      template: templates/references
+      index:
+        id: REF-001
+        type: code
+        summary: This template points at a directory.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const directoryTemplateResourceCheck = run(["preset", "check", directoryTemplateResourceSource, "--json"], { env });
+assert(directoryTemplateResourceCheck.status !== 0, "preset check should reject directory template resources");
+assert(`${directoryTemplateResourceCheck.stdout}\n${directoryTemplateResourceCheck.stderr}`.includes("reference resource directoryTemplate template must be a file"), "directory template rejection should explain the file requirement");
+
+const pipeResourcePathSource = path.join(tmpRoot, "pipe-resource-path-preset");
+fs.mkdirSync(path.join(pipeResourcePathSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(pipeResourcePathSource, "resources/reference.md"), "Reference\n");
+fs.writeFileSync(
+  path.join(pipeResourcePathSource, "preset.yaml"),
+  `id: pipe-resource-path
+version: 1
+purpose: Pipe resource path fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    pipePath:
+      path: references/foo|bar.md
+      source: resources/reference.md
+      index:
+        id: REF-001
+        type: code
+        summary: This path contains a table delimiter.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const pipeResourcePathCheck = run(["preset", "check", pipeResourcePathSource, "--json"], { env });
+assert(pipeResourcePathCheck.status !== 0, "preset check should reject resource paths containing Markdown table delimiters");
+assert(`${pipeResourcePathCheck.stdout}\n${pipeResourcePathCheck.stderr}`.includes("reference resource pipePath path cannot contain Markdown table delimiters"), "pipe path rejection should explain the delimiter issue");
+
+const pipeResourceIdSource = path.join(tmpRoot, "pipe-resource-id-preset");
+fs.mkdirSync(path.join(pipeResourceIdSource, "resources"), { recursive: true });
+fs.writeFileSync(path.join(pipeResourceIdSource, "resources/reference.md"), "Reference\n");
+fs.writeFileSync(
+  path.join(pipeResourceIdSource, "preset.yaml"),
+  `id: pipe-resource-id
+version: 1
+purpose: Pipe resource id fixture
+compatibleBudgets: [complex]
+entrypoints:
+  newTask:
+    type: template
+    writes: [docs/09-PLANNING/TASKS/**]
+    audit: true
+resources:
+  references:
+    pipeId:
+      path: references/reference.md
+      source: resources/reference.md
+      index:
+        id: REF|001
+        type: code
+        summary: This id contains a table delimiter.
+        usedBy: worker
+audit:
+  manifestRequired: true
+writeScopes:
+  taskDocs:
+    path: docs/09-PLANNING/TASKS/**
+    access: write
+`,
+);
+const pipeResourceIdCheck = run(["preset", "check", pipeResourceIdSource, "--json"], { env });
+assert(pipeResourceIdCheck.status !== 0, "preset check should reject resource IDs containing Markdown table delimiters");
+assert(`${pipeResourceIdCheck.stdout}\n${pipeResourceIdCheck.stderr}`.includes("reference resource pipeId index.id cannot contain Markdown table delimiters"), "pipe id rejection should explain the delimiter issue");
+
+const referenceIndexTemplate = fs.readFileSync(path.join(repoRootFromTest(), "templates/planning/optional/references/INDEX.md"), "utf8");
+const artifactIndexTemplate = fs.readFileSync(path.join(repoRootFromTest(), "templates/planning/optional/artifacts/INDEX.md"), "utf8");
+assert(!referenceIndexTemplate.includes("| REF-001 |"), "reference index template should not ship a real-looking placeholder resource id");
+assert(!artifactIndexTemplate.includes("| ART-001 |"), "artifact index template should not ship a real-looking placeholder artifact id");
 
 const exactScopeSource = path.join(tmpRoot, "exact-scope-preset");
 fs.mkdirSync(exactScopeSource, { recursive: true });

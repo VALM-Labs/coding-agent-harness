@@ -83,6 +83,7 @@ export function evaluateTemplateValues(preset, resolvedInputs, { taskId = "", ta
 }
 
 export function buildPresetContext(preset, { target, taskDir, taskId, taskTitle, resolvedInputs, evaluatedValues }) {
+  const taskRelativeDir = toPosix(path.relative(target.projectRoot, taskDir));
   const evidenceBundle = presetEvidenceBundle(preset, { target, taskDir, evaluatedValues });
   const audit = buildPresetAudit(preset, {
     taskId,
@@ -98,6 +99,7 @@ export function buildPresetContext(preset, { target, taskDir, taskId, taskTitle,
     resolvedInputs,
     taskId,
     taskTitle,
+    taskRelativeDir,
     values: {
       ...evaluatedValues,
       evidenceBundle,
@@ -107,6 +109,9 @@ export function buildPresetContext(preset, { target, taskDir, taskId, taskTitle,
     evidenceBundle,
   };
   context.evidenceFiles = generateEvidenceFiles(preset, { target, taskDir, context });
+  const resources = generateResourceFiles(preset, { context });
+  context.resourceFiles = resources.files;
+  context.resourceIndexRows = resources.indexRows;
   return context;
 }
 
@@ -131,7 +136,25 @@ export function renderPresetTaskTemplate(destination, content, presetContext) {
   if (templatePath) {
     next = `${next.trimEnd()}\n\n${renderPresetTemplate(presetContext.presetPackage, templatePath, presetContext.values).trimEnd()}\n`;
   }
+  if (destination === "task_plan.md" || destination === "task_plan") {
+    next = appendPresetRequiredReads(next, presetContext);
+  }
   return next;
+}
+
+export function renderPresetResourceIndex(content, kind, rows) {
+  if (!rows.length) return content;
+  const renderedRows = rows.map((row) => kind === "references"
+    ? `| ${markdownTableCell(row.id)} | ${markdownTableCell(row.type || "preset")} | ${markdownTableCell(row.path)} | ${markdownTableCell(row.summary)} | ${markdownTableCell(row.usedBy || "coordinator")} |`
+    : `| ${markdownTableCell(row.id)} | ${markdownTableCell(row.type || "preset")} | ${markdownTableCell(row.path)} | ${markdownTableCell(row.summary)} | ${markdownTableCell(row.producedBy || "preset")} |`);
+  const base = String(content || "").trim() ? String(content || "") : presetIndexSkeleton(kind);
+  const lines = base.trimEnd().split(/\r?\n/);
+  const separatorIndex = lines.findIndex((line) => /^\|\s*---/.test(line));
+  if (separatorIndex >= 0) {
+    lines.splice(separatorIndex + 1, 0, ...renderedRows);
+    return `${lines.join("\n")}\n`;
+  }
+  return `${String(content || "").trimEnd()}\n${renderedRows.join("\n")}\n`;
 }
 
 export function assertPresetWriteScope(preset, relativePath) {
@@ -194,6 +217,62 @@ function generateEvidenceFiles(preset, { target, context }) {
     addAuditFile({ name, preset, context, add });
   }
   return files;
+}
+
+function generateResourceFiles(preset, { context }) {
+  const files = [];
+  const indexRows = { references: [], artifacts: [] };
+  const add = (relativePath, source, content) => {
+    assertPresetWriteScope(preset, relativePath);
+    files.push({ relativePath, source, content });
+  };
+  for (const resource of Object.values(preset.resources?.references || {})) {
+    const relativePath = toPosix(path.join(context.taskRelativeDir, resource.path));
+    add(relativePath, resource.source || resource.template, renderResourceContent(preset, resource, context));
+    indexRows.references.push(renderReferenceIndexRow(resource, relativePath, context.values));
+  }
+  for (const resource of Object.values(preset.resources?.artifacts || {})) {
+    const relativePath = toPosix(path.join(context.taskRelativeDir, resource.path));
+    add(relativePath, resource.source || resource.template, renderResourceContent(preset, resource, context));
+    indexRows.artifacts.push(renderArtifactIndexRow(resource, relativePath, context.values));
+  }
+  return { files, indexRows };
+}
+
+function renderResourceContent(preset, resource, context) {
+  if (resource.template) return renderPresetTemplate(preset, resource.template, context.values);
+  return fs.readFileSync(path.join(preset.directory, resource.source), "utf8");
+}
+
+function renderReferenceIndexRow(resource, relativePath, values) {
+  return {
+    id: resource.index.id,
+    type: renderInline(resource.index.type, values),
+    path: `TARGET:${relativePath}`,
+    summary: renderInline(resource.index.summary, values),
+    usedBy: renderInline(resource.index.usedBy, values),
+  };
+}
+
+function renderArtifactIndexRow(resource, relativePath, values) {
+  return {
+    id: resource.index.id,
+    type: renderInline(resource.index.type, values),
+    path: `TARGET:${relativePath}`,
+    summary: renderInline(resource.index.summary, values),
+    producedBy: renderInline(resource.index.producedBy || "preset", values),
+  };
+}
+
+function appendPresetRequiredReads(content, context) {
+  const requiredReads = context.presetPackage?.context?.requiredReads || [];
+  if (!requiredReads.length) return content;
+  const rowsById = new Map((context.resourceIndexRows?.references || []).map((row) => [row.id, row]));
+  const rows = requiredReads.map((id) => {
+    const row = rowsById.get(id);
+    return `| ${markdownTableCell(id)} | ${markdownTableCell(row?.path || "references/INDEX.md")} | ${markdownTableCell(row?.summary || "Preset-provided reference")} |`;
+  });
+  return `${content.trimEnd()}\n\n## Preset Required Reads\n\nOpen \`references/INDEX.md\`, then read these preset-provided references before implementation.\n\n| Reference | Path | Why |\n| --- | --- | --- |\n${rows.join("\n")}\n`;
 }
 
 function addEvidenceFile({ name, declaration, preset, target, context, add }) {
@@ -357,6 +436,8 @@ function presetManifestSnapshot(preset) {
     inputs: preset.inputs,
     templateValues: preset.templateValues,
     metadata: preset.metadata,
+    resources: preset.resources,
+    context: preset.context,
   };
 }
 
@@ -390,6 +471,24 @@ function packageVersion() {
 function getPath(values, key) {
   if (!key) return values;
   return String(key).split(".").reduce((cursor, part) => (cursor && Object.prototype.hasOwnProperty.call(cursor, part) ? cursor[part] : undefined), values);
+}
+
+function renderInline(value, values) {
+  return String(value || "").replace(/\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/g, (_match, key) => {
+    const result = getPath(values, key);
+    return result == null ? "" : String(result);
+  });
+}
+
+function markdownTableCell(value) {
+  return String(value || "").replace(/\r?\n/g, " ").replaceAll("|", "&#124;").trim();
+}
+
+function presetIndexSkeleton(kind) {
+  if (kind === "references") {
+    return "# References Index\n\n| ID | Type | Path | Summary | Used By |\n| --- | --- | --- | --- | --- |\n";
+  }
+  return "# Artifacts Index\n\n| ID | Type | Path | Summary | Produced By |\n| --- | --- | --- | --- | --- |\n";
 }
 
 function escapeRegExp(value) {
