@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.5
 
 - Relicense the public package from MIT to AGPL-3.0-or-later.
 - Add an additional permission for Generated Harness Materials so target
