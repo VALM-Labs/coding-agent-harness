@@ -169,13 +169,20 @@ function assertSafeDashboardTarget(target, options) {
 }
 
 function looksLikeGeneratedDashboardDirectory(target) {
-  return [
+  const full = [
     "index.html",
     "README.md",
     "assets/app.js",
     "assets/dashboard-data.js",
     "data/status.json",
   ].every((relativePath) => fs.existsSync(path.join(target, relativePath)));
+  if (full) return true;
+  const readmePath = path.join(target, "README.md");
+  if (!fs.existsSync(readmePath)) return false;
+  try {
+    const content = fs.readFileSync(readmePath, "utf8");
+    return content.includes("Harness Dashboard") && content.includes("harness dashboard");
+  } catch { return false; }
 }
 
 function dashboardTemplateRootForLocale(locale = "en-US") {

@@ -17,8 +17,8 @@ function overview() {
 function statusStrip() {
   const status = bundle.status?.checkState?.status || "unknown";
   const validationMode = bundle.status?.checkState?.validationMode || "validated";
-  const dataOnly = validationMode === "data-only";
-  const displayState = dataOnly ? "snapshot" : status;
+  const snapshotOnly = validationMode === "data-only" && !isWorkbenchRuntime();
+  const displayState = snapshotOnly ? "snapshot" : status;
   const failures = bundle.status?.checkState?.failures || 0;
   const warnings = bundle.status?.checkState?.warnings || 0;
   const tasks = bundle.status?.tasks || [];
@@ -27,8 +27,8 @@ function statusStrip() {
   const withBrief = tasks.filter((task) => task.briefSource === "standalone").length;
   return `<section class="status-card-group">
     <div class="status-primary ${displayState}">
-      <span>${dataOnly ? t("snapshotStatus") : t("readiness")}</span>
-      <strong>${dataOnly ? t("snapshot") : label(status)}</strong>
+      <span>${snapshotOnly ? t("snapshotStatus") : t("readiness")}</span>
+      <strong>${snapshotOnly ? t("snapshot") : label(status)}</strong>
       <p>${nextActionText()}</p>
     </div>
     <div class="metrics-grid">
@@ -49,14 +49,20 @@ function metric(labelText, value) {
 }
 
 function nextActionText() {
-  if ((bundle.status?.checkState?.validationMode || "validated") === "data-only") return t("snapshotNotValidated");
+  const dataOnly = (bundle.status?.checkState?.validationMode || "validated") === "data-only";
+  if (dataOnly && !isWorkbenchRuntime()) return t("snapshotNotValidated");
   const failures = bundle.status?.checkState?.failures || 0;
   if (failures > 0) return t("resolveBlockers");
   const missingBriefs = (bundle.status?.tasks || []).filter((task) => task.briefSource !== "standalone").length;
   if (missingBriefs > 0) return `${missingBriefs} ${t("missingBriefs")}`;
   const warnings = bundle.status?.checkState?.warnings || 0;
   if (warnings > 0) return t("reviewAdvice");
+  if (dataOnly) return t("workbenchDataOnly");
   return t("noBlockers");
+}
+
+function isWorkbenchRuntime() {
+  return window.__HARNESS_WORKBENCH__ === true || state.runtime?.mode === "workbench";
 }
 
 function flowPanel() {
