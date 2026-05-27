@@ -50,11 +50,14 @@ const legacyTask = path.join(migrationTarget, "docs/09-PLANNING/TASKS/old");
 const legacyModuleTask = path.join(migrationTarget, "docs/09-PLANNING/MODULES/auth/TASKS/auth-old");
 fs.mkdirSync(legacyTask, { recursive: true });
 fs.mkdirSync(legacyModuleTask, { recursive: true });
+fs.mkdirSync(path.join(migrationTarget, "docs/09-PLANNING/TASKS/_task-template"), { recursive: true });
+fs.mkdirSync(path.join(migrationTarget, "docs/09-PLANNING/MODULES/_task-template"), { recursive: true });
+fs.mkdirSync(path.join(migrationTarget, "docs/09-PLANNING/MODULES/_module-template"), { recursive: true });
 fs.mkdirSync(path.join(migrationTarget, "docs/10-WALKTHROUGH"), { recursive: true });
 fs.mkdirSync(path.join(migrationTarget, "docs/11-REFERENCE"), { recursive: true });
 fs.writeFileSync(
   path.join(migrationTarget, ".harness-capabilities.json"),
-  JSON.stringify({ version: 1, locale: "zh-CN", capabilities: [{ name: "core", state: "configured" }, { name: "dashboard", state: "configured" }] }, null, 2),
+  JSON.stringify({ version: 1, locale: "zh-CN", capabilities: [{ name: "core", state: "configured" }, { name: "dashboard", state: "configured" }, { name: "safe-adoption", state: "configured" }] }, null, 2),
 );
 fs.writeFileSync(path.join(migrationTarget, "AGENTS.md"), "# Legacy Agents\n\nDO_NOT_OVERWRITE\n");
 fs.writeFileSync(path.join(migrationTarget, "docs/Harness-Ledger.md"), "# Legacy Ledger\n");
@@ -67,6 +70,9 @@ fs.writeFileSync(path.join(legacyTask, "progress.md"), "# Progress\n\n## Status\
 fs.writeFileSync(path.join(legacyModuleTask, "task_plan.md"), "# Old Module Task\n\nTask Contract: harness-task/v1\n\nSelected budget: simple\n");
 fs.writeFileSync(path.join(legacyModuleTask, "brief.md"), "# Old Module Brief\n\nThis legacy module task verifies uppercase TASKS normalization into the v2 module task directory shape.\n");
 fs.writeFileSync(path.join(legacyModuleTask, "progress.md"), "# Progress\n\n## Status\n\nplanned\n");
+fs.writeFileSync(path.join(migrationTarget, "docs/09-PLANNING/TASKS/_task-template/task_plan.md"), "# Legacy Task Template\n");
+fs.writeFileSync(path.join(migrationTarget, "docs/09-PLANNING/MODULES/_task-template/task_plan.md"), "# Legacy Module Task Template\n");
+fs.writeFileSync(path.join(migrationTarget, "docs/09-PLANNING/MODULES/_module-template/module_plan.md"), "# Legacy Module Template\n");
 
 const docsRootPlan = expectJson(["migrate-structure", "--json", "--plan", path.join(migrationTarget, "docs")]);
 assert(docsRootPlan.target === migrationTarget, "migrate-structure should accept a legacy docs/ path and resolve the project root");
@@ -108,6 +114,9 @@ assert(fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/t
 assert(fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/auth/tasks/auth-old/task_plan.md")), "structure migration should normalize legacy module task directories to v2 module tasks");
 assert(fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/auth/tasks/auth-old/walkthrough.md")), "structure migration should add task-local walkthroughs for migrated module tasks");
 assert(fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/auth/tasks/auth-old/visual_map.md")), "structure migration should add canonical visual maps for migrated tasks when absent");
+assert(!fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/tasks/_task-template")), "structure migration should remove generated task template directories");
+assert(!fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/_task-template")), "structure migration should remove generated module task template directories");
+assert(!fs.existsSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/_module-template")), "structure migration should remove generated module template directories");
 assert(
   !fs.readdirSync(path.join(migrationTarget, "coding-agent-harness/planning/modules/auth")).includes("TASKS"),
   "structure migration should remove legacy uppercase module TASKS roots",
@@ -118,16 +127,23 @@ assert(applied.actionsApplied.some((action) => action.action === "archive-source
 const manifest = fs.readFileSync(path.join(migrationTarget, "coding-agent-harness/harness.yaml"), "utf8");
 assert(manifest.includes("locale: zh-CN"), "structure migration should persist locale in manifest");
 assert(/^\s*-\s*dashboard\s*$/m.test(manifest), "structure migration should persist capabilities in manifest");
+assert(/^\s*-\s*safe-adoption\s*$/m.test(manifest), "structure migration should preserve safe-adoption as historical capability metadata");
+const archivedBadReview = path.join(migrationTarget, "coding-agent-harness/governance/archive/manual/legacy-task/review.md");
+fs.mkdirSync(path.dirname(archivedBadReview), { recursive: true });
+fs.writeFileSync(archivedBadReview, "# Archived Review\n\nThis archived review intentionally lacks current review schema sections.\n");
 
 const migratedStatus = expectJson(["status", "--json", migrationTarget]);
 assert(migratedStatus.mode === "v2-manifest", "migrated target should run in v2 manifest mode");
 assert(migratedStatus.tasks.some((task) => task.path === "TARGET:coding-agent-harness/planning/tasks/old"), "status should discover migrated v2 task");
 assert(migratedStatus.tasks.some((task) => task.id === "MODULES/auth/auth-old"), "status should discover migrated v2 module task identity");
 assert(!JSON.stringify(migratedStatus).includes("docs/09-PLANNING"), "migrated status should not expose legacy active task paths");
+assert(!migratedStatus.checkState.details.warnings.some((warning) => /legacy check failed/i.test(warning)), "v2 migrated safe-adoption target should not run the legacy checker");
+assert(!migratedStatus.checkState.details.warnings.some((warning) => warning.includes("Archived Review")), "v2 migrated target should not validate archived review files");
 const dashboardDir = path.join(tmpRoot, "structure-migration-dashboard");
 expectPass(["dashboard", "--out-dir", dashboardDir, migrationTarget]);
 const dashboardStatus = JSON.parse(fs.readFileSync(path.join(dashboardDir, "data/status.json"), "utf8"));
 assert(dashboardStatus.tasks.some((task) => task.path === "TARGET:coding-agent-harness/planning/tasks/old"), "dashboard should display migrated v2 task");
 assert(dashboardStatus.tasks.some((task) => task.path === "TARGET:coding-agent-harness/planning/modules/auth/tasks/auth-old"), "dashboard should display migrated v2 module task");
+assert(!dashboardStatus.checkState.details.warnings.some((warning) => /legacy check failed/i.test(warning)), "v2 migrated dashboard should not run the legacy checker");
 
 console.log("Migration adoption tests passed");

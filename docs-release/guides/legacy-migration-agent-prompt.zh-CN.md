@@ -44,6 +44,7 @@ English source: `docs-release/guides/legacy-migration-agent-prompt.md`
 git -C /path/to/project status --short --branch
 harness status --json /path/to/project > /tmp/harness-status.json
 harness migrate-plan --json --limit 1000 /path/to/project > /tmp/harness-migrate-plan.json
+harness migrate-structure --plan --json /path/to/project > /tmp/harness-migrate-structure-plan.json
 ```
 
 然后给用户一个简短迁移计划，并主动提问。计划必须包含：
@@ -51,6 +52,7 @@ harness migrate-plan --json --limit 1000 /path/to/project > /tmp/harness-migrate
 - 任务总数、brief 覆盖、canonical `visual_map.md` 覆盖。
 - `migrate-plan.summary` 中的 warnings、taskActions、reviewSchemaGaps、legacyReferenceGaps、legacyResiduals、fullCutoverEligible。
 - dirty / untracked 文件解释。
+- v2 目录结构计划，包括活跃 Harness 根目录是默认的 `coding-agent-harness/`，还是自定义的 `structure.harnessRoot`。
 - 是否属于微服务、多仓、前后端分仓或外部集成项目；如果是，是否已询问用户外部资料。
 - 推荐迁移模式和原因。
 - 预计改动范围、token / 时间成本、是否需要 subagent。
@@ -102,7 +104,14 @@ harness migrate-plan --json --limit 50 /path/to/project > /tmp/harness-migrate-p
   - 英文团队或英文对外文档使用 `--locale en-US`。
 - 从入口文件或产品文档记录具体语言证据，例如 `AGENTS.md`、`CLAUDE.md`、`README.md`、`docs/Harness-Ledger.md` 和活跃任务文档。信号冲突时停止并让用户决定语言。
 
-运行迁移轨道：
+先运行 v2 目录结构迁移，再运行迁移轨道：
+
+```bash
+harness migrate-structure --apply --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+然后创建 migration session：
 
 ```bash
 harness migrate-run \

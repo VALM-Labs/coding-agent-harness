@@ -90,6 +90,12 @@ so user and project preset precedence remains stable across upgrades.
 The `preset-creator` Skill is for authoring these preset packages; the Harness
 CLI is what checks, installs, lists, and applies them.
 
+Default task and module templates come from the installed npm package at command
+runtime. Target projects should not treat `planning/**/_task-template` or
+`planning/**/_module-template` directories as active state; v2 structure
+migration removes those generated legacy template directories when it finds
+them.
+
 ### Safe Migration For Existing Projects
 
 Legacy project migration starts with a scan, a migration plan, a recommended migration mode, and user confirmation. Only then should the agent write files. Final status is proven with a dashboard and checks.
@@ -167,6 +173,42 @@ The `.coding-agent-harness/presets/` location is intentionally retained for
 preset overlays; it is not a legacy task-state directory.
 
 Agents must not silently run a global install. They may run `npm install -g coding-agent-harness` only after the user explicitly approves changing the global npm environment. Without that approval, keep using `npx --yes coding-agent-harness ...`.
+
+### Harness State Location
+
+By default, `harness init` and `harness migrate-structure --apply` write active
+Harness state under `coding-agent-harness/` in the target project:
+
+```text
+coding-agent-harness/harness.yaml
+coding-agent-harness/planning/tasks/
+coding-agent-harness/governance/
+```
+
+Checks and dashboards are not tied to that exact folder name. A project can keep
+Harness state in a custom project-relative directory by placing `harness.yaml`
+there and declaring the same path in `structure.harnessRoot`. For example:
+
+```yaml
+version: 2
+locale: zh-CN
+capabilities:
+  - core
+  - dashboard
+structure:
+  harnessRoot: .project-control/harness-state
+  planningRoot: .project-control/harness-state/planning
+  tasksRoot: .project-control/harness-state/planning/tasks
+  governanceRoot: .project-control/harness-state/governance
+  generatedRoot: .project-control/harness-state/governance/generated
+```
+
+After that, these are equivalent when the manifest is unique under the project:
+
+```bash
+npx --yes coding-agent-harness status --json /path/to/project
+npx --yes coding-agent-harness status --json /path/to/project/.project-control/harness-state
+```
 
 ### Commands For Humans
 
@@ -279,8 +321,12 @@ First run a detailed scan and give me a migration plan:
 During the scan phase, run at least:
 npx --yes coding-agent-harness status --json .
 npx --yes coding-agent-harness migrate-plan --json --limit 1000 .
+npx --yes coding-agent-harness migrate-structure --plan --json .
 
-After I confirm the migration mode, run the migration rail and verify it:
+After I confirm the migration mode, first migrate the directory structure to the
+v2 manifest layout, then run the migration rail and verify it:
+npx --yes coding-agent-harness migrate-structure --apply --json .
+npx --yes coding-agent-harness check --profile target-project .
 npx --yes coding-agent-harness migrate-run --locale zh-CN --session-dir /tmp/cah-migration-project --out-dir /tmp/cah-migration-project/dashboard .
 npx --yes coding-agent-harness migrate-verify /tmp/cah-migration-project/session.json
 

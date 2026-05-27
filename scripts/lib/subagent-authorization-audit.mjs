@@ -3,6 +3,7 @@ import {
   readFileSafe,
   toPosix,
   walkFiles,
+  isArchivedHarnessPath,
 } from "./core-shared.mjs";
 import {
   firstColumn,
@@ -20,7 +21,7 @@ export function validateSubagentAuthorization(target, { strict = true } = {}) {
     .filter((file) => file.endsWith("execution_strategy.md"))
     .filter((file) => !file.includes(`${path.sep}_task-template${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}_optional-structures${path.sep}`))
-    .filter((file) => !file.includes(`${path.sep}_archive${path.sep}`));
+    .filter((file) => !isArchivedHarnessPath(file));
 
   for (const strategyPath of strategyPaths) {
     const relative = toPosix(path.relative(target.projectRoot, strategyPath));

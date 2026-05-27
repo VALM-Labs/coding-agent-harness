@@ -9,6 +9,7 @@ import {
   readFileSafe,
   readJsonSafe,
   walkFiles,
+  isArchivedHarnessPath,
   titleFromMarkdown,
 } from "./core-shared.mjs";
 import {
@@ -159,7 +160,7 @@ export function listTaskPlanPaths(target) {
     .filter((file) => file.endsWith("task_plan.md"))
     .filter((file) => !file.includes(`${path.sep}_task-template${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}_optional-structures${path.sep}`))
-    .filter((file) => !file.includes(`${path.sep}_archive${path.sep}`));
+    .filter((file) => !isArchivedHarnessPath(file));
 }
 
 export function taskIdForDirectory(target, taskDir) {

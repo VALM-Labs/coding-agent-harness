@@ -17,6 +17,37 @@ English mirror: `docs-release/guides/migration-playbook.en-US.md`
 用 `npx --yes coding-agent-harness <command>` 运行同一条 CLI。维护者在本源码仓调试时，
 可以把同一命令替换为 `node scripts/harness.mjs`。
 
+## 目标路径和 v2 结构
+
+v2 的默认活跃目录是目标项目里的 `coding-agent-harness/`，入口文件是
+`coding-agent-harness/harness.yaml`。但检查目标不要求这个目录一定在仓库根目录下使用固定名称。
+如果项目已经把 Harness 状态放在自定义目录，例如
+`.project-control/harness-state/`，需要在该目录的 `harness.yaml` 中声明：
+
+```yaml
+structure:
+  harnessRoot: .project-control/harness-state
+  planningRoot: .project-control/harness-state/planning
+  tasksRoot: .project-control/harness-state/planning/tasks
+  governanceRoot: .project-control/harness-state/governance
+  generatedRoot: .project-control/harness-state/governance/generated
+```
+
+之后可以从项目根运行：
+
+```bash
+harness status --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+也可以直接指向 Harness 根目录：
+
+```bash
+harness status --json /path/to/project/.project-control/harness-state
+```
+
+如果一个项目下存在多个 `harness.yaml`，不要让 agent 猜；必须把目标 Harness 根目录作为命令参数传入。
+
 ## 迁移原则
 
 - 先保护历史，再补新合同。不要覆盖 `AGENTS.md`、`CLAUDE.md`、历史 task、walkthrough、SSoT 或 ledger。
@@ -35,6 +66,7 @@ English mirror: `docs-release/guides/migration-playbook.en-US.md`
 git -C /path/to/project status --short --branch
 harness status --json /path/to/project
 harness migrate-plan --json --limit 1000 /path/to/project
+harness migrate-structure --plan --json /path/to/project
 ```
 
 然后 agent 必须给用户一份迁移计划，并主动推荐迁移深度：
@@ -68,6 +100,20 @@ Agent 必须记录具体判断证据，例如 `AGENTS.md`、`CLAUDE.md`、`READM
 如果本轮还没有用户确认的迁移深度，停在这里，不要写文件。
 
 2. 运行迁移轨道：
+
+先把旧 `docs/` 布局迁到 v2 manifest 布局。`--plan` 是只读预览；用户确认后才运行
+`--apply`。默认迁移目标是 `coding-agent-harness/`，并会把旧 `docs/` 归档到
+`coding-agent-harness/governance/archive/legacy-docs/`。旧版本遗留的
+`planning/**/_task-template` 和 `planning/**/_module-template` 是 npm 包内模板的生成副本，
+迁移时会从目标项目中移除：
+
+```bash
+harness migrate-structure --plan --json /path/to/project
+harness migrate-structure --apply --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+目录迁移通过后，再运行 session 迁移轨道：
 
 ```bash
 harness migrate-run \

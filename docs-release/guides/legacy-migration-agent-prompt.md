@@ -44,6 +44,7 @@ Scan first. Do not write files:
 git -C /path/to/project status --short --branch
 harness status --json /path/to/project > /tmp/harness-status.json
 harness migrate-plan --json --limit 1000 /path/to/project > /tmp/harness-migrate-plan.json
+harness migrate-structure --plan --json /path/to/project > /tmp/harness-migrate-structure-plan.json
 ```
 
 Then return a short migration plan and ask for confirmation. The plan must include:
@@ -51,6 +52,7 @@ Then return a short migration plan and ask for confirmation. The plan must inclu
 - task count, brief coverage, and canonical `visual_map.md` coverage;
 - `migrate-plan.summary` warnings, taskActions, reviewSchemaGaps, legacyReferenceGaps, legacyResiduals, and fullCutoverEligible;
 - dirty / untracked file explanation;
+- v2 structure plan, including whether the active Harness root is the default `coding-agent-harness/` or a custom `structure.harnessRoot`;
 - whether the project is a microservice, multi-repo, split frontend/backend, or externally integrated project, and whether the user has been asked for external source material;
 - recommended migration mode and rationale;
 - estimated write scope, token / time cost, and whether subagents are needed;
@@ -101,7 +103,14 @@ Before writing files:
   - `--locale zh-CN` for Chinese users, Chinese project operating context, or Chinese-facing docs.
   - `--locale en-US` for English teams or English-facing docs.
 - Record concrete locale evidence from entry files or product-facing docs, such as `AGENTS.md`, `CLAUDE.md`, `README.md`, `docs/Harness-Ledger.md`, and active task docs. Stop and ask for a locale decision if those signals conflict.
-- Run the migration rail:
+- Run the v2 directory-structure migration, then the migration rail:
+
+```bash
+harness migrate-structure --apply --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+Then create the migration session:
 
 ```bash
 harness migrate-run \

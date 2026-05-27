@@ -52,8 +52,8 @@ assert(
   "init scaffold should copy the external source intake standard into v2 governance standards",
 );
 assert(
-  dryRun.changes.some((change) => change.source === "templates-zh-CN/planning/task_plan.md"),
-  "init zh-CN dry-run should use localized task_plan template when available",
+  dryRun.changes.some((change) => change.destination === "coding-agent-harness/planning/tasks" && change.action === "would-create-directory"),
+  "init zh-CN dry-run should create the task root without vendoring localized package templates",
 );
 assert(!fs.existsSync(path.join(dryRunTarget, "AGENTS.md")), "init dry-run mutated target");
 
@@ -68,8 +68,8 @@ if (commandExists("expect")) {
   const interactiveZh = expectTtyJson(["init", "--dry-run", "--capabilities", "core,dashboard", interactiveZhTarget], { input: "1\n", timeout: 5000 });
   assert(interactiveZh.locale === "zh-CN", "interactive init option 1 should select zh-CN");
   assert(
-    interactiveZh.changes.some((change) => change.source === "templates-zh-CN/planning/task_plan.md"),
-    "interactive zh-CN init should use localized templates",
+    interactiveZh.changes.some((change) => change.destination === "coding-agent-harness/planning/tasks" && change.action === "would-create-directory"),
+    "interactive zh-CN init should create task root without vendoring localized package templates",
   );
 
   const ttyExplicitTarget = path.join(tmpRoot, "tty-explicit-target");
@@ -97,8 +97,7 @@ assert(
   fs.readFileSync(path.join(zhInitTarget, "coding-agent-harness/context/development/external-source-packs/README.md"), "utf8").includes("外部资料包索引"),
   "zh-CN init should create localized external source pack registry",
 );
-const zhReviewTemplate = fs.readFileSync(path.join(zhInitTarget, "coding-agent-harness/planning/tasks/_task-template/review.md"), "utf8");
-assert(zhReviewTemplate.includes("| ID | Severity | Finding | Evidence Checked | Required Action | Open | Disposition | Blocks Release | Follow-up |"), "zh-CN review template should preserve checker table headers");
+assert(!fs.existsSync(path.join(zhInitTarget, "coding-agent-harness/planning/tasks/_task-template")), "init should not vendor task templates into the target project");
 const zhInitCheck = expectJson(["status", "--json", zhInitTarget]);
 assert(zhInitCheck.checkState.status === "pass", "core+dashboard init should pass status check without safe-adoption");
 assert(zhInitCheck.checkState.warnings === 0, "core+dashboard init should not warn about safe-adoption orphan artifacts");
@@ -132,8 +131,8 @@ fs.mkdirSync(enRunTarget);
 const enRun = expectJson(["init", "--dry-run", "--locale", "en-US", "--capabilities", "core", enRunTarget]);
 assert(enRun.locale === "en-US", "init dry-run did not preserve en-US locale");
 assert(
-  enRun.changes.some((change) => change.source === "templates/planning/task_plan.md"),
-  "init en-US dry-run should use default English task_plan template",
+  enRun.changes.some((change) => change.destination === "coding-agent-harness/planning/tasks" && change.action === "would-create-directory"),
+  "init en-US dry-run should create the task root without vendoring package templates",
 );
 const enInitTarget = path.join(tmpRoot, "en-init-target");
 fs.mkdirSync(enInitTarget);

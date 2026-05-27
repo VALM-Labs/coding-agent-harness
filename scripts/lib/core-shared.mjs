@@ -123,6 +123,11 @@ export function walkFiles(root, options = {}) {
   return results;
 }
 
+export function isArchivedHarnessPath(filePath) {
+  const normalized = `/${toPosix(filePath)}/`;
+  return normalized.includes("/_archive/") || normalized.includes("/governance/archive/");
+}
+
 export function normalizeLocale(locale = "en-US") {
   return supportedLocales.has(locale) ? locale : "en-US";
 }

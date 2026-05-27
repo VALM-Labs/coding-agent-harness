@@ -55,6 +55,18 @@ export function planStructureMigration(targetInput = ".") {
       destination: archiveDestination,
     });
   }
+  for (const relative of generatedTemplateDirs()) {
+    const legacyEquivalent = relative
+      .replace(`${v2HarnessRoot}/planning/tasks`, "09-PLANNING/TASKS")
+      .replace(`${v2HarnessRoot}/planning/modules`, "09-PLANNING/MODULES");
+    if (fs.existsSync(path.join(target.projectRoot, relative)) || fs.existsSync(path.join(legacyDocsRoot, legacyEquivalent))) {
+      actions.push({
+        action: "remove-generated-template-dir",
+        source: "",
+        destination: relative,
+      });
+    }
+  }
   const legacyRegistry = path.join(target.projectRoot, ".harness-capabilities.json");
   if (fs.existsSync(legacyRegistry)) {
     actions.push({
@@ -112,6 +124,7 @@ export function applyStructureMigration(targetInput = ".", { force = false } = {
   archiveLegacyCapabilityRegistry(targetRoot, applied);
   normalizeMigratedModuleTasks(targetRoot, applied, { force });
   scaffoldMissingTaskWalkthroughs(targetRoot, applied);
+  removeGeneratedTemplateDirectories(targetRoot, applied);
   return {
     ...plan,
     applied: true,
@@ -121,6 +134,26 @@ export function applyStructureMigration(targetInput = ".", { force = false } = {
       applied: applied.length,
     },
   };
+}
+
+function removeGeneratedTemplateDirectories(targetRoot, applied) {
+  for (const relative of generatedTemplateDirs()) {
+    const directory = path.join(targetRoot, relative);
+    if (!fs.existsSync(directory)) continue;
+    fs.rmSync(directory, { recursive: true, force: true });
+    applied.push({
+      action: "remove-generated-template-dir",
+      destination: relative,
+    });
+  }
+}
+
+function generatedTemplateDirs() {
+  return [
+    `${v2HarnessRoot}/planning/tasks/_task-template`,
+    `${v2HarnessRoot}/planning/modules/_task-template`,
+    `${v2HarnessRoot}/planning/modules/_module-template`,
+  ];
 }
 
 function preflightStructureMigration(plan, { force = false } = {}) {

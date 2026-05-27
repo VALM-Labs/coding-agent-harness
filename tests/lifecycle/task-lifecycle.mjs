@@ -754,9 +754,8 @@ const zhRegistryTarget = path.join(tmpRoot, "zh-module-registry-target");
 fs.mkdirSync(zhRegistryTarget);
 expectJson(["init", "--locale", "zh-CN", "--capabilities", "core,module-parallel", zhRegistryTarget]);
 assert(fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/Session-Prompt-Pack.md")), "module-parallel init should create a session prompt pack");
-assert(fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/_module-template/module_plan.md")), "module-parallel init should create a module plan template");
-assert(fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/_module-template/session_prompt.md")), "module-parallel init should create a module session prompt template");
-assert(fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/_task-template/review.md")), "module-parallel init should create complete module task templates");
+assert(!fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/_module-template")), "module-parallel init should not vendor module templates into the target project");
+assert(!fs.existsSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/_task-template")), "module-parallel init should not vendor module task templates into the target project");
 expectJson(["new-task", "zh-task", "--module", "example", "--title", "中文模块任务", "--locale", "zh-CN", zhRegistryTarget]);
 fs.mkdirSync(path.join(zhRegistryTarget, "coding-agent-harness/planning/modules/example"), { recursive: true });
 fs.writeFileSync(

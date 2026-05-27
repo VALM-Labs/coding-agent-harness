@@ -463,70 +463,66 @@ function capabilityArtifactsForTarget(target, capabilityName) {
     case "adversarial-review":
       return [relative(paths.tasksRoot)];
     case "long-running-task":
-      return [relative(path.join(paths.tasksRoot, "_task-template/long-running-task-contract.md"))];
+      return [];
     default:
       return capabilityDefinitions[capabilityName].artifacts;
   }
 }
 
 
-export function plannedInitFiles(capabilities = ["core"], { locale = "en-US" } = {}) {
+export function plannedInitFiles(capabilities = ["core"], { locale = "en-US", paths = null } = {}) {
+  const root = paths ? toPosix(path.relative(paths.projectRoot, paths.harnessRoot)) : v2HarnessRoot;
+  const modulesRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.modulesRoot)) : `${root}/planning/modules`;
+  const regressionRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.regressionRoot)) : `${root}/governance/regression`;
+  const contextRoot = `${root}/context`;
+  const governanceRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.governanceRoot)) : `${root}/governance`;
   const files = [
     ["AGENTS.md", "templates/AGENTS.md.template"],
     ["CLAUDE.md", "templates/CLAUDE.md.template"],
-    [`${v2HarnessRoot}/context/architecture/README.md`, "templates/architecture/README.md"],
-    [`${v2HarnessRoot}/context/architecture/Architecture-SSoT.md`, "templates/architecture/Architecture-SSoT.md"],
-    [`${v2HarnessRoot}/context/architecture/local-repo-context.md`, "templates/architecture/local-repo-context.md"],
-    [`${v2HarnessRoot}/context/architecture/system-map.md`, "templates/architecture/system-map.md"],
-    [`${v2HarnessRoot}/context/architecture/service-catalog.md`, "templates/architecture/service-catalog.md"],
-    [`${v2HarnessRoot}/context/architecture/critical-flows.md`, "templates/architecture/critical-flows.md"],
-    [`${v2HarnessRoot}/context/architecture/services/_service-template.md`, "templates/architecture/services/service-template.md"],
-    [`${v2HarnessRoot}/context/development/README.md`, "templates/development/README.md"],
-    [`${v2HarnessRoot}/context/development/local-setup.md`, "templates/development/local-setup.md"],
-    [`${v2HarnessRoot}/context/development/codebase-map.md`, "templates/development/codebase-map.md"],
-    [`${v2HarnessRoot}/context/development/external-context/_service-template.md`, "templates/development/external-context/service-template.md"],
-    [`${v2HarnessRoot}/context/development/external-source-packs/README.md`, "templates/development/external-source-packs/README.md"],
-    [`${v2HarnessRoot}/context/development/external-source-packs/_digest-template.md`, "templates/development/external-source-packs/digest-template.md"],
-    [`${v2HarnessRoot}/context/development/stubs-and-mocks.md`, "templates/development/stubs-and-mocks.md"],
-    [`${v2HarnessRoot}/context/development/cross-repo-debugging.md`, "templates/development/cross-repo-debugging.md"],
-    [`${v2HarnessRoot}/context/integrations/README.md`, "templates/integrations/README.md"],
-    [`${v2HarnessRoot}/context/integrations/_api-contract-template.md`, "templates/integrations/api-contract.md"],
-    [`${v2HarnessRoot}/context/integrations/_event-contract-template.md`, "templates/integrations/event-contract.md"],
-    [`${v2HarnessRoot}/context/integrations/_webhook-contract-template.md`, "templates/integrations/webhook-contract.md"],
-    [`${v2HarnessRoot}/context/integrations/third-party/_vendor-template.md`, "templates/integrations/third-party/vendor-template.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/brief.md`, "templates/planning/brief.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/task_plan.md`, "templates/planning/task_plan.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/execution_strategy.md`, "templates/planning/execution_strategy.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/${visualMapFile}`, "templates/planning/visual_map.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/findings.md`, "templates/planning/findings.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/progress.md`, "templates/planning/progress.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/review.md`, "templates/planning/review.md"],
-    [`${v2HarnessRoot}/planning/tasks/_task-template/walkthrough.md`, "templates/planning/walkthrough.md"],
-    [`${v2HarnessRoot}/governance/regression/Regression-SSoT.md`, "templates/ssot/Regression-SSoT.md"],
-    [`${v2HarnessRoot}/governance/regression/Cadence-Ledger.md`, "templates/regression/Cadence-Ledger.md"],
-    [`${v2HarnessRoot}/governance/standards/walkthrough-template.md`, "templates/walkthrough/walkthrough-template.md"],
-    [`${v2HarnessRoot}/governance/standards/external-source-intake-standard.md`, "templates/reference/external-source-intake-standard.md"],
+    [`${contextRoot}/architecture/README.md`, "templates/architecture/README.md"],
+    [`${contextRoot}/architecture/Architecture-SSoT.md`, "templates/architecture/Architecture-SSoT.md"],
+    [`${contextRoot}/architecture/local-repo-context.md`, "templates/architecture/local-repo-context.md"],
+    [`${contextRoot}/architecture/system-map.md`, "templates/architecture/system-map.md"],
+    [`${contextRoot}/architecture/service-catalog.md`, "templates/architecture/service-catalog.md"],
+    [`${contextRoot}/architecture/critical-flows.md`, "templates/architecture/critical-flows.md"],
+    [`${contextRoot}/architecture/services/_service-template.md`, "templates/architecture/services/service-template.md"],
+    [`${contextRoot}/development/README.md`, "templates/development/README.md"],
+    [`${contextRoot}/development/local-setup.md`, "templates/development/local-setup.md"],
+    [`${contextRoot}/development/codebase-map.md`, "templates/development/codebase-map.md"],
+    [`${contextRoot}/development/external-context/_service-template.md`, "templates/development/external-context/service-template.md"],
+    [`${contextRoot}/development/external-source-packs/README.md`, "templates/development/external-source-packs/README.md"],
+    [`${contextRoot}/development/external-source-packs/_digest-template.md`, "templates/development/external-source-packs/digest-template.md"],
+    [`${contextRoot}/development/stubs-and-mocks.md`, "templates/development/stubs-and-mocks.md"],
+    [`${contextRoot}/development/cross-repo-debugging.md`, "templates/development/cross-repo-debugging.md"],
+    [`${contextRoot}/integrations/README.md`, "templates/integrations/README.md"],
+    [`${contextRoot}/integrations/_api-contract-template.md`, "templates/integrations/api-contract.md"],
+    [`${contextRoot}/integrations/_event-contract-template.md`, "templates/integrations/event-contract.md"],
+    [`${contextRoot}/integrations/_webhook-contract-template.md`, "templates/integrations/webhook-contract.md"],
+    [`${contextRoot}/integrations/third-party/_vendor-template.md`, "templates/integrations/third-party/vendor-template.md"],
+    [`${regressionRoot}/Regression-SSoT.md`, "templates/ssot/Regression-SSoT.md"],
+    [`${regressionRoot}/Cadence-Ledger.md`, "templates/regression/Cadence-Ledger.md"],
+    [`${governanceRoot}/standards/walkthrough-template.md`, "templates/walkthrough/walkthrough-template.md"],
+    [`${governanceRoot}/standards/external-source-intake-standard.md`, "templates/reference/external-source-intake-standard.md"],
   ];
   if (capabilities.includes("module-parallel")) {
-    files.push([`${v2HarnessRoot}/planning/modules/Module-Registry.md`, "templates/ssot/Module-Registry.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/Session-Prompt-Pack.md`, "templates/planning/module_session_prompt.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_module-template/brief.md`, "templates/planning/module_brief.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_module-template/module_plan.md`, "templates/planning/module_plan.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_module-template/execution_strategy.md`, "templates/planning/execution_strategy.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_module-template/${visualMapFile}`, "templates/planning/visual_map.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_module-template/session_prompt.md`, "templates/planning/module_session_prompt.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/task_plan.md`, "templates/planning/task_plan.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/execution_strategy.md`, "templates/planning/execution_strategy.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/${visualMapFile}`, "templates/planning/visual_map.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/findings.md`, "templates/planning/findings.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/progress.md`, "templates/planning/progress.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/review.md`, "templates/planning/review.md"]);
-    files.push([`${v2HarnessRoot}/planning/modules/_task-template/walkthrough.md`, "templates/planning/walkthrough.md"]);
-  }
-  if (capabilities.includes("long-running-task")) {
-    files.push([`${v2HarnessRoot}/planning/tasks/_task-template/long-running-task-contract.md`, "templates/planning/long-running-task-contract.md"]);
+    files.push([`${modulesRoot}/Module-Registry.md`, "templates/ssot/Module-Registry.md"]);
+    files.push([`${modulesRoot}/Session-Prompt-Pack.md`, "templates/planning/module_session_prompt.md"]);
   }
   return files.map(([destination, source]) => [destination, localizedTemplateSource(source, locale)]);
+}
+
+function plannedInitDirectories(capabilities = ["core"], { paths = null } = {}) {
+  const planningRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.planningRoot)) : `${v2HarnessRoot}/planning`;
+  const tasksRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.tasksRoot)) : `${v2HarnessRoot}/planning/tasks`;
+  const modulesRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.modulesRoot)) : `${v2HarnessRoot}/planning/modules`;
+  const generatedRoot = paths ? toPosix(path.relative(paths.projectRoot, paths.generatedRoot)) : `${v2HarnessRoot}/governance/generated`;
+  const directories = [
+    planningRoot,
+    tasksRoot,
+    generatedRoot,
+  ];
+  if (capabilities.includes("module-parallel")) directories.push(modulesRoot);
+  return directories;
 }
 
 export function writeInitFiles(targetInput, capabilities, { dryRun = true, locale = "en-US", addNpmScripts = false } = {}) {
@@ -555,6 +551,12 @@ export function writeInitFiles(targetInput, capabilities, { dryRun = true, local
     fs.writeFileSync(manifestPath, renderHarnessManifest({ locale: normalizedLocale, capabilities: normalizedCapabilities }));
     target = normalizeTarget(target.projectRoot);
   }
+  for (const directory of plannedInitDirectories(normalizedCapabilities)) {
+    const directoryPath = path.join(target.projectRoot, directory);
+    const existsAlready = fs.existsSync(directoryPath);
+    changes.push({ destination: directory, source: "harness-directory/v2", action: existsAlready ? "skip-existing" : dryRun ? "would-create-directory" : "create-directory" });
+    if (!dryRun && !existsAlready) fs.mkdirSync(directoryPath, { recursive: true });
+  }
   for (const [destination, source] of planned) {
     const destinationPath = path.join(target.projectRoot, destination);
     const sourcePath = path.join(repoRoot, source);
@@ -573,20 +575,23 @@ export function writeInitFiles(targetInput, capabilities, { dryRun = true, local
   return { target, capabilities: normalizedCapabilities, locale: normalizedLocale, changes, presetSeed, nextCommands: initNextCommands(), report };
 }
 
-function renderHarnessManifest({ locale, capabilities }) {
+function renderHarnessManifest({ locale, capabilities, structure = null }) {
+  const manifestStructure = structure || {
+    harnessRoot: v2HarnessRoot,
+    planningRoot: `${v2HarnessRoot}/planning`,
+    tasksRoot: `${v2HarnessRoot}/planning/tasks`,
+    modulesRoot: `${v2HarnessRoot}/planning/modules`,
+    externalRoot: `${v2HarnessRoot}/planning/external`,
+    governanceRoot: `${v2HarnessRoot}/governance`,
+    generatedRoot: `${v2HarnessRoot}/governance/generated`,
+  };
   return [
     "version: 2",
     `locale: ${locale}`,
     "capabilities:",
     ...capabilities.map((capability) => `  - ${capability}`),
     "structure:",
-    `  harnessRoot: ${v2HarnessRoot}`,
-    `  planningRoot: ${v2HarnessRoot}/planning`,
-    `  tasksRoot: ${v2HarnessRoot}/planning/tasks`,
-    `  modulesRoot: ${v2HarnessRoot}/planning/modules`,
-    `  externalRoot: ${v2HarnessRoot}/planning/external`,
-    `  governanceRoot: ${v2HarnessRoot}/governance`,
-    `  generatedRoot: ${v2HarnessRoot}/governance/generated`,
+    ...Object.entries(manifestStructure).map(([key, value]) => `  ${key}: ${value}`),
     "",
   ].join("\n");
 }
@@ -636,8 +641,14 @@ export function addCapability(targetInput, capabilityName, { dryRun = true, loca
   }
   if (!capabilityMap.has(normalizedCapability)) capabilityMap.set(normalizedCapability, { name: normalizedCapability, state: "scaffolded" });
   const nextCapabilities = [...capabilityMap.keys()];
-  const scaffold = plannedInitFiles([...capabilityMap.keys()], { locale: normalizedLocale });
+  const scaffold = plannedInitFiles([...capabilityMap.keys()], { locale: normalizedLocale, paths: target.harness?.version === 2 ? target.harness : null });
   const changes = [];
+  for (const directory of plannedInitDirectories(nextCapabilities, { paths: target.harness?.version === 2 ? target.harness : null })) {
+    const destinationPath = path.join(target.projectRoot, directory);
+    const existsAlready = fs.existsSync(destinationPath);
+    changes.push({ destination: directory, source: "harness-directory/v2", action: existsAlready ? "skip-existing" : dryRun ? "would-create-directory" : "create-directory" });
+    if (!dryRun && !existsAlready) fs.mkdirSync(destinationPath, { recursive: true });
+  }
   for (const [destination, source] of scaffold) {
     const destinationPath = path.join(target.projectRoot, destination);
     const sourcePath = path.join(repoRoot, source);
@@ -653,7 +664,7 @@ export function addCapability(targetInput, capabilityName, { dryRun = true, loca
       ? target.manifestPath
       : path.join(target.projectRoot, v2HarnessRoot, "harness.yaml");
     fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
-    fs.writeFileSync(manifestPath, renderHarnessManifest({ locale: normalizedLocale, capabilities: nextCapabilities }));
+    fs.writeFileSync(manifestPath, renderHarnessManifest({ locale: normalizedLocale, capabilities: nextCapabilities, structure: target.harness.manifest?.structure }));
   }
   const report = buildInstallReport({ target, locale: normalizedLocale, capabilities: [...capabilityMap.keys()], changes, dryRun, operation: "add-capability" });
   return {

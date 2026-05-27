@@ -13,6 +13,39 @@ If another agent will execute the migration, first give it:
 
 This guide assumes the installed `harness` command. The executing agent must first check `command -v harness`. If the target environment does not have `harness`, do not silently install globally. Ask the user whether `npm install -g coding-agent-harness` is allowed. Install globally only after explicit approval. If the user does not approve or does not respond, run the same CLI with `npx --yes coding-agent-harness <command>`. Maintainers debugging from the source checkout can replace it with `node scripts/harness.mjs`.
 
+## Target Path And v2 Structure
+
+The default active v2 directory is `coding-agent-harness/` inside the target
+project, with `coding-agent-harness/harness.yaml` as the entry file. Checks do
+not require that exact folder name. If a project keeps Harness state in a custom
+project-relative directory, such as `.project-control/harness-state/`, declare it
+in that directory's `harness.yaml`:
+
+```yaml
+structure:
+  harnessRoot: .project-control/harness-state
+  planningRoot: .project-control/harness-state/planning
+  tasksRoot: .project-control/harness-state/planning/tasks
+  governanceRoot: .project-control/harness-state/governance
+  generatedRoot: .project-control/harness-state/governance/generated
+```
+
+Then commands can run from the project root:
+
+```bash
+harness status --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+They can also point directly at the Harness root:
+
+```bash
+harness status --json /path/to/project/.project-control/harness-state
+```
+
+If a project contains multiple `harness.yaml` files, the agent must not guess.
+Pass the intended Harness root explicitly.
+
 ## Migration Principles
 
 - Protect history first, then add the new contract. Do not overwrite `AGENTS.md`, `CLAUDE.md`, historical tasks, walkthroughs, SSoTs, or ledgers.
@@ -31,6 +64,7 @@ After receiving the migration prompt, the target-project agent starts with read-
 git -C /path/to/project status --short --branch
 harness status --json /path/to/project
 harness migrate-plan --json --limit 1000 /path/to/project
+harness migrate-structure --plan --json /path/to/project
 ```
 
 Then the agent must give the user a migration plan and actively recommend a migration depth:
@@ -64,6 +98,22 @@ The agent must record concrete evidence for the decision, such as `AGENTS.md`, `
 If this run does not yet have a user-confirmed migration depth, stop here and do not write files.
 
 2. Run the migration rail:
+
+First migrate the old `docs/` layout into the v2 manifest layout. `--plan` is a
+read-only preview; run `--apply` only after user confirmation. The default
+migration destination is `coding-agent-harness/`, and the old `docs/` root is
+archived under `coding-agent-harness/governance/archive/legacy-docs/`. Legacy
+`planning/**/_task-template` and `planning/**/_module-template` directories are
+generated copies of npm-package templates, so migration removes them from the
+target project when present:
+
+```bash
+harness migrate-structure --plan --json /path/to/project
+harness migrate-structure --apply --json /path/to/project
+harness check --profile target-project /path/to/project
+```
+
+After the directory migration passes, run the session migration rail:
 
 ```bash
 harness migrate-run \

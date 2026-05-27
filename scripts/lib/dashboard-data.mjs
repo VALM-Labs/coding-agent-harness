@@ -15,6 +15,7 @@ import {
   prefixedPath,
   toPosix,
   walkFiles,
+  isArchivedHarnessPath,
   visualMapFile,
   legacyVisualRoadmapFile,
   lessonCandidatesFile,
@@ -145,7 +146,7 @@ function collectDashboardDocumentPaths(target, options = {}) {
     if (file.endsWith(".md")) selected.add(file);
   }
   return [...selected]
-    .filter((file) => !file.includes(`${path.sep}_archive${path.sep}`))
+    .filter((file) => !isArchivedHarnessPath(file))
     .filter((file) => !file.includes(`${path.sep}_task-template${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}_optional-structures${path.sep}`))
     .sort()
@@ -492,7 +493,7 @@ export function buildDashboardBundle(targetInput, options = {}) {
   const capabilityState = validateCapabilities(target);
   const gitState = summarizeGitState(target);
   const declaredCapabilities = new Set(capabilityState.registry.capabilities.map((capability) => capability.name));
-  const shouldRunLegacy = !options.skipLegacyCheck && (capabilityState.registry.mode === legacyCompatMode || declaredCapabilities.has(safeAdoptionCapability));
+  const shouldRunLegacy = target.harness?.version !== 2 && !options.skipLegacyCheck && (capabilityState.registry.mode === legacyCompatMode || declaredCapabilities.has(safeAdoptionCapability));
   const legacy = shouldRunLegacy ? runDashboardCompatibilityCheck(target) : { status: "skipped", code: 0, stdout: "", stderr: "" };
   const legacyWarnings = legacy.status === "fail" ? [`adoption-needed: legacy check failed: ${(legacy.stderr || legacy.stdout).trim()}`] : [];
   const governanceBoundaries = validateGovernanceTableBoundaries(target);

@@ -14,6 +14,7 @@ function run(args, options = {}) {
   return spawnSync(node, [cli, ...args], {
     cwd: repoRoot,
     encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
     ...options,
   });
 }

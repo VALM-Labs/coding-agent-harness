@@ -154,30 +154,37 @@ export function toPosix(value) {
 function normalizeTargetShape(input = ".") {
   if (input && typeof input === "object" && input.projectRoot) {
     const requestedProjectRoot = path.resolve(input.projectRoot);
-    const directHarnessRoot = findNearestHarnessRoot(path.resolve(input.input || requestedProjectRoot));
-    const projectRoot = directHarnessRoot && requestedProjectRoot === directHarnessRoot
-      ? path.dirname(directHarnessRoot)
+    const inputPath = path.resolve(input.input || requestedProjectRoot);
+    const directHarnessRoot = findNearestHarnessRoot(inputPath);
+    const discoveredHarnessRoot = directHarnessRoot || findProjectHarnessRoot(requestedProjectRoot);
+    const projectRoot = directHarnessRoot
+      ? projectRootForHarnessRoot(directHarnessRoot)
       : requestedProjectRoot;
     return {
       ...input,
       projectRoot,
       docsRoot: input.docsRoot || path.join(projectRoot, "docs"),
-      harnessRootCandidate: input.harnessRootCandidate || directHarnessRoot || path.join(projectRoot, v2HarnessRoot),
+      harnessRootCandidate: input.harnessRootCandidate || discoveredHarnessRoot || path.join(projectRoot, v2HarnessRoot),
     };
   }
   const target = path.resolve(input || ".");
-  const siblingV2Manifest = path.join(path.dirname(target), v2HarnessRoot, "harness.yaml");
+  const docsProjectRoot = path.dirname(target);
+  const siblingHarnessRoot = findProjectHarnessRoot(docsProjectRoot);
+  const siblingV2Manifest = siblingHarnessRoot
+    ? path.join(siblingHarnessRoot, "harness.yaml")
+    : path.join(docsProjectRoot, v2HarnessRoot, "harness.yaml");
   const isDocsRoot =
     path.basename(target) === "docs" &&
     (fs.existsSync(path.join(target, "09-PLANNING")) || fs.existsSync(path.join(target, "11-REFERENCE")) || fs.existsSync(siblingV2Manifest));
   const directHarnessRoot = !isDocsRoot ? findNearestHarnessRoot(target) : "";
-  const projectRoot = isDocsRoot ? path.dirname(target) : directHarnessRoot ? path.dirname(directHarnessRoot) : target;
+  const discoveredHarnessRoot = directHarnessRoot || (!isDocsRoot ? findProjectHarnessRoot(target) : siblingHarnessRoot);
+  const projectRoot = isDocsRoot ? docsProjectRoot : directHarnessRoot ? projectRootForHarnessRoot(directHarnessRoot) : target;
   return {
     input: target,
     projectRoot,
     docsRoot: isDocsRoot ? target : path.join(target, "docs"),
     docsOnly: isDocsRoot,
-    harnessRootCandidate: directHarnessRoot || path.join(projectRoot, v2HarnessRoot),
+    harnessRootCandidate: discoveredHarnessRoot || path.join(projectRoot, v2HarnessRoot),
   };
 }
 
@@ -190,6 +197,57 @@ function findNearestHarnessRoot(target) {
     current = parent;
   }
   return "";
+}
+
+function findProjectHarnessRoot(projectRoot) {
+  const defaultRoot = path.join(projectRoot, v2HarnessRoot);
+  if (fs.existsSync(path.join(defaultRoot, "harness.yaml"))) return defaultRoot;
+  const candidates = [];
+  const ignored = new Set([".git", "node_modules", "tmp", "dist", "build", ".next", "coverage"]);
+  function visit(dir, depth) {
+    if (depth > 5 || !fs.existsSync(dir)) return;
+    if (fs.existsSync(path.join(dir, "harness.yaml")) && projectRootForHarnessRoot(dir) === projectRoot) {
+      candidates.push(dir);
+      return;
+    }
+    for (const entry of fs.readdirSync(dir)) {
+      if (ignored.has(entry)) continue;
+      const full = path.join(dir, entry);
+      let stat;
+      try {
+        stat = fs.lstatSync(full);
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory() && !stat.isSymbolicLink()) visit(full, depth + 1);
+    }
+  }
+  visit(projectRoot, 0);
+  const unique = [...new Set(candidates)].sort((left, right) => {
+    const leftDepth = path.relative(projectRoot, left).split(path.sep).filter(Boolean).length;
+    const rightDepth = path.relative(projectRoot, right).split(path.sep).filter(Boolean).length;
+    return leftDepth - rightDepth || left.localeCompare(right);
+  });
+  if (unique.length > 1) {
+    const shallowestDepth = path.relative(projectRoot, unique[0]).split(path.sep).filter(Boolean).length;
+    const shallowest = unique.filter((item) => path.relative(projectRoot, item).split(path.sep).filter(Boolean).length === shallowestDepth);
+    if (shallowest.length === 1) return shallowest[0];
+    throw new Error(`Multiple v2 harness manifests found at the same nearest depth; pass the intended harness root explicitly: ${shallowest.map((item) => toPosix(path.relative(projectRoot, item))).join(", ")}`);
+  }
+  return unique[0] || "";
+}
+
+function projectRootForHarnessRoot(harnessRoot) {
+  const manifest = readHarnessManifest(path.join(harnessRoot, "harness.yaml"));
+  const declaredHarnessRoot = manifest?.structure?.harnessRoot || v2HarnessRoot;
+  let current = harnessRoot;
+  for (let depth = 0; depth < 10; depth += 1) {
+    if (path.resolve(current, declaredHarnessRoot) === path.resolve(harnessRoot)) return current;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return path.dirname(harnessRoot);
 }
 
 function legacyPaths(projectRoot) {

@@ -13,6 +13,7 @@ import {
   toPosix,
   readFileSafe,
   walkFiles,
+  isArchivedHarnessPath,
 } from "./core-shared.mjs";
 import {
   tableAfterHeading,
@@ -71,7 +72,7 @@ export function validateReviewSchema(target, { strict = true } = {}) {
     .filter((file) => file.endsWith("review.md"))
     .filter((file) => !file.includes(`${path.sep}_task-template${path.sep}`))
     .filter((file) => !file.includes(`${path.sep}_optional-structures${path.sep}`))
-    .filter((file) => !file.includes(`${path.sep}_archive${path.sep}`));
+    .filter((file) => !isArchivedHarnessPath(file));
 
   for (const reviewPath of reviewPaths) {
     const relative = toPosix(path.relative(target.projectRoot, reviewPath));
@@ -281,7 +282,7 @@ export function validateContextDocs(target, { strict = true } = {}) {
   };
   const files = contextDocRoots(target).flatMap((root) => walkFiles(root)).filter((file) => file.endsWith(".md"));
   for (const file of files) {
-    if (file.includes(`${path.sep}_archive${path.sep}`)) continue;
+    if (isArchivedHarnessPath(file)) continue;
     const relative = toPosix(path.relative(target.projectRoot, file));
     const content = readFileSafe(file);
     if (!/Context Doc Type:\s*\S+/i.test(content) && !/上下文文档类型[：:]\s*\S+/.test(content)) report(`${relative} missing Context Doc Type`);
@@ -341,7 +342,7 @@ export function buildStatus(targetInput, options = {}) {
   const capabilityState = validateCapabilities(target);
   const declaredCapabilities = new Set(capabilityState.registry.capabilities.map((capability) => capability.name));
   const safeAdoptionMode = declaredCapabilities.has(safeAdoptionCapability);
-  const shouldRunLegacy = !options.skipLegacyCheck && (capabilityState.registry.mode === legacyCompatMode || safeAdoptionMode);
+  const shouldRunLegacy = target.harness?.version !== 2 && !options.skipLegacyCheck && (capabilityState.registry.mode === legacyCompatMode || safeAdoptionMode);
   const legacy = shouldRunLegacy ? runCompatibilityCheck(target) : { status: "skipped", code: 0, stdout: "", stderr: "" };
   const contractStrict = Boolean(options.strict) || (capabilityState.registry.mode !== legacyCompatMode && !safeAdoptionMode);
   const taskPlanPaths = listTaskPlanPaths(target);
