@@ -1,7 +1,10 @@
 # TypeScript Runtime Migration Closeout
 
 This closeout records the public package rule after the progressive JavaScript to
-TypeScript runtime migration.
+TypeScript runtime migration. It now covers the Phase 2 package-runtime cutover:
+the npm package executes committed `dist/**/*.mjs` artifacts while historical
+`scripts/**/*.mjs` and `tests/**/*.mjs` shims remain checked in for observation
+and rollback.
 
 ## Current State
 
@@ -10,27 +13,33 @@ explicit TypeScript source twin:
 
 - `scripts/**/*.mjs` has adjacent `scripts/**/*.mts`.
 - `tests/**/*.mjs` has adjacent `tests/**/*.mts`.
-- Checked-in `.mjs` files remain the package runtime surface.
-- `.mts` files are the source ownership surface.
+- `scripts/**/*.mts` builds to committed `dist/**/*.mjs` artifacts.
+- `dist/**/*.mjs` is the package runtime surface for npm bin, npm scripts, and
+  postinstall.
+- `.mts` files remain the source ownership surface.
 
-The package still publishes both surfaces. This is intentional: Node users,
-package `bin`, postinstall, tests, and internal runtime imports execute `.mjs`
-files. The `.mjs` files are generated runtime shims, not stale source files.
+The package still publishes both `dist/` and historical `scripts/` surfaces.
+This is intentional during the observation window: Node users execute `dist/`,
+while `scripts/**/*.mjs` remains as a historical fallback until dist-primary
+execution has enough package-smoke evidence to authorize deletion.
 
-## Why `.mjs` Stays
+## Why Historical `scripts/*.mjs` Stays
 
-The package is an ESM package and its public runtime contract points at
-JavaScript entrypoints:
+The package is an ESM package and its current public runtime contract points at
+the committed dist build output:
 
-- `package.json` maps the `harness` executable to `scripts/harness.mjs`.
-- npm postinstall runs `scripts/postinstall.mjs`.
-- Runtime modules import sibling `.mjs` files so installed package execution does
-  not depend on TypeScript loaders.
+- `package.json` maps the `harness` executable to `dist/harness.mjs`.
+- npm postinstall runs `dist/postinstall.mjs`.
+- npm helper scripts such as `check`, `status`, and dashboard generation run
+  through `dist/harness.mjs`.
+- Runtime modules import sibling `.mjs` files inside `dist/`, so installed
+  package execution does not depend on TypeScript loaders.
 
-Removing these `.mjs` files would require a separate package contract change, a
-new bin/postinstall strategy, and full tarball validation. The progressive
-migration deliberately avoided that change so every PR remained independently
-revertible.
+Historical `scripts/**/*.mjs` and `tests/**/*.mjs` files have not been deleted
+yet. Removing them requires the remaining observation gates: tarball smoke must
+prove package execution is dist-primary, tests must no longer rely on checked-in
+test `.mjs` files as the long-term runner, and the deletion PR must remain
+independently revertible.
 
 ## Documented Exceptions
 
@@ -54,8 +63,8 @@ own package and browser checks.
 
 ## Future Cleanup Gate
 
-Before any future PR removes `.mjs` runtime shims, it must prove all of the
-following:
+Before any future PR removes historical `scripts/**/*.mjs` or `tests/**/*.mjs`
+shims, it must prove all of the following:
 
 - package `bin` and `postinstall` still work from a packed tarball;
 - installed package execution works with a temp `HOME` and PATH isolated to the
@@ -66,5 +75,5 @@ following:
 - real target smoke passes;
 - the PR is independently revertible.
 
-Until those gates pass under a new package contract, `.mjs` runtime shims remain
-the supported execution surface.
+Until those gates pass, `dist/**/*.mjs` remains the supported package execution
+surface and historical `.mjs` shims remain an observation and rollback surface.
