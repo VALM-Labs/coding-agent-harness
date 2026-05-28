@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Dynamic review queue modeling stays behavior-first until the metadata domain model PR.
 
 import fs from "node:fs";
@@ -19,9 +18,109 @@ import {
   implementationPhases,
   phaseHasRecordedProgress,
 } from "./phase-kind.mjs";
+import type { PhaseProgress } from "./phase-kind.mjs";
 import { validateReviewConfirmationGitAudit } from "./review-confirm-git-gate.mjs";
 import { isLessonCandidateDecisionComplete } from "./task-lesson-candidates.mjs";
 import { reviewConfirmationFromTaskAudit } from "./task-audit-metadata.mjs";
+
+type StringMap = Map<string, string>;
+
+type HarnessTarget = {
+  projectRoot: string;
+  harness?: {
+    closeoutIndexPath?: string;
+  };
+};
+
+type TaskIdentity = {
+  taskKey: string;
+  identitySource: "explicit" | "path-derived-legacy";
+};
+
+type TaskTombstone = {
+  deletionState: string;
+  supersededBy: string;
+  supersedes: string[];
+  deleteReason: string;
+  archiveMetadata: Record<string, string>;
+  hiddenByDefault: boolean;
+  reopenEligible: boolean;
+  archiveEligible: boolean;
+  tombstoneSourcePath: string;
+};
+
+type ReviewSubmission = {
+  submitted: boolean;
+  missingFields: string[];
+  submissionId: string;
+  submittedAt: string;
+  submittedBy: string;
+  taskKey: string;
+  taskKeyMismatch: boolean;
+  materialsChecklistHash: string;
+  evidenceSummary: string;
+  openFindingsCount: number;
+  scannerVersion: string;
+};
+
+type ReviewConfirmation = {
+  confirmed: boolean;
+  missingFields: string[];
+  auditSource?: string;
+  commitSha?: string;
+  gitAudit?: unknown;
+  gitAuditInvalid?: boolean;
+};
+
+type MaterialIssue = {
+  code: string;
+  severity: string;
+  queue: string;
+  sourcePath: string;
+  sourceLine: number;
+  owner: string;
+  message: string;
+  allowedWritePaths: string[];
+  forbiddenActions: string[];
+  validationCommands: string[];
+  confidence: string;
+  repairable: boolean;
+};
+
+type MaterialIssueExtra = Partial<Pick<MaterialIssue, "severity" | "owner" | "allowedWritePaths" | "confidence">>;
+
+type LessonCandidates = {
+  status?: string;
+  promotionState?: string;
+  openCount?: number;
+};
+
+type TaskBudget = "simple" | "standard" | "complex";
+
+type TaskMaterialContent = {
+  source?: string;
+  status?: string;
+};
+
+type ReviewRisk = {
+  id?: string;
+  severity?: string;
+  open: boolean;
+  blocksRelease: boolean;
+  disposition?: string;
+  waiverBy?: string;
+  summary?: string;
+};
+
+type StateConflict = {
+  code: string;
+  severity: string;
+  message: string;
+};
+
+type QueueReason = MaterialIssue & Record<string, unknown>;
+
+type TaskAudit = unknown;
 
 export const taskScannerVersion = "task-scanner/2026-05-25-phase-kind";
 export const reviewFindingColumns = {
@@ -33,20 +132,20 @@ export const reviewFindingColumns = {
   waiverBy: ["Waiver By", "豁免人"],
 };
 
-export function normalizeReviewBoolean(value) {
+export function normalizeReviewBoolean(value: unknown): string {
   const raw = String(value || "").trim().toLowerCase();
   if (/^(yes|true|open|是|开放)$/.test(raw)) return "yes";
   if (/^(no|false|closed|fixed|done|否|关闭|已关闭|已修复)$/.test(raw)) return "no";
   return raw;
 }
 
-function parseMetadataLine(content, labels) {
+function parseMetadataLine(content: unknown, labels: string[]): string {
   const escaped = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   const match = String(content || "").match(new RegExp(`^(?:${escaped})\\s*[:：]\\s*([^\\n]+)`, "im"));
   return match ? match[1].replace(/`/g, "").trim() : "";
 }
 
-function normalizeMetadataValue(value, fallback = "") {
+function normalizeMetadataValue(value: unknown, fallback = ""): string {
   const normalized = String(value || "")
     .replace(/`/g, "")
     .trim()
@@ -56,7 +155,7 @@ function normalizeMetadataValue(value, fallback = "") {
   return normalized || fallback;
 }
 
-export function parseTaskIdentity(taskPlanContent, fallbackTaskId) {
+export function parseTaskIdentity(taskPlanContent: unknown, fallbackTaskId: string): TaskIdentity {
   const taskKey =
     parseMetadataLine(taskPlanContent, ["Task Key", "任务主键"]) ||
     parseMetadataLine(taskPlanContent, ["Task ID", "任务 ID"]) ||
@@ -67,7 +166,7 @@ export function parseTaskIdentity(taskPlanContent, fallbackTaskId) {
   };
 }
 
-export function parseTaskTombstone(taskPlanContent) {
+export function parseTaskTombstone(taskPlanContent: unknown): TaskTombstone {
   const topLevelSupersedes = splitList(parseMetadataLine(taskPlanContent, ["Supersedes", "合并自"]));
   const match = String(taskPlanContent || "").match(/^##\s*(?:Task Tombstone|任务墓碑)\s*$([\s\S]*?)(?=^##\s+|(?![\s\S]))/im);
   const fields = match ? fieldsFromMarkdownBlock(match[1] || "") : new Map();
@@ -99,7 +198,7 @@ export function parseTaskTombstone(taskPlanContent) {
   };
 }
 
-export function parseAgentReviewSubmission(reviewContent, { taskKey = "" } = {}) {
+export function parseAgentReviewSubmission(reviewContent: unknown, { taskKey = "" }: { taskKey?: string } = {}): ReviewSubmission | null {
   const match = String(reviewContent || "").match(/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$([\s\S]*?)(?=^##\s+|(?![\s\S]))/im);
   if (!match) return null;
   const fields = fieldsFromMarkdownBlock(match[1] || "");
@@ -130,9 +229,29 @@ export function parseAgentReviewSubmission(reviewContent, { taskKey = "" } = {})
   };
 }
 
-export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, reviewSubmission, lessonCandidates, phases, longRunningContractPath, reviewSurfaceRequired = true }) {
-  const issues = [];
-  const addIssue = (code, message, sourcePath, extra = {}) => {
+export function assessMaterialsReadiness({
+  budget,
+  taskDir,
+  brief,
+  visualMap,
+  reviewSubmission,
+  lessonCandidates,
+  phases,
+  longRunningContractPath,
+  reviewSurfaceRequired = true,
+}: {
+  budget: TaskBudget;
+  taskDir: string;
+  brief: TaskMaterialContent;
+  visualMap: TaskMaterialContent;
+  reviewSubmission: ReviewSubmission | null;
+  lessonCandidates: LessonCandidates;
+  phases: PhaseProgress[];
+  longRunningContractPath: string;
+  reviewSurfaceRequired?: boolean;
+}): { ready: boolean; issues: MaterialIssue[] } {
+  const issues: MaterialIssue[] = [];
+  const addIssue = (code: string, message: string, sourcePath: string, extra: MaterialIssueExtra = {}) => {
     issues.push({
       code,
       severity: extra.severity || "P2",
@@ -179,7 +298,7 @@ export function assessMaterialsReadiness({ budget, taskDir, brief, visualMap, re
   return { ready: issues.length === 0, issues };
 }
 
-export function requiresReviewMaterials({ state = "unknown", lifecycleState = "unknown", closeoutStatus = "missing" } = {}) {
+export function requiresReviewMaterials({ state = "unknown", lifecycleState = "unknown", closeoutStatus = "missing" }: { state?: string; lifecycleState?: string; closeoutStatus?: string } = {}): boolean {
   return (
     state === "review" ||
     state === "done" ||
@@ -188,9 +307,43 @@ export function requiresReviewMaterials({ state = "unknown", lifecycleState = "u
   );
 }
 
-export function deriveTaskQueues({ id, title, state, budget, reviewStatus, reviewSubmission, reviewConfirmation, reviewQueueState, materialIssues, risks, stateConflicts, lessonCandidates, closeoutStatus, tombstone, taskDir, target }) {
-  const queueReasons = [];
-  const pushReason = (reason) => {
+export function deriveTaskQueues({
+  id,
+  title,
+  state,
+  budget,
+  reviewStatus,
+  reviewSubmission,
+  reviewConfirmation,
+  reviewQueueState,
+  materialIssues,
+  risks,
+  stateConflicts,
+  lessonCandidates,
+  closeoutStatus,
+  tombstone,
+  taskDir,
+  target,
+}: {
+  id: string;
+  title?: string;
+  state: string;
+  budget: TaskBudget;
+  reviewStatus: string;
+  reviewSubmission: ReviewSubmission | null;
+  reviewConfirmation: ReviewConfirmation | null;
+  reviewQueueState: string;
+  materialIssues: MaterialIssue[];
+  risks: ReviewRisk[];
+  stateConflicts: StateConflict[];
+  lessonCandidates: LessonCandidates;
+  closeoutStatus: string;
+  tombstone: Pick<TaskTombstone, "deletionState">;
+  taskDir: string;
+  target: HarnessTarget;
+}): { taskQueues: string[]; queueReasons: QueueReason[]; repairPrompt: string } {
+  const queueReasons: QueueReason[] = [];
+  const pushReason = (reason: Partial<QueueReason> & { code: string; message: string }) => {
     queueReasons.push({
       severity: "P2",
       queue: "blocked",
@@ -242,8 +395,8 @@ export function deriveTaskQueues({ id, title, state, budget, reviewStatus, revie
       message: "Agent review was submitted, but closeout materials are not ready for human confirmation.",
     });
   }
-  const hasLessonWork = lessonCandidates?.status === "needs-promotion" || lessonCandidates?.promotionState === "queued" || lessonCandidates?.openCount > 0;
-  const taskQueues = [];
+  const hasLessonWork = lessonCandidates?.status === "needs-promotion" || lessonCandidates?.promotionState === "queued" || (lessonCandidates?.openCount ?? 0) > 0;
+  const taskQueues: string[] = [];
   if (tombstone.deletionState !== "active") {
     taskQueues.push("soft-deleted-superseded");
   } else {
@@ -264,7 +417,7 @@ export function deriveTaskQueues({ id, title, state, budget, reviewStatus, revie
   };
 }
 
-function closeoutMaterialSourcePath(target, taskDir) {
+function closeoutMaterialSourcePath(target: HarnessTarget, taskDir: string): string {
   const localWalkthrough = path.join(taskDir, "walkthrough.md");
   if (fs.existsSync(localWalkthrough)) return "TARGET:walkthrough.md";
   const closeoutIndexPath = target.harness?.closeoutIndexPath;
@@ -272,7 +425,18 @@ function closeoutMaterialSourcePath(target, taskDir) {
   return "TARGET:closeout-materials";
 }
 
-export function parseReviewConfirmation(reviewContent, { taskKey = "", taskAudit = null, projectRoot = "", taskDir = "", indexPath = "", reviewPath = "", progressPath = "" } = {}) {
+export function parseReviewConfirmation(
+  reviewContent: unknown,
+  { taskKey = "", taskAudit = null, projectRoot = "", taskDir = "", indexPath = "", reviewPath = "", progressPath = "" }: {
+    taskKey?: string;
+    taskAudit?: TaskAudit | null;
+    projectRoot?: string;
+    taskDir?: string;
+    indexPath?: string;
+    reviewPath?: string;
+    progressPath?: string;
+  } = {},
+): ReviewConfirmation | null {
   if (taskAudit) {
     const confirmation = reviewConfirmationFromTaskAudit(taskAudit, { taskKey });
     if (
@@ -302,7 +466,7 @@ export function parseReviewConfirmation(reviewContent, { taskKey = "", taskAudit
   return null;
 }
 
-export function taskReviewStatus({ reviewContent = "", risks = [], confirmation = null, submission = null } = {}) {
+export function taskReviewStatus({ reviewContent = "", risks = [], confirmation = null, submission = null }: { reviewContent?: unknown; risks?: ReviewRisk[]; confirmation?: ReviewConfirmation | null; submission?: ReviewSubmission | null } = {}): string {
   if (risks.some(isBlockingReviewRisk)) return "blocked-open-findings";
   if (confirmation?.confirmed) return "confirmed";
   if (!String(reviewContent || "").trim()) return "missing";
@@ -311,7 +475,7 @@ export function taskReviewStatus({ reviewContent = "", risks = [], confirmation 
   return "required";
 }
 
-function hasAgentReviewSignal(reviewContent) {
+function hasAgentReviewSignal(reviewContent: unknown): boolean {
   const content = String(reviewContent || "");
   const verdict = content.match(/^\s*[-*]?\s*Verdict\s*[:：]\s*([^\n]+)/im);
   if (verdict) {
@@ -321,11 +485,11 @@ function hasAgentReviewSignal(reviewContent) {
   return /本轮已检查|未发现阻塞目标的重要发现/.test(content);
 }
 
-export function isBlockingReviewRisk(risk) {
-  return /^P[0-2]$/i.test(risk?.severity || "") && (risk.open || risk.blocksRelease);
+export function isBlockingReviewRisk(risk: Partial<ReviewRisk> | null | undefined): boolean {
+  return /^P[0-2]$/i.test(risk?.severity || "") && Boolean(risk?.open || risk?.blocksRelease);
 }
 
-export function deriveLifecycleState({ state = "unknown", reviewStatus = "missing", closeoutStatus = "missing", budget = "standard" } = {}) {
+export function deriveLifecycleState({ state = "unknown", reviewStatus = "missing", closeoutStatus = "missing", budget = "standard" }: { state?: string; reviewStatus?: string; closeoutStatus?: string; budget?: TaskBudget } = {}): string {
   if (reviewStatus === "blocked-open-findings") return "review-blocked";
   if (budget === "simple" && closeoutStatus === "closed") return "closed";
   if (closeoutStatus === "closed" && reviewStatus !== "confirmed") return "closed-review-pending";
@@ -338,7 +502,7 @@ export function deriveLifecycleState({ state = "unknown", reviewStatus = "missin
   return "unknown";
 }
 
-export function deriveReviewQueueState({ state = "unknown", lifecycleState = "unknown", reviewStatus = "missing", closeoutStatus = "missing", budget = "standard", walkthroughPath = "", lessonCandidateDecisionComplete = false, materialsReady = true, deletionState = "active" } = {}) {
+export function deriveReviewQueueState({ state = "unknown", lifecycleState = "unknown", reviewStatus = "missing", closeoutStatus = "missing", budget = "standard", walkthroughPath = "", lessonCandidateDecisionComplete = false, materialsReady = true, deletionState = "active" }: { state?: string; lifecycleState?: string; reviewStatus?: string; closeoutStatus?: string; budget?: TaskBudget; walkthroughPath?: string; lessonCandidateDecisionComplete?: boolean; materialsReady?: boolean; deletionState?: string } = {}): string {
   if (deletionState !== "active") return "not-in-queue";
   if (reviewStatus === "blocked-open-findings") return "blocked";
   if (["not_started", "planned", "in_progress"].includes(state)) return "not-in-queue";
@@ -353,8 +517,8 @@ export function deriveReviewQueueState({ state = "unknown", lifecycleState = "un
   return "ready-to-confirm";
 }
 
-export function collectStateConflicts({ state, reviewStatus, closeoutStatus, lifecycleState, budget = "standard" }) {
-  const conflicts = [];
+export function collectStateConflicts({ state, reviewStatus, closeoutStatus, lifecycleState, budget = "standard" }: { state: string; reviewStatus: string; closeoutStatus: string; lifecycleState: string; budget?: TaskBudget }): StateConflict[] {
+  const conflicts: StateConflict[] = [];
   if (state === "done" && closeoutStatus !== "closed") {
     conflicts.push({ code: "done-without-closeout", severity: "warn", message: "Task state is done, but closeout is still missing or pending." });
   }
@@ -370,7 +534,7 @@ export function collectStateConflicts({ state, reviewStatus, closeoutStatus, lif
   return conflicts;
 }
 
-export function collectReviewRisks(reviewContent) {
+export function collectReviewRisks(reviewContent: string): ReviewRisk[] {
   const { header, rows } = tableAfterHeading(reviewContent, /^ID$/i);
   const severityIndex = firstColumn(header, reviewFindingColumns.severity);
   const findingIndex = firstColumn(header, reviewFindingColumns.finding);
@@ -396,7 +560,7 @@ export function collectReviewRisks(reviewContent) {
     });
 }
 
-function renderRepairPrompt({ id, title, taskDir, target, reasons }) {
+function renderRepairPrompt({ id, title, taskDir, target, reasons }: { id: string; title?: string; taskDir: string; target: HarnessTarget; reasons: QueueReason[] }): string {
   const repairable = (reasons || []).filter((reason) => reason.repairable !== false);
   if (repairable.length === 0) return "";
   const relativeTaskDir = toPosix(path.relative(target.projectRoot, taskDir));
@@ -426,8 +590,8 @@ function renderRepairPrompt({ id, title, taskDir, target, reasons }) {
   ].join("\n");
 }
 
-function fieldsFromMarkdownBlock(block) {
-  const fields = new Map();
+function fieldsFromMarkdownBlock(block: unknown): StringMap {
+  const fields: StringMap = new Map();
   const tableLines = String(block || "").split(/\r?\n/).filter((line) => line.trim().startsWith("|"));
   for (let index = 0; index < tableLines.length - 1; index += 1) {
     const header = splitMarkdownRow(tableLines[index]);
@@ -451,18 +615,18 @@ function fieldsFromMarkdownBlock(block) {
   return fields;
 }
 
-function isConcreteField(value) {
+function isConcreteField(value: unknown): boolean {
   const raw = String(value || "").trim();
   if (!raw) return false;
   return !/^\[.*\]$/.test(raw) && !/\{\{[^}]+\}\}/.test(raw);
 }
 
-function taskKeysMatch(candidate, expected) {
+function taskKeysMatch(candidate: unknown, expected: unknown): boolean {
   const left = String(candidate || "").replace(/`/g, "").trim();
   const right = String(expected || "").replace(/`/g, "").trim();
   return left === right || right.endsWith(`/${left}`);
 }
 
-function parseTombstoneBooleanLike(value) {
+function parseTombstoneBooleanLike(value: unknown): boolean {
   return /^(yes|true|open|blocked|是|开放|阻塞|阻塞确认|阻塞发布)$/i.test(String(value || "").trim());
 }
