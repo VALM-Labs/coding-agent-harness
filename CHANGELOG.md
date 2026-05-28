@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.7
+
+- Generate `harness init --add-npm-scripts` commands with
+  `npx --yes coding-agent-harness ...` so target projects can run Harness
+  scripts without adding a project dependency or relying on a global install.
+- Isolate the dist observation command matrix from local ignored docs by using
+  the minimal target-project fixture for target-facing commands.
+- Preserve the executable bit on the committed `dist/harness.mjs` CLI entry.
+
+## 1.0.6
+
+- Bump the npm package version after the 1.0.5 publication so the TypeScript
+  runtime-source migration can be published again.
+
 ## 1.0.5
 
 - Relicense the public package from MIT to AGPL-3.0-or-later.
