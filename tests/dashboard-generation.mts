@@ -161,9 +161,16 @@ assert(dashboardApp.includes("syncPresetUninstallScope(selected)"), "dashboard p
 assert(dashboardApp.includes("data-preset-uninstall-scope ${lockedUninstallScope ? \"disabled\" : \"\"}"), "dashboard preset uninstall scope should be locked for project/user selections");
 assert(dashboardApp.includes("reviewWorkspace("), "dashboard missing review workspace route implementation");
 assert(dashboardApp.includes("reviewQueueState"), "dashboard review queue must use status-level review queue state");
+assert(dashboardApp.includes("data-review-bulk-select"), "dashboard review queue should expose per-task bulk review selection");
+assert(dashboardApp.includes("data-review-bulk-select-all"), "dashboard review queue should expose select-all review confirmation");
+assert(dashboardApp.includes("/api/tasks/review-complete-bulk"), "dashboard review queue should call the bulk review completion endpoint");
 assert(dashboardApp.includes("[\"lessonCandidates\", \"lesson_candidates.md\"]"), "dashboard should expose lesson candidate documents");
 assert(dashboardApp.includes("data-copy-lesson-prompt"), "dashboard lessons queue should expose copyable sedimentation prompt");
 assert(dashboardApp.includes("data-create-lesson-sedimentation"), "dashboard lessons queue should expose sedimentation task creation action");
+assert(dashboardApp.includes("data-lesson-bulk-select"), "dashboard lessons should expose per-candidate bulk sedimentation selection");
+assert(dashboardApp.includes("data-lesson-bulk-select-all"), "dashboard lessons should expose select-all sedimentation controls");
+assert(dashboardApp.includes("/api/tasks/lesson-sedimentation-bulk"), "dashboard lessons should call the bulk sedimentation endpoint");
+assert(dashboardI18n.includes("Create aggregate task"), "dashboard bulk lessons should describe aggregate task creation");
 assert(dashboardApp.includes("lessonCandidatePanel(task, { context: \"detail\" })"), "task detail should expose lesson sedimentation actions");
 assert(dashboardApp.includes("lessonCandidatePanel(task, { context: \"drawer\" })"), "review drawer should expose lesson sedimentation actions");
 assert(dashboardApp.includes("lessonSedimentationSuccess"), "dashboard should render post-create follow-up task and prompt actions");
@@ -185,6 +192,7 @@ assert(dashboardMermaid.includes("mermaid-rendered"), "dashboard missing rendere
 assert(dashboardCss.includes(".runtime-banner"), "dashboard missing static read-only banner styling");
 assert(dashboardCss.includes(".archive-task-row"), "dashboard missing archive task row styling");
 assert(dashboardCss.includes(".archive-meta-grid"), "dashboard missing archive metadata grid styling");
+assert(dashboardCss.includes(".bulk-action-bar"), "dashboard missing bulk action bar styling");
 assert(dashboardCss.includes(".preset-workspace"), "dashboard missing preset management workspace layout");
 assert(dashboardCss.includes(".preset-catalog-list"), "dashboard missing preset collection list layout");
 assert(dashboardCss.includes(".preset-detail-list"), "dashboard missing preset detail typography grid");
@@ -303,6 +311,13 @@ fs.rmSync(devRecoveryOutDir, { recursive: true, force: true });
 writePartialGeneratedDashboardDirectory(devRecoveryOutDir);
 await expectDevStarts(["dev", "--no-open", "--port", "0", devRecoveryTarget]);
 assert(fs.existsSync(path.join(devRecoveryOutDir, ".harness-dashboard")), "harness dev should recover interrupted generated dashboard temp dirs by README signature");
+
+fs.rmSync(devRecoveryOutDir, { recursive: true, force: true });
+fs.mkdirSync(devRecoveryOutDir, { recursive: true });
+fs.writeFileSync(path.join(devRecoveryOutDir, "junk.txt"), "stale interrupted temp output\n");
+await expectDevStarts(["dev", "--no-open", "--port", "0", devRecoveryTarget]);
+assert(fs.existsSync(path.join(devRecoveryOutDir, ".harness-dashboard")), "harness dev should clear non-dashboard default temp dirs before regenerating");
+assert(!fs.existsSync(path.join(devRecoveryOutDir, "junk.txt")), "harness dev should not preserve stale junk files in the default temp dir");
 
 const explicitStaleOutDir = path.join(tmpRoot, "explicit-stale-dashboard");
 writeStaleDashboardLikeDirectory(explicitStaleOutDir);

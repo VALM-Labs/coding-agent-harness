@@ -35,7 +35,7 @@ export class LessonSedimentationError extends Error {
   }
 }
 
-export function createLessonSedimentationTask(targetInput, taskRef, candidateId, { dryRun = false, title = "" } = {}) {
+export function createLessonSedimentationTask(targetInput, taskRef, candidateId, { dryRun = false, title = "", deferCommit = false, allowDirtyRelativePaths = [] } = {}) {
   const target = normalizeTarget(targetInput);
   const sourceTaskDir = resolveTaskDirectory(target, taskRef);
   const sourceTaskId = taskIdForDirectory(target, sourceTaskDir);
@@ -90,6 +90,8 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
       budget: "standard",
       longRunning: true,
       dryRun,
+      deferCommit,
+      allowDirtyRelativePaths,
     });
   } catch (error) {
     if (/Task already exists:/i.test(error.message)) {
@@ -133,7 +135,19 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
   const changes = [...taskResult.changes];
 
   if (!dryRun) {
-    const governanceContext = beginGovernanceSync(target, { operation: `lesson-sediment ${sourceTaskId} ${candidate.id}` });
+    const deferredDirtyPaths = deferCommit
+      ? [
+        ...governanceRelativePaths(taskResult.changes),
+        toPosix(path.relative(target.projectRoot, candidatePath)),
+        ...(allowDirtyRelativePaths || []),
+      ]
+      : [];
+    const governanceContext = beginGovernanceSync(target, {
+      operation: `lesson-sediment ${sourceTaskId} ${candidate.id}`,
+      allowDirtyWorktree: deferCommit,
+      allowedRelativePaths: deferredDirtyPaths,
+      allowDirtyWriteScope: deferCommit,
+    });
     try {
       appendToFollowUpTask({ followUpDir, sourceTaskId, candidate, prompt, contextPacket, audit });
       updateSourceFollowUpTask(candidatePath, candidate.id, followUpTaskId);
@@ -164,11 +178,14 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
           action: "update-follow-up-task",
         },
       );
+      const commit = deferCommit
+        ? { committed: false, reason: "deferred", allowedPaths: governanceRelativePaths(changes) }
+        : commitGovernanceSync(governanceContext, governanceRelativePaths(changes), {
+          message: `chore(harness): record lesson sedimentation ${candidate.id}`,
+        });
       taskResult.governance = {
         ...(taskResult.governance || {}),
-        lessonSedimentationCommit: commitGovernanceSync(governanceContext, governanceRelativePaths(changes), {
-          message: `chore(harness): record lesson sedimentation ${candidate.id}`,
-        }),
+        lessonSedimentationCommit: commit,
       };
     } finally {
       releaseGovernanceSync(governanceContext);
@@ -190,6 +207,175 @@ export function createLessonSedimentationTask(targetInput, taskRef, candidateId,
     changes,
     governance: taskResult.governance || null,
   };
+}
+
+export function createAggregateLessonSedimentationTask(targetInput, selections, { dryRun = false, title = "" } = {}) {
+  const target = normalizeTarget(targetInput);
+  const normalizedSelections = normalizeAggregateSelections(selections);
+  if (normalizedSelections.length === 0) {
+    throw new LessonSedimentationError("No lesson candidates selected", {
+      code: "lesson-aggregate-empty",
+      status: 400,
+      recovery: ["Select at least one actionable lesson candidate."],
+    });
+  }
+  const entries = normalizedSelections.map((selection) => resolveLessonCandidate(target, selection.taskId, selection.candidateId));
+  const sourceShort = entries.length === 1
+    ? entries[0].sourceShortId.replace(/^\d{4}-\d{2}-\d{2}-/, "")
+    : commonSourceShort(entries) || "selected-lessons";
+  const slug = normalizeTaskId(`lesson-${sourceShort}-aggregate-${Date.now().toString(36).slice(-6)}`);
+  const taskTitle = title || `Aggregate lesson sedimentation for ${entries.length} candidates`;
+  const locale = readCapabilityRegistry(target).locale;
+  const preset = readPresetPackage(presetId);
+  const taskResult = createTask(target.projectRoot, slug, {
+    title: taskTitle,
+    locale,
+    budget: "standard",
+    longRunning: true,
+    dryRun,
+    deferCommit: true,
+  });
+  const followUpTaskId = taskResult.task.id;
+  const followUpDir = path.join(target.projectRoot, taskResult.task.path.replace(/^TARGET:/, ""));
+  const audit = buildPresetAudit(preset, {
+    taskId: followUpTaskId,
+    targetRoot: target.projectRoot,
+    entrypoint: "newTask",
+    writeScopes: [`${toPosix(path.relative(target.projectRoot, target.harness.tasksRoot))}/**`],
+  });
+  const prompt = renderAggregateLessonSedimentationPrompt({ target, entries, followUpTaskId });
+  const contextPacket = renderAggregateContextPacket({ target, entries, followUpTaskId, audit });
+  const changes = [...taskResult.changes];
+  if (!dryRun) {
+    const candidatePaths = [...new Set(entries.map((entry) => toPosix(path.relative(target.projectRoot, entry.candidatePath))))];
+    const governanceContext = beginGovernanceSync(target, {
+      operation: `lesson-sediment-aggregate ${followUpTaskId}`,
+      allowDirtyWorktree: true,
+      allowedRelativePaths: [...governanceRelativePaths(taskResult.changes), ...candidatePaths],
+      allowDirtyWriteScope: true,
+    });
+    try {
+      appendToAggregateFollowUpTask({ followUpDir, entries, prompt, contextPacket, audit });
+      for (const entry of entries) updateSourceFollowUpTask(entry.candidatePath, entry.candidate.id, followUpTaskId);
+      changes.push(
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "task_plan.md"))),
+          source: "lesson-sedimentation-aggregate",
+          action: "append-aggregate-context",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "progress.md"))),
+          source: "lesson-sedimentation-aggregate",
+          action: "append-aggregate-progress",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "artifacts/lesson-sedimentation-prompt.md"))),
+          source: "lesson-sedimentation-aggregate",
+          action: "create-aggregate-prompt-artifact",
+        },
+        {
+          destination: toPosix(path.relative(target.projectRoot, path.join(followUpDir, "artifacts/preset-audit.json"))),
+          source: "lesson-sedimentation-aggregate",
+          action: "create-aggregate-preset-audit",
+        },
+        ...candidatePaths.map((destination) => ({
+          destination,
+          source: lessonCandidatesFile,
+          action: "update-follow-up-task",
+        })),
+      );
+      taskResult.governance = {
+        ...(taskResult.governance || {}),
+        commit: commitGovernanceSync(governanceContext, governanceRelativePaths(changes), {
+          message: `chore(harness): record aggregate lesson sedimentation ${followUpTaskId}`,
+        }),
+      };
+    } finally {
+      releaseGovernanceSync(governanceContext);
+    }
+  }
+  return {
+    dryRun,
+    event: "lesson-sedimentation-aggregate",
+    preset: presetId,
+    candidates: entries.map((entry) => ({
+      taskId: entry.sourceTaskId,
+      candidateId: entry.candidate.id,
+      title: entry.candidate.title,
+      detailArtifact: resolveDetailArtifact(target, entry.sourceTaskDir, entry.candidate).prefixedPath || "",
+    })),
+    followUpTask: {
+      id: followUpTaskId,
+      path: taskResult.task.path,
+      title: taskTitle,
+    },
+    prompt,
+    changes,
+    governance: taskResult.governance || null,
+  };
+}
+
+function normalizeAggregateSelections(selections) {
+  const seen = new Set();
+  const normalized = [];
+  for (const selection of Array.isArray(selections) ? selections : []) {
+    const taskId = String(selection?.taskId || "").trim();
+    const candidateId = String(selection?.candidateId || "").trim();
+    if (!taskId || !candidateId) continue;
+    const key = `${taskId}\n${candidateId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    normalized.push({ taskId, candidateId });
+  }
+  return normalized;
+}
+
+function resolveLessonCandidate(target, taskRef, candidateId) {
+  const sourceTaskDir = resolveTaskDirectory(target, taskRef);
+  const sourceTaskId = taskIdForDirectory(target, sourceTaskDir);
+  const sourceShortId = path.basename(sourceTaskDir);
+  const candidatePath = path.join(sourceTaskDir, lessonCandidatesFile);
+  const candidateStatus = parseLessonCandidateStatus(readFileSafe(candidatePath));
+  const candidate = candidateStatus.rows.find((row) => row.id === candidateId);
+  if (!candidate) {
+    throw new LessonSedimentationError(`Lesson candidate not found: ${candidateId}`, {
+      code: "lesson-candidate-not-found",
+      status: 404,
+      details: { candidateId, sourceTask: sourceTaskId },
+      recovery: [
+        "Open the source task lesson_candidates.md and confirm the candidate ID.",
+        "Refresh the Dashboard snapshot if the candidate was just added.",
+      ],
+    });
+  }
+  if (!["needs-promotion", "ready-for-review"].includes(candidate.status)) {
+    throw new LessonSedimentationError(`Lesson candidate must be ready-for-review or needs-promotion; current status is ${candidate.status}`, {
+      code: "lesson-candidate-not-actionable",
+      status: 409,
+      details: { candidateId, status: candidate.status, sourceTask: sourceTaskId },
+      recovery: [
+        "Set the candidate status to ready-for-review or needs-promotion after human review.",
+        "Use Copy lesson prompt if you only need the prompt without creating a task.",
+      ],
+    });
+  }
+  if (candidate.followUpTask && !/^pending$/i.test(candidate.followUpTask)) {
+    throw new LessonSedimentationError(`Lesson candidate already has follow-up task: ${candidate.followUpTask}`, {
+      code: "lesson-follow-up-exists",
+      status: 409,
+      details: { candidateId, followUpTask: candidate.followUpTask, sourceTask: sourceTaskId },
+      recovery: [
+        "Open the existing follow-up task instead of creating a duplicate.",
+        "If the existing task is wrong, edit the Follow-up Task cell back to pending after review.",
+      ],
+    });
+  }
+  return { sourceTaskDir, sourceTaskId, sourceShortId, candidatePath, candidate };
+}
+
+function commonSourceShort(entries) {
+  const unique = [...new Set(entries.map((entry) => entry.sourceShortId.replace(/^\d{4}-\d{2}-\d{2}-/, "")))];
+  return unique.length === 1 ? unique[0] : "";
 }
 
 function renderLessonSedimentationPrompt(preset, values) {
@@ -248,6 +434,78 @@ function renderContextPacket({ target, sourceTaskDir, sourceTaskId, candidate, f
   ].join("\n");
 }
 
+function renderAggregateLessonSedimentationPrompt({ target, entries, followUpTaskId }) {
+  const candidateBlocks = entries.map((entry, index) => {
+    const detailArtifact = resolveDetailArtifact(target, entry.sourceTaskDir, entry.candidate);
+    return [
+      `### ${index + 1}. ${entry.candidate.id} - ${entry.candidate.title || "Untitled lesson candidate"}`,
+      "",
+      `- Source task: ${entry.sourceTaskId}`,
+      `- Candidate status: ${entry.candidate.status}`,
+      `- Scope: ${entry.candidate.scope || "unspecified"}`,
+      `- Module key: ${entry.candidate.moduleKey || "n/a"}`,
+      `- Detail artifact: ${detailArtifact.prefixedPath || "not provided"}`,
+      `- Boundary reason: ${entry.candidate.boundaryReason || "unspecified"}`,
+      `- Why it might matter: ${entry.candidate.whyItMightMatter || "unspecified"}`,
+      `- Promotion target: ${entry.candidate.promotionTarget || "unspecified"}`,
+      `- Conflict check: ${entry.candidate.conflictCheck || "pending"}`,
+      `- Required standard update: ${entry.candidate.requiredStandardUpdate || "pending"}`,
+      "",
+    ].join("\n");
+  }).join("\n");
+  return [
+    "You are executing an aggregate lesson sedimentation follow-up task.",
+    "",
+    `Follow-up task: ${followUpTaskId}`,
+    `Candidate count: ${entries.length}`,
+    "",
+    "Instructions:",
+    "1. Read each source task, review, findings, progress, lesson_candidates.md, and task-local detail artifact.",
+    "2. Preserve candidate boundaries; do not merge unrelated lessons into one vague generalization.",
+    "3. Promote the smallest coherent set of reusable lessons, grouping only when candidates describe the same rule.",
+    "4. Check conflicts against existing lessons and standards before proposing changes.",
+    "5. Propose the smallest diff first.",
+    "6. Do not write a shared Lessons table; use promoted detail docs or focused follow-up edits.",
+    "",
+    "Selected candidates:",
+    "",
+    candidateBlocks.trimEnd(),
+    "",
+  ].join("\n");
+}
+
+function renderAggregateContextPacket({ target, entries, followUpTaskId, audit }) {
+  const rows = entries.map((entry) => {
+    const detailArtifact = resolveDetailArtifact(target, entry.sourceTaskDir, entry.candidate);
+    const sourceLessonPath = `TARGET:${toPosix(path.relative(target.projectRoot, path.join(entry.sourceTaskDir, lessonCandidatesFile)))}`;
+    return [
+      entry.candidate.id,
+      entry.sourceTaskId,
+      entry.candidate.title || "",
+      entry.candidate.scope || "unspecified",
+      entry.candidate.moduleKey || "n/a",
+      detailArtifact.prefixedPath || "not provided",
+      sourceLessonPath,
+      entry.candidate.promotionTarget || "unspecified",
+    ];
+  });
+  return [
+    "## Aggregate Lesson Sedimentation Context Packet",
+    "",
+    "| Candidate | Source Task | Title | Scope | Module | Detail Artifact | Candidate Table | Promotion Target |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.map(markdownCell).join(" | ")} |`),
+    "",
+    "| Field | Value |",
+    "| --- | --- |",
+    `| Preset | ${presetId} |`,
+    `| Follow-up Task | ${followUpTaskId} |`,
+    `| Candidate Count | ${entries.length} |`,
+    `| Preset Manifest | ${audit.manifestPath} |`,
+    "",
+  ].join("\n");
+}
+
 function resolveDetailArtifact(target, sourceTaskDir, candidate) {
   const raw = String(candidate.detailArtifact || "").trim();
   if (!raw || /^(?:n\/a|none|pending)$/i.test(raw)) return { path: "", prefixedPath: "" };
@@ -300,6 +558,46 @@ function appendToFollowUpTask({ followUpDir, sourceTaskId, candidate, prompt, co
       "",
     ].join("\n"),
   );
+}
+
+function appendToAggregateFollowUpTask({ followUpDir, entries, prompt, contextPacket, audit }) {
+  const taskPlanPath = path.join(followUpDir, "task_plan.md");
+  const progressPath = path.join(followUpDir, "progress.md");
+  const artifactsDir = path.join(followUpDir, "artifacts");
+  fs.mkdirSync(artifactsDir, { recursive: true });
+  fs.writeFileSync(path.join(artifactsDir, "lesson-sedimentation-prompt.md"), `${prompt}\n`);
+  fs.writeFileSync(path.join(artifactsDir, "preset-audit.json"), `${JSON.stringify(audit, null, 2)}\n`);
+
+  const candidateList = entries.map((entry) => `- ${entry.candidate.id}: ${entry.sourceTaskId} - ${entry.candidate.title || "Untitled lesson candidate"}`).join("\n");
+  fs.appendFileSync(taskPlanPath, [
+    "",
+    "## Aggregate Lesson Sedimentation Preset",
+    "",
+    "Task Preset: lesson-sedimentation",
+    "Preset Version: 1",
+    "Task Kind: lesson-sedimentation",
+    `Candidate Count: ${entries.length}`,
+    "",
+    "### Selected Candidates",
+    "",
+    candidateList,
+    "",
+    contextPacket.trimEnd(),
+    "",
+    "## Execution Prompt",
+    "",
+    "The copyable aggregate prompt for a new agent session is stored in `artifacts/lesson-sedimentation-prompt.md`.",
+    "",
+  ].join("\n"));
+  fs.appendFileSync(progressPath, [
+    "",
+    "### Aggregate lesson sedimentation task created",
+    "",
+    `- Candidate count: ${entries.length}`,
+    `- Source tasks: ${[...new Set(entries.map((entry) => entry.sourceTaskId))].join(", ")}`,
+    "- Next: use the aggregate execution prompt, preserve candidate boundaries, and propose focused reusable lesson diffs.",
+    "",
+  ].join("\n"));
 }
 
 function updateSourceFollowUpTask(candidatePath, candidateId, followUpTaskId) {

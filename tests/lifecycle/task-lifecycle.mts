@@ -622,11 +622,41 @@ fs.writeFileSync(
   ].join("\n"),
 );
 fs.writeFileSync(
+  path.join(workbenchLessonDir, "lessons/LC-WORKBENCH-002.md"),
+  [
+    "# LC-WORKBENCH-002 - Bulk workbench lesson action",
+    "",
+    "## Problem / Trigger",
+    "",
+    "Operators need to create multiple lesson follow-up tasks without clicking each candidate one at a time.",
+    "",
+    "## Correct Rule",
+    "",
+    "The bulk action should preserve the same per-candidate prompt and follow-up task behavior as the single action.",
+    "",
+  ].join("\n"),
+);
+fs.writeFileSync(
+  path.join(workbenchLessonDir, "lessons/LC-WORKBENCH-003.md"),
+  [
+    "# LC-WORKBENCH-003 - Second bulk workbench lesson action",
+    "",
+    "## Problem / Trigger",
+    "",
+    "Bulk lesson sedimentation should continue through multiple valid candidates.",
+    "",
+    "## Correct Rule",
+    "",
+    "Each candidate should return its own success result and created follow-up task.",
+    "",
+  ].join("\n"),
+);
+fs.writeFileSync(
   workbenchLessonCandidatePath,
   fs.readFileSync(workbenchLessonCandidatePath, "utf8")
     .replace(
       "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LC-WORKBENCH-001 | needs-promotion | A very long dashboard lesson action title that should stay bounded inside queue cards and drawers | process | n/a | lessons/LC-WORKBENCH-001.md | Workbench click path needs product feedback beyond CLI dry-run | Users need the created follow-up task, prompt, and recovery action visible in the Dashboard | pending | task lifecycle review checklist with a deliberately long promotion target | pending | possibly checker or template | pending |",
+      "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n| LC-WORKBENCH-001 | needs-promotion | A very long dashboard lesson action title that should stay bounded inside queue cards and drawers | process | n/a | lessons/LC-WORKBENCH-001.md | Workbench click path needs product feedback beyond CLI dry-run | Users need the created follow-up task, prompt, and recovery action visible in the Dashboard | pending | task lifecycle review checklist with a deliberately long promotion target | pending | possibly checker or template | pending |\n| LC-WORKBENCH-002 | needs-promotion | Bulk dashboard lesson action | process | n/a | lessons/LC-WORKBENCH-002.md | Bulk lesson creation needs parity with single create | Users need selected candidate creation without repeated clicks | pending | dashboard bulk lesson sedimentation | pending | dashboard workbench | pending |\n| LC-WORKBENCH-003 | ready-for-review | Second bulk dashboard lesson action | process | n/a | lessons/LC-WORKBENCH-003.md | Bulk lesson creation must process more than one candidate | Users need per-item success results | pending | dashboard bulk lesson sedimentation | pending | dashboard workbench | pending |",
     ),
 );
 commitFixtureBaseline(lifecycleTarget, "before workbench lesson sedimentation fixture");
@@ -665,6 +695,32 @@ try {
   assert(duplicateLessonPayload.code === "lesson-follow-up-exists", "duplicate lesson creation should expose a stable error code");
   assert(Array.isArray(duplicateLessonPayload.recovery) && duplicateLessonPayload.recovery.length > 0, "duplicate lesson creation should include recovery actions");
   assert(duplicateLessonPayload.details?.followUpTask === lessonCreatePayload.followUpTask.id, "duplicate lesson creation should identify the existing follow-up task");
+  const bulkLessonResponse = await fetch(new URL("api/tasks/lesson-sedimentation-bulk", runtime.url), {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: runtime.url.replace(/\/$/, "") },
+    body: JSON.stringify({
+      selections: [
+        { taskId: workbenchLessonTask.task.id, candidateId: "LC-WORKBENCH-002" },
+        { taskId: workbenchLessonTask.task.id, candidateId: "LC-WORKBENCH-003" },
+      ],
+    }),
+  });
+  const bulkLessonText = await bulkLessonResponse.text();
+  assert(bulkLessonResponse.status === 200, `bulk lesson sedimentation should create an aggregate follow-up task, got ${bulkLessonResponse.status}: ${bulkLessonText}`);
+  const bulkLessonPayload = JSON.parse(bulkLessonText);
+  assert(bulkLessonPayload.created === 1, "bulk lesson sedimentation should create one aggregate follow-up task");
+  assert(bulkLessonPayload.candidates === 2, "bulk lesson sedimentation should count aggregated candidates");
+  assert(bulkLessonPayload.failed === 0, "bulk lesson sedimentation should not fail valid selected candidates");
+  assert(bulkLessonPayload.followUpTask?.id?.includes("lesson-workbench-lesson-action-aggregate"), "bulk lesson sedimentation should return the aggregate follow-up task");
+  assert(bulkLessonPayload.results.every((result) => result.ok && result.followUpTask?.id === bulkLessonPayload.followUpTask.id), "bulk lesson sedimentation should point every selected candidate at the aggregate task");
+  assert(bulkLessonPayload.prompt.includes("LC-WORKBENCH-002") && bulkLessonPayload.prompt.includes("LC-WORKBENCH-003"), "bulk lesson sedimentation prompt should include every selected candidate");
+  const aggregateTaskDir = path.join(lifecycleTarget, bulkLessonPayload.followUpTask.path.replace(/^TARGET:/, ""));
+  assert(fs.existsSync(path.join(aggregateTaskDir, "artifacts/lesson-sedimentation-prompt.md")), "aggregate lesson task should write one copyable prompt artifact");
+  const updatedLessonCandidates = fs.readFileSync(workbenchLessonCandidatePath, "utf8");
+  const updatedLessonRows = updatedLessonCandidates.split(/\r?\n/);
+  assert(updatedLessonRows.some((line) => line.includes("| LC-WORKBENCH-002 |") && line.includes(`| ${bulkLessonPayload.followUpTask.id} |`)), "bulk lesson sedimentation should point the first candidate at the aggregate task");
+  assert(updatedLessonRows.some((line) => line.includes("| LC-WORKBENCH-003 |") && line.includes(`| ${bulkLessonPayload.followUpTask.id} |`)), "bulk lesson sedimentation should point the second candidate at the aggregate task");
+  assert(bulkLessonPayload.governance?.commit?.commitSha, "bulk lesson sedimentation should commit the aggregate task once");
   const badOrigin = await fetch(new URL("api/tasks/review-complete", runtime.url), {
     method: "POST",
     headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: "http://127.0.0.1:9" },
@@ -710,6 +766,28 @@ try {
   expectJson(["task-phase", "workbench-review", "EXEC-01", "--state", "done", "--completion", "100", "--evidence", "present", lifecycleTarget]);
   expectJson(["task-review", "workbench-review", "--message", "submitted for workbench confirmation", "--evidence", "command:TARGET:workbench-smoke:passed", lifecycleTarget]);
   commitFixtureBaseline(lifecycleTarget, "before workbench review confirmation");
+  const bulkReviewA = prepareWorkbenchReviewConfirmationFixture("workbench-bulk-review-a");
+  const bulkReviewB = prepareWorkbenchReviewConfirmationFixture("workbench-bulk-review-b");
+  const bulkReviewResponse = await fetch(new URL("api/tasks/review-complete-bulk", runtime.url), {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: runtime.url.replace(/\/$/, "") },
+    body: JSON.stringify({
+      taskIds: [bulkReviewA.id, bulkReviewB.id],
+      reviewer: "Human Reviewer",
+      message: "bulk confirmed from workbench",
+    }),
+  });
+  const bulkReviewText = await bulkReviewResponse.text();
+  assert(bulkReviewResponse.status === 200, `bulk review completion should pass, got ${bulkReviewResponse.status}: ${bulkReviewText}`);
+  const bulkReviewPayload = JSON.parse(bulkReviewText);
+  assert(bulkReviewPayload.confirmed === 2, "bulk review completion should count confirmed tasks");
+  assert(bulkReviewPayload.failed === 0, "bulk review completion should not fail valid selected tasks");
+  assert(bulkReviewPayload.results.every((result) => result.ok && result.audit?.commitSha), "bulk review completion should return per-task audit commits");
+  assert(new Set(bulkReviewPayload.results.map((result) => result.audit?.commitSha)).size === 1, "bulk review completion should use one shared confirmation commit");
+  assert(new Set(bulkReviewPayload.results.map((result) => result.audit?.auditCommitSha)).size === 1, "bulk review completion should use one shared audit commit");
+  const bulkReviewStatus = expectJson(["status", "--json", lifecycleTarget]);
+  assert(bulkReviewStatus.tasks.find((task) => task.id === bulkReviewA.id)?.reviewStatus === "confirmed", "bulk review completion should confirm the first selected task");
+  assert(bulkReviewStatus.tasks.find((task) => task.id === bulkReviewB.id)?.reviewStatus === "confirmed", "bulk review completion should confirm the second selected task");
   const okResponse = await fetch(new URL("api/tasks/review-complete", runtime.url), {
     method: "POST",
     headers: { "content-type": "application/json", "x-harness-csrf": runtime.csrf, origin: runtime.url.replace(/\/$/, "") },
@@ -746,6 +824,20 @@ function expectFixtureGit(target, args) {
   const result = spawnSync("git", args, { cwd: target, encoding: "utf8" });
   assert(result.status === 0, `git ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
   return result;
+}
+
+function prepareWorkbenchReviewConfirmationFixture(slug) {
+  const created = expectJson(["new-task", slug, "--title", `Bulk review ${slug}`, "--locale", "zh-CN", lifecycleTarget]);
+  const taskDir = path.join(lifecycleTarget, `coding-agent-harness/planning/tasks/${todayLocal}-${slug}`);
+  const walkthrough = path.join(taskDir, "walkthrough.md");
+  fs.writeFileSync(walkthrough, `${fs.readFileSync(walkthrough, "utf8").trimEnd()}\n\n## Summary\n\nHuman-readable walkthrough for bulk dashboard review confirmation.\n`);
+  acceptNoLessonCandidate(taskDir);
+  commitFixtureBaseline(lifecycleTarget, `before ${slug} review lifecycle fixture`);
+  expectJson(["task-start", slug, "--message", "readying bulk workbench review fixture", lifecycleTarget]);
+  expectJson(["task-phase", slug, "EXEC-01", "--state", "done", "--completion", "100", "--evidence", "present", lifecycleTarget]);
+  expectJson(["task-review", slug, "--message", "submitted for bulk workbench confirmation", "--evidence", "command:TARGET:bulk-workbench-smoke:passed", lifecycleTarget]);
+  commitFixtureBaseline(lifecycleTarget, `before ${slug} review confirmation`);
+  return { id: created.task.id, shortId: created.task.shortId || `${todayLocal}-${slug}` };
 }
 const devDir = path.join(tmpRoot, "dev-workbench");
 const dev = spawn(node, [cli, "dev", "--no-open", "--out-dir", devDir, "--host", "127.0.0.1", "--port", "0", lifecycleTarget], {
