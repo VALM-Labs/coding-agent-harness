@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Dynamic review gate modeling stays behavior-first until the metadata domain model PR.
 
 import fs from "node:fs";
@@ -18,8 +17,38 @@ import {
   implementationPhases,
   phaseHasRecordedProgress,
 } from "../phase-kind.mjs";
+import type { TaskBudget } from "../types/task-scanner.js";
 
-export function validateLifecycleTransition({ event, currentState, budget, reviewContent = "", indexContent = "", reviewTaskKey = "", projectRoot = "", taskDir = "" }) {
+type LifecycleEvent = "task-start" | "task-review" | "task-complete";
+
+type ReviewGateTask = {
+  walkthroughPath?: string;
+  reviewQueueState?: string;
+  state?: string;
+  taskQueues?: string[];
+  lessonCandidateDecisionComplete?: boolean;
+  lessonCandidateStatus?: string;
+};
+
+export function validateLifecycleTransition({
+  event,
+  currentState,
+  budget,
+  reviewContent = "",
+  indexContent = "",
+  reviewTaskKey = "",
+  projectRoot = "",
+  taskDir = "",
+}: {
+  event: LifecycleEvent;
+  currentState?: string;
+  budget: TaskBudget;
+  reviewContent?: string;
+  indexContent?: string;
+  reviewTaskKey?: string;
+  projectRoot?: string;
+  taskDir?: string;
+}) {
   if (event === "task-review" && currentState !== "in_progress") {
     throw new Error(`task-review requires current state in_progress; current state is ${currentState || "unknown"}`);
   }
@@ -38,7 +67,7 @@ export function validateLifecycleTransition({ event, currentState, budget, revie
   }
 }
 
-export function validateReviewEntryGate(taskDir, budget) {
+export function validateReviewEntryGate(taskDir: string, budget: TaskBudget) {
   if (budget === "simple") return;
   const candidatePath = path.join(taskDir, lessonCandidatesFile);
   if (!fs.existsSync(candidatePath)) {
@@ -55,7 +84,7 @@ export function validateReviewEntryGate(taskDir, budget) {
   }
 }
 
-export function validateHumanReviewConfirmation({ task, budget }) {
+export function validateHumanReviewConfirmation({ task, budget }: { task?: ReviewGateTask; budget: TaskBudget }) {
   if (budget === "simple") return;
   if (!task?.walkthroughPath) {
     throw new Error("Human review confirmation requires task-local walkthrough.md before review-confirm.");

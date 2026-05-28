@@ -1,4 +1,3 @@
-// @ts-nocheck
 import fs from "node:fs";
 import path from "node:path";
 import { toPosix } from "../core-shared.mjs";
@@ -8,9 +7,51 @@ import {
   taskFilesForBudget,
 } from "./template-files.mjs";
 import { discoverImplicitHarnessTarget } from "../harness-paths.mjs";
+import type { TaskScannerTarget, TaskBudget } from "../types/task-scanner.js";
 
-export function planCreateTaskChanges({ target, directory, normalizedModuleKey, normalizedLocale, normalizedBudget, longRunning, presetContext }) {
-  const changes = [];
+type CreateTaskChange = {
+  destination: string;
+  source: string;
+  action: "create" | "update";
+};
+
+type PresetGeneratedFile = {
+  relativePath: string;
+  source: string;
+  content?: string;
+};
+
+type PresetAudit = {
+  writeScopes?: string[];
+  presetWriteScopes?: string[];
+  commandWriteScopes?: unknown[];
+};
+
+type PresetContext = {
+  audit: PresetAudit;
+  evidenceFiles?: PresetGeneratedFile[];
+  resourceFiles?: PresetGeneratedFile[];
+  resourceIndexRows?: Record<string, unknown[]>;
+};
+
+export function planCreateTaskChanges({
+  target,
+  directory,
+  normalizedModuleKey,
+  normalizedLocale,
+  normalizedBudget,
+  longRunning,
+  presetContext,
+}: {
+  target: TaskScannerTarget;
+  directory: string;
+  normalizedModuleKey?: string;
+  normalizedLocale: string;
+  normalizedBudget: TaskBudget;
+  longRunning?: boolean;
+  presetContext?: PresetContext;
+}): CreateTaskChange[] {
+  const changes: CreateTaskChange[] = [];
   if (normalizedModuleKey) {
     const moduleDirectory = path.dirname(directory);
     for (const [destination, source] of moduleTemplateFiles({ locale: normalizedLocale })) {
@@ -53,7 +94,11 @@ export function planCreateTaskChanges({ target, directory, normalizedModuleKey, 
   return changes;
 }
 
-export function refreshPresetCommandAudit(target, presetContext, { commandWriteScopes = [], dryRun = false } = {}) {
+export function refreshPresetCommandAudit(
+  target: TaskScannerTarget,
+  presetContext: PresetContext,
+  { commandWriteScopes = [], dryRun = false }: { commandWriteScopes?: readonly unknown[]; dryRun?: boolean } = {},
+) {
   const scopes = [...new Set(commandWriteScopes.filter(Boolean))];
   presetContext.audit = {
     ...presetContext.audit,
@@ -68,17 +113,17 @@ export function refreshPresetCommandAudit(target, presetContext, { commandWriteS
   }
 }
 
-export function targetInputFromSessionFile(fromSession) {
+export function targetInputFromSessionFile(fromSession?: string): string {
   if (!fromSession) return "";
   try {
-    const parsed = JSON.parse(fs.readFileSync(path.resolve(fromSession), "utf8"));
+    const parsed = JSON.parse(fs.readFileSync(path.resolve(fromSession), "utf8")) as { target?: string };
     return parsed.target || "";
   } catch {
     return "";
   }
 }
 
-export function resolveImplicitCreateTarget(targetInput, fromSession) {
+export function resolveImplicitCreateTarget(targetInput?: string, fromSession?: string): string {
   const sessionTarget = targetInputFromSessionFile(fromSession);
   if (targetInput && targetInput !== ".") return targetInput;
   return sessionTarget || discoverImplicitHarnessTarget(targetInput || ".") || targetInput || "";
