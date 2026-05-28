@@ -1,4 +1,3 @@
-// @ts-nocheck
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -43,22 +42,108 @@ import {
   recommendedMigrationCapabilities,
   migrationPhases,
 } from "./migration-support.mjs";
+import type { CheckTarget, ScannedTask } from "./types/check-profiles.js";
 
-export function buildMigrationPlan(targetInput, { limit = 20 } = {}) {
-  const target = normalizeTarget(targetInput);
+type MigrationTarget = CheckTarget;
+type MigrationStatus = ReturnType<typeof buildStatus>;
+type MigrationTask = ScannedTask;
+type FullCutoverSession = Parameters<typeof validateFullCutoverSession>[0];
+
+type MigrationPlanOptions = {
+  limit?: number;
+};
+
+type MigrationRunOptions = MigrationPlanOptions & {
+  allowDirty?: boolean;
+  locale?: string;
+  assumeLocale?: boolean;
+  sessionDir?: string;
+  outDir?: string;
+  planOnly?: boolean;
+};
+
+type TaskAction = {
+  taskId: string;
+  path: string;
+  files: Set<string>;
+  action: string;
+};
+
+type ReviewAction = {
+  path: string;
+  missing: Set<string>;
+  action: string;
+};
+
+type LegacyAction = Record<string, unknown>;
+type WarningGroup = {
+  category: string;
+  count: number;
+  examples: string[];
+};
+
+type MigrationSession = {
+  operation?: string;
+  version?: number;
+  schemaVersion?: number;
+  generatedAt?: string;
+  result: string;
+  target: string;
+  sessionDir?: string;
+  planOnly?: boolean;
+  localeDecision: {
+    selected: string;
+    source?: string;
+    probe: {
+      confidence: string;
+    };
+  };
+  dashboard?: {
+    dir?: string;
+    indexPath?: string;
+  } | null;
+  capabilities: Array<{
+    name: string;
+    state?: string;
+  }>;
+  plan: {
+    operation?: string;
+    mode?: string;
+    nextCommands?: string[];
+    summary?: Record<string, unknown>;
+  };
+  checks: {
+    normal?: ReturnType<typeof statusCheckSummary>;
+    strict?: ReturnType<typeof statusCheckSummary>;
+  };
+  strictDeferred?: {
+    owner?: string;
+    trigger?: string;
+    nextAction?: string;
+    failureCount?: number;
+  } | null;
+  git?: {
+    before?: ReturnType<typeof inspectGitStatus>;
+    after?: ReturnType<typeof inspectGitStatus>;
+  };
+};
+
+export function buildMigrationPlan(targetInput: string, { limit = 20 }: MigrationPlanOptions = {}) {
+  const target = normalizeTarget(targetInput) as MigrationTarget;
   const status = buildStatus(targetInput, { strict: false, strictLegacy: false, allowLegacyTarget: true });
   const registry = readCapabilityRegistry(target);
   const locale = registry.raw ? registry.locale : inferProjectLocale(target, registry.locale);
   const adoption = collectAdoption(status);
   const warnings = adoption.warnings.map((warning) => warning.detail).filter(Boolean);
-  const taskActionsByTask = new Map();
-  const reviewActionsByPath = new Map();
-  const legacyActions = [];
-  const legacyResiduals = [];
-  const warningGroups = new Map();
-  const tasksByShortId = new Map(status.tasks.map((task) => [task.shortId, task]));
+  const taskActionsByTask = new Map<string, TaskAction>();
+  const reviewActionsByPath = new Map<string, ReviewAction>();
+  const legacyActions: LegacyAction[] = [];
+  const legacyResiduals: LegacyAction[] = [];
+  const warningGroups = new Map<string, WarningGroup>();
+  const tasks = status.tasks as MigrationTask[];
+  const tasksByShortId = new Map(tasks.map((task) => [task.shortId, task]));
 
-  function addTaskAction(taskId, actionPath, fileName, actionText) {
+  function addTaskAction(taskId: string, actionPath: string, fileName: string, actionText: string): TaskAction {
     const existing = taskActionsByTask.get(taskId) || {
       taskId,
       path: actionPath,
@@ -130,7 +215,7 @@ export function buildMigrationPlan(targetInput, { limit = 20 } = {}) {
   const legacyVisualOnlyTasks = [];
   const unknownClassificationTasks = [];
   const weakBriefTasks = [];
-  for (const task of status.tasks) {
+  for (const task of tasks) {
     if (task.visualMapStatus === "legacy-only") {
       legacyVisualOnlyTasks.push({
         taskId: task.shortId,
@@ -194,7 +279,7 @@ export function buildMigrationPlan(targetInput, { limit = 20 } = {}) {
   const recommendedCapabilities = recommendedMigrationCapabilities(status, target, registry);
   const missingExecutionStrategy = taskActions.filter((action) => action.files.includes("execution_strategy.md")).length;
   const missingVisualMap = taskActions.filter((action) => action.files.includes(visualMapFile)).length;
-  const cutoverCounters = taskCutoverCounters(status.tasks);
+  const cutoverCounters = taskCutoverCounters(tasks);
   const visualMapActions = taskActions.filter((action) => action.files.includes(visualMapFile)).length;
   const fullCutoverEligible =
     status.checkState.status === "pass" &&
@@ -240,7 +325,7 @@ export function buildMigrationPlan(targetInput, { limit = 20 } = {}) {
       fullCutoverEligible,
     },
     recommendedCapabilities,
-    phases: migrationPhases({ locale, recommendedCapabilities }),
+    phases: migrationPhases({ locale, recommendedCapabilities: recommendedCapabilities.map((capability) => ({ ...capability, state: "recommended" })) }),
     taskActions: taskActions.slice(0, limit),
     visualMapActions: taskActions.filter((action) => action.files.includes(visualMapFile)).slice(0, limit),
     legacyVisualOnlyTasks: legacyVisualOnlyTasks.slice(0, limit),
@@ -260,8 +345,8 @@ export function buildMigrationPlan(targetInput, { limit = 20 } = {}) {
   };
 }
 
-export function runMigration(targetInput, options = {}) {
-  const target = normalizeTarget(targetInput);
+export function runMigration(targetInput: string, options: MigrationRunOptions = {}) {
+  const target = normalizeTarget(targetInput) as MigrationTarget;
   const targetLabel = target.projectRoot;
   const beforeGit = inspectGitStatus(target.projectRoot);
   if (beforeGit.error) throw new Error(`Could not inspect git status: ${beforeGit.error.trim()}`);
@@ -281,8 +366,8 @@ export function runMigration(targetInput, options = {}) {
   const sessionDir = ensureSessionDir(path.basename(target.projectRoot), options.sessionDir || "");
   const dashboardDir = options.outDir ? path.resolve(options.outDir) : path.join(sessionDir, "dashboard");
 
-  let safeAdoption = null;
-  let dashboardCapability = null;
+  let safeAdoption: ReturnType<typeof addCapability> | null = null;
+  let dashboardCapability: ReturnType<typeof addCapability> | null = null;
   const safeAdoptionDryRun = addCapability(targetInput, "safe-adoption", { dryRun: true, locale: selectedLocale });
   const dashboardDryRun = addCapability(targetInput, "dashboard", { dryRun: true, locale: selectedLocale });
   let dashboardIndex = "";
@@ -353,20 +438,20 @@ export function runMigration(targetInput, options = {}) {
   fs.writeFileSync(path.join(sessionDir, "status-strict.json"), `${JSON.stringify(strictStatus, null, 2)}\n`);
   fs.writeFileSync(sessionPath, `${JSON.stringify(session, null, 2)}\n`);
   const reportPath = path.join(sessionDir, "report.md");
-  fs.writeFileSync(reportPath, writeMigrationReport(session));
+  fs.writeFileSync(reportPath, writeMigrationReport(session as Parameters<typeof writeMigrationReport>[0]));
   return { ...session, sessionPath, reportPath };
 }
 
-export function verifyMigrationSession(sessionPathInput, { fullCutover = false } = {}) {
-  const sessionPath = path.resolve(sessionPathInput || "");
+export function verifyMigrationSession(sessionPathInput: unknown, { fullCutover = false }: { fullCutover?: boolean } = {}) {
+  const sessionPath = path.resolve(String(sessionPathInput || ""));
   if (!sessionPath || !fs.existsSync(sessionPath)) {
     return { operation: "migrate-verify", status: "fail", failures: [`session file not found: ${sessionPathInput}`], warnings: [] };
   }
-  const failures = [];
-  const warnings = [];
-  let readError = null;
-  const session = readJsonSafe(sessionPath, null, { onError: (error) => { readError = error; } });
-  if (!session) return { operation: "migrate-verify", status: "fail", failures: [`invalid session json: ${readError?.message || "unknown parse error"}`], warnings };
+  const failures: string[] = [];
+  const warnings: string[] = [];
+  let readError: unknown = null;
+  const session = readJsonSafe(sessionPath, null, { onError: (error: unknown) => { readError = error; } }) as MigrationSession | null;
+  if (!session) return { operation: "migrate-verify", status: "fail", failures: [`invalid session json: ${errorMessage(readError)}`], warnings };
   if (session.operation !== "migrate-run") failures.push("session operation is not migrate-run");
   if (session.schemaVersion !== 1 && session.version !== 1) failures.push("session missing schema version");
   if (session.planOnly) failures.push("plan-only session is not completed migration evidence; rerun migrate-run without --plan-only");
@@ -382,7 +467,7 @@ export function verifyMigrationSession(sessionPathInput, { fullCutover = false }
   if (session.git?.after?.staged?.length) failures.push(`migration left staged files: ${session.git.after.staged.join(", ")}`);
 
   if (session.target && fs.existsSync(session.target)) {
-    const target = normalizeTarget(session.target);
+    const target = normalizeTarget(session.target) as MigrationTarget;
     const currentGit = inspectGitStatus(target.projectRoot);
     if (currentGit.error) failures.push(`could not inspect current git status: ${currentGit.error.trim()}`);
     if (currentGit.inGit !== true) failures.push("target is not currently a git worktree");
@@ -435,16 +520,20 @@ export function verifyMigrationSession(sessionPathInput, { fullCutover = false }
       failures.push("dashboard-data.js does not contain a generated dashboard bundle");
     } else {
       try {
-        const dashboardBundle = JSON.parse(dataMatch[1]);
+        const dashboardBundle = JSON.parse(dataMatch[1]) as Record<string, unknown>;
+        const dashboardStatus = asRecord(dashboardBundle.status);
+        const dashboardProject = asRecord(dashboardStatus.project);
+        const dashboardCheckState = dashboardStatus.checkState;
+        const dashboardAdoption = asRecord(dashboardBundle.adoption);
         const expectedProjectName = session.target ? path.basename(session.target) : "";
-        if (dashboardBundle.status?.schemaVersion !== 2) failures.push("dashboard bundle missing status schemaVersion 2");
-        if (expectedProjectName && dashboardBundle.status?.project?.name !== expectedProjectName) {
-          failures.push(`dashboard bundle project ${dashboardBundle.status?.project?.name || "(none)"} does not match target ${expectedProjectName}`);
+        if (dashboardStatus.schemaVersion !== 2) failures.push("dashboard bundle missing status schemaVersion 2");
+        if (expectedProjectName && dashboardProject.name !== expectedProjectName) {
+          failures.push(`dashboard bundle project ${dashboardProject.name || "(none)"} does not match target ${expectedProjectName}`);
         }
-        if (!dashboardBundle.status?.checkState) failures.push("dashboard bundle missing checkState");
-        if (!Array.isArray(dashboardBundle.adoption?.warnings)) failures.push("dashboard bundle missing adoption warnings array");
+        if (!dashboardCheckState) failures.push("dashboard bundle missing checkState");
+        if (!Array.isArray(dashboardAdoption.warnings)) failures.push("dashboard bundle missing adoption warnings array");
       } catch (error) {
-        failures.push(`dashboard-data.js contains invalid dashboard JSON: ${error.message}`);
+        failures.push(`dashboard-data.js contains invalid dashboard JSON: ${errorMessage(error)}`);
       }
     }
   }
@@ -459,7 +548,9 @@ export function verifyMigrationSession(sessionPathInput, { fullCutover = false }
     }
   }
 
-  if (fullCutover) validateFullCutoverSession(session, failures);
+  if (fullCutover) {
+    validateFullCutoverSession({ ...session, dashboard: session.dashboard || undefined } as FullCutoverSession, failures);
+  }
 
   return {
     operation: "migrate-verify",
@@ -473,4 +564,16 @@ export function verifyMigrationSession(sessionPathInput, { fullCutover = false }
     failures,
     warnings,
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown parse error";
 }
