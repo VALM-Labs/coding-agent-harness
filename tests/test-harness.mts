@@ -120,8 +120,8 @@ const packageScriptInit = expectJson(["init", "--locale", "en-US", "--capabiliti
 assert(packageScriptInit.changes.some((change) => change.destination === "package.json" && change.action === "update-scripts"), "init --add-npm-scripts should report package.json script update");
 const packageScripts = JSON.parse(fs.readFileSync(path.join(packageScriptTarget, "package.json"), "utf8")).scripts;
 assert(packageScripts.test === "node --version", "init --add-npm-scripts should preserve existing scripts");
-assert(packageScripts["harness:dev"] === "coding-agent-harness dev .", "init --add-npm-scripts should add harness:dev");
-assert(packageScripts["harness:dashboard"] === "coding-agent-harness dashboard --out-dir tmp/harness-dashboard .", "init --add-npm-scripts should add static dashboard script");
+assert(packageScripts["harness:dev"] === "npx --yes coding-agent-harness dev .", "init --add-npm-scripts should add harness:dev");
+assert(packageScripts["harness:dashboard"] === "npx --yes coding-agent-harness dashboard --out-dir tmp/harness-dashboard .", "init --add-npm-scripts should add static dashboard script");
 const noPackageScriptTarget = path.join(tmpRoot, "no-package-script-target");
 fs.mkdirSync(noPackageScriptTarget);
 const noPackageScripts = run(["init", "--dry-run", "--locale", "en-US", "--capabilities", "core", "--add-npm-scripts", noPackageScriptTarget]);

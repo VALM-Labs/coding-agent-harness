@@ -610,8 +610,8 @@ function writeNpmScripts(target, { dryRun = true } = {}) {
   const pkg = readJsonSafe(packagePath, {});
   const scripts = { ...(pkg.scripts || {}) };
   const additions = {
-    "harness:dev": "coding-agent-harness dev .",
-    "harness:dashboard": "coding-agent-harness dashboard --out-dir tmp/harness-dashboard .",
+    "harness:dev": "npx --yes coding-agent-harness dev .",
+    "harness:dashboard": "npx --yes coding-agent-harness dashboard --out-dir tmp/harness-dashboard .",
   };
   let changed = false;
   const scriptChanges = [];
