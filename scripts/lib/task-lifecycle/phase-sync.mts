@@ -1,4 +1,3 @@
-// @ts-nocheck
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -17,8 +16,11 @@ import {
   normalizePhaseKind,
 } from "../phase-kind.mjs";
 import { parseLessonCandidateStatus } from "../task-lesson-candidates.mjs";
+import type { TaskScannerTarget } from "../types/task-scanner.js";
 
-export function advanceLifecyclePhase(target, taskDir, event) {
+type LifecycleEvent = "task-start" | "task-review" | "task-complete";
+
+export function advanceLifecyclePhase(target: TaskScannerTarget, taskDir: string, event: LifecycleEvent): string {
   const visualMapPath = path.join(taskDir, visualMapFile);
   if (!fs.existsSync(visualMapPath)) return "";
   const content = readFileSafe(visualMapPath);
@@ -40,7 +42,7 @@ export function advanceLifecyclePhase(target, taskDir, event) {
   return toPosix(path.relative(target.projectRoot, visualMapPath));
 }
 
-export function autoRecordNoLessonCandidateDecision(target, taskDir) {
+export function autoRecordNoLessonCandidateDecision(target: TaskScannerTarget, taskDir: string): string {
   const candidatePath = path.join(taskDir, lessonCandidatesFile);
   if (!fs.existsSync(candidatePath)) return "";
   const content = readFileSafe(candidatePath);
@@ -52,7 +54,7 @@ export function autoRecordNoLessonCandidateDecision(target, taskDir) {
   return toPosix(path.relative(target.projectRoot, candidatePath));
 }
 
-function phaseMatchesLifecycleEvent(header, row, event) {
+function phaseMatchesLifecycleEvent(header: string[], row: string[], event: LifecycleEvent): boolean {
   const kindIndex = firstColumn(header, ["Kind", "阶段类型", "类型"]);
   if (kindIndex < 0) return false;
   const actorIndex = firstColumn(header, ["Actor", "执行者", "角色"]);
@@ -72,9 +74,9 @@ function phaseMatchesLifecycleEvent(header, row, event) {
   return false;
 }
 
-function replaceNoLessonCandidateFields(content) {
+function replaceNoLessonCandidateFields(content: string): string {
   let next = String(content || "");
-  const replacements = [
+  const replacements: Array<[RegExp, string]> = [
     [/(\|\s*Task-level status\s*\|\s*)[^|]+(\|)/i, "$1no-candidate-accepted $2"],
     [/(\|\s*Review decision\s*\|\s*)[^|]+(\|)/i, "$1accepted-no-candidate $2"],
     [/(\|\s*Closeout token\s*\|\s*)[^|]+(\|)/i, "$1checked-none:auto-no-candidate $2"],
