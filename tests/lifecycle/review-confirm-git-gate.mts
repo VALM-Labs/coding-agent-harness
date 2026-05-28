@@ -133,13 +133,30 @@ function readIndex(fixture) {
 }
 
 {
-  const fixture = prepareReviewTarget("git-gate-dirty-refusal");
+  const fixture = prepareReviewTarget("git-gate-unrelated-dirty-allowed");
   fs.writeFileSync(path.join(fixture.target, "README.md"), "unrelated change\n");
-  const beforeReview = readReview(fixture);
   const result = reviewConfirm(fixture);
-  assert(result.status !== 0, "review-confirm should reject unrelated dirty files");
-  assert(`${result.stdout}\n${result.stderr}`.includes("Git working tree is not clean"), "dirty refusal should explain the unsafe git state");
-  assert(readReview(fixture) === beforeReview, "dirty refusal should not write review.md");
+  assert(result.status === 0, `review-confirm should ignore unrelated dirty files\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
+  const payload = JSON.parse(result.stdout);
+  const committedFiles = expectGit(fixture.target, ["show", "--name-only", "--format=", payload.audit.commitSha]).stdout.trim().split(/\r?\n/).filter(Boolean);
+  assert(committedFiles.length === 1, `review-confirm should commit only INDEX.md, got ${committedFiles.join(", ")}`);
+  assert(committedFiles[0] === `coding-agent-harness/planning/tasks/${fixture.shortId}/INDEX.md`, "review-confirm commit should not include unrelated dirty files");
+  assert(git(fixture.target, ["status", "--porcelain"]).stdout.includes("README.md"), "unrelated dirty file should remain dirty after review-confirm");
+  const status = expectHarnessJson(["status", "--json", fixture.target]);
+  const task = status.tasks.find((candidate) => candidate.id === fixture.taskId);
+  assert(task?.reviewStatus === "confirmed", "unrelated dirty state should not keep the task in review after confirmation");
+}
+
+{
+  const fixture = prepareReviewTarget("git-gate-owned-dirty-refusal");
+  const indexPath = path.join(fixture.taskDir, "INDEX.md");
+  fs.appendFileSync(indexPath, "\n<!-- user-owned local edit -->\n");
+  const beforeIndex = readIndex(fixture);
+  const result = reviewConfirm(fixture);
+  assert(result.status !== 0, "review-confirm should reject pre-existing dirty state in its owned INDEX.md");
+  const output = `${result.stdout}\n${result.stderr}`;
+  assert(output.includes("Review confirmation owned path is already dirty"), "owned dirty refusal should identify the owned path boundary");
+  assert(readIndex(fixture) === beforeIndex, "owned dirty refusal should not overwrite existing INDEX.md edits");
 }
 
 {
