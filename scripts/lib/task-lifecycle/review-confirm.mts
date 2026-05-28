@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Dynamic review confirmation flow stays behavior-first until the metadata domain model PR.
 
 import fs from "node:fs";
@@ -26,8 +25,45 @@ import {
 import { commitReviewConfirmationGate, prepareReviewConfirmGitGate } from "../review-confirm-git-gate.mjs";
 import { validateHumanReviewConfirmation } from "./review-gates.mjs";
 import { markdownCell } from "./text-utils.mjs";
+import type { TaskScannerTarget } from "../types/task-scanner.js";
 
-export function confirmTaskReview({ target, taskDir, findTaskByDirectory }, { reviewer = "Human Reviewer", message = "", confirmText = "", evidence = "" } = {}) {
+type ReviewConfirmationTarget = TaskScannerTarget & {
+  locale?: string;
+  harness?: {
+    taskRoots?: string[];
+  } & Record<string, unknown>;
+};
+
+type ReviewTask = {
+  id?: string;
+  reviewStatus?: string;
+  walkthroughPath?: string;
+  reviewQueueState?: string;
+  state?: string;
+  taskQueues?: string[];
+  lessonCandidateDecisionComplete?: boolean;
+  lessonCandidateStatus?: string;
+};
+
+type ReviewConfirmationContext = {
+  target: ReviewConfirmationTarget;
+  taskDir: string;
+  findTaskByDirectory: (target: ReviewConfirmationTarget, taskDir: string) => ReviewTask | undefined;
+};
+
+type ConfirmTaskReviewOptions = {
+  reviewer?: string;
+  message?: string;
+  confirmText?: string;
+  evidence?: string;
+};
+
+type AuditFields = Record<string, string>;
+
+export function confirmTaskReview(
+  { target, taskDir, findTaskByDirectory }: ReviewConfirmationContext,
+  { reviewer = "Human Reviewer", message = "", confirmText = "", evidence = "" }: ConfirmTaskReviewOptions = {},
+) {
   assertTaskDirectoryInsidePlanning(target, taskDir);
   const canonicalTaskId = taskIdForDirectory(target, taskDir);
   const shortId = path.basename(taskDir);
@@ -60,7 +96,7 @@ export function confirmTaskReview({ target, taskDir, findTaskByDirectory }, { re
   const confirmationId = `HRC-${timestamp.replace(/[^0-9]/g, "").slice(0, 14)}`;
   const identity = readGitIdentity(target.projectRoot);
   const baseAuditFields = taskAuditFieldsFromIndex(indexContent);
-  const buildAuditFields = ({ commitSha = "pending", auditStatus = "commit-pending" } = {}) => ({
+  const buildAuditFields = ({ commitSha = "pending", auditStatus = "commit-pending" }: { commitSha?: string; auditStatus?: string } = {}): AuditFields => ({
     ...baseAuditFields,
     "Human Review Status": "confirmed",
     "Confirmation ID": confirmationId,
@@ -93,7 +129,7 @@ export function confirmTaskReview({ target, taskDir, findTaskByDirectory }, { re
   };
 }
 
-function assertTaskDirectoryInsidePlanning(target, taskDir) {
+function assertTaskDirectoryInsidePlanning(target: ReviewConfirmationTarget, taskDir: string) {
   const realTaskDir = fs.realpathSync(taskDir);
   const allowedRoots = (target.harness?.taskRoots || [])
     .filter(fs.existsSync)
@@ -103,13 +139,13 @@ function assertTaskDirectoryInsidePlanning(target, taskDir) {
   }
 }
 
-function taskAuditFieldsFromIndex(content) {
+function taskAuditFieldsFromIndex(content: string): AuditFields {
   const audit = parseTaskAuditMetadata(content, { required: true });
-  const fields = {};
+  const fields: AuditFields = {};
   for (const field of taskAuditFieldOrder) fields[field] = audit.fields.get(field.toLowerCase()) || "n/a";
   return fields;
 }
 
-function ensureTrailingNewline(content) {
+function ensureTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content : `${content}\n`;
 }

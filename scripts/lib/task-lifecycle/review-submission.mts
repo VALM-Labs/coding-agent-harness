@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Dynamic review submission rendering stays behavior-first until the metadata domain model PR.
 
 import crypto from "node:crypto";
@@ -18,8 +17,21 @@ import {
   taskScannerVersion,
 } from "../task-review-model.mjs";
 import { markdownCell } from "./text-utils.mjs";
+import type { TaskScannerTarget } from "../types/task-scanner.js";
 
-export function renderAgentReviewSubmission({ target, taskDir, canonicalTaskId, message, evidence }) {
+export function renderAgentReviewSubmission({
+  target,
+  taskDir,
+  canonicalTaskId,
+  message,
+  evidence,
+}: {
+  target: TaskScannerTarget;
+  taskDir: string;
+  canonicalTaskId: string;
+  message?: string;
+  evidence?: string;
+}): string {
   const timestamp = nowTimestamp();
   const submissionId = `ARS-${timestamp.replace(/[^0-9]/g, "").slice(0, 14)}`;
   const materialsHash = hashTaskMaterials(taskDir);
@@ -44,7 +56,7 @@ export function renderAgentReviewSubmission({ target, taskDir, canonicalTaskId, 
   ].join("\n");
 }
 
-export function replaceAgentReviewSubmission(content, block) {
+export function replaceAgentReviewSubmission(content: string, block: string): string {
   const trimmed = String(content || "").trimEnd();
   if (/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$/im.test(trimmed)) {
     return `${trimmed.replace(/^##\s*(?:Agent Review Submission|Agent 审查提交|Agent 提交审查)\s*$[\s\S]*?(?=^##\s+|(?![\s\S]))/im, `${block.trimEnd()}\n\n`)}\n`;
@@ -52,7 +64,7 @@ export function replaceAgentReviewSubmission(content, block) {
   return `${trimmed}\n\n${block.trimEnd()}\n`;
 }
 
-function hashTaskMaterials(taskDir) {
+function hashTaskMaterials(taskDir: string): string {
   const hash = crypto.createHash("sha256");
   for (const fileName of ["brief.md", "task_plan.md", visualMapFile, lessonCandidatesFile, "progress.md", "review.md", "findings.md", longRunningTaskContractFile]) {
     const filePath = path.join(taskDir, fileName);
