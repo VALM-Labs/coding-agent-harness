@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const { buildImportGraph, checkImportGraph } = await import(pathToFileURL(path.join(repoRoot, "scripts/check-import-graph.mjs")));
 
 function assert(condition, message) {

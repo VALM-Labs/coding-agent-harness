@@ -14,7 +14,7 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "harness-architecture-health-"));
 
 function copyMinimalProject(name) {

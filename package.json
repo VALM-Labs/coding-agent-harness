@@ -38,7 +38,7 @@
     "pack:dry-run": "npm pack --dry-run --json",
     "postinstall": "node dist/postinstall.mjs",
     "smoke:dashboard": "node tests/smoke-dashboard.mjs",
-    "test": "node tests/run-all.mjs"
+    "test": "node tests/run-built.mjs"
   },
   "files": [
     "README.md",

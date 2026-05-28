@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "harness-dist-build-"));
 const distRoot = path.join(tempRoot, "dist");
 
@@ -74,6 +74,7 @@ assert(packageJson.scripts?.check === "node dist/harness.mjs check --profile sou
 assert(packageJson.files.includes("dist/"), "package allowlist should include committed dist artifacts");
 assert(packageJson.files.includes("scripts/"), "PR-25 must retain historical scripts shims during observation");
 assert(packageJson.files.includes("tsconfig.dist.json"), "package allowlist should include the dist build config");
+assert(packageJson.scripts?.test === "node tests/run-built.mjs", "test runner should execute built output from tests/**/*.mts");
 
 const help = spawnSync(process.execPath, [path.join(distRoot, "harness.mjs"), "--help"], {
   cwd: repoRoot,

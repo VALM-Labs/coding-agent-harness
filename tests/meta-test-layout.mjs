@@ -2,13 +2,14 @@
 // @ts-nocheck
 import fs from "node:fs";
 import path from "node:path";
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 function assert(condition, message) {
     if (!condition)
         throw new Error(message);
 }
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
-assert(pkg.scripts.test === "node tests/run-all.mjs", "npm test should use the multi-suite test runner");
+assert(pkg.scripts.test === "node tests/run-built.mjs", "npm test should use the built TS-source test runner");
+assert(fs.existsSync(path.join(repoRoot, "tests/run-all.mjs")), "historical checked-in tests/run-all.mjs shim should remain during observation");
 const mainHarness = fs.readFileSync(path.join(repoRoot, "tests/test-harness.mjs"), "utf8");
 assert(mainHarness.split(/\r?\n/).length <= 350, "tests/test-harness.mjs should stay below 350 lines after lifecycle/migration suite extraction");
 assert(fs.existsSync(path.join(repoRoot, "tests/source-package-boundary.mjs")), "source/package boundary tests should live in a dedicated suite");

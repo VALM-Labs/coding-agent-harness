@@ -2,7 +2,8 @@
 // @ts-nocheck
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const runnerRoot = process.env.HARNESS_TEST_RUNNER_OUT_DIR || repoRoot;
 const suites = [
     "tests/meta-test-layout.mjs",
     "tests/directory-structure-v2.mjs",
@@ -33,7 +34,8 @@ const suites = [
     "tests/test-harness.mjs",
 ];
 for (const suite of suites) {
-    const result = spawnSync(process.execPath, [suite], {
+    const suitePath = process.env.HARNESS_TEST_RUNNER_MODE === "built" ? path.join(runnerRoot, suite) : suite;
+    const result = spawnSync(process.execPath, [suitePath], {
         cwd: repoRoot,
         encoding: "utf8",
         stdio: "inherit",

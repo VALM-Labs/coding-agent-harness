@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const { checkRuntimeEmitContract } = await import(pathToFileURL(path.join(repoRoot, "scripts/check-runtime-emit.mjs")));
 const fixtureSource = path.join(repoRoot, "fixtures/runtime-emit");
 function assert(condition, message) {

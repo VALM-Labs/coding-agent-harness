@@ -5,7 +5,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { spawnSync } from "node:child_process";
 
-export const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
+export const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "../..");
 export const packageVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).version;
 export const node = process.execPath;
 export const cli = path.join(repoRoot, "scripts/harness.mjs");

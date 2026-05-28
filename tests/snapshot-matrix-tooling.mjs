@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const repoRoot = process.env.HARNESS_TEST_REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const { compareSnapshotMatrices, normalizeSnapshotMatrix, runSnapshotSelfTest, snapshotCommands, } = await import(pathToFileURL(path.join(repoRoot, "tests/scripts/snapshot-matrix.mjs")));
 function assert(condition, message) {
     if (!condition)
