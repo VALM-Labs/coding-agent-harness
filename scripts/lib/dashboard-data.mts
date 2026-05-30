@@ -733,7 +733,7 @@ function warningAction(message: string): string {
 
 export function buildDashboardBundle(targetInput: string, options: DashboardOptions = {}): DashboardBundle {
   const target = normalizeTarget(targetInput) as DashboardTarget;
-  const tasks = createScannerTaskRepository(target).list();
+  const tasks = options.tasks || createScannerTaskRepository(target).list();
   const capabilityState = validateCapabilities(target);
   const gitState = summarizeGitState(target);
   const declaredCapabilities = new Set(capabilityState.registry.capabilities.map((capability) => capability.name));
