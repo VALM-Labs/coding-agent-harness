@@ -125,6 +125,59 @@ assert(!fs.existsSync(path.join(tmpRoot, "transaction-outside.txt")), "invalid r
 assert(!fs.existsSync(path.join(tmpRoot, "target-outside.txt")), "invalid TARGET paths must not write outside target");
 assert(!fs.existsSync(path.join(tmpRoot, "absolute-outside.txt")), "invalid absolute paths must not write outside target");
 
+const symlinkEscapeTarget = path.join(tmpRoot, "harness-transaction-symlink-escape-target");
+const symlinkOutside = path.join(tmpRoot, "harness-transaction-symlink-outside");
+fs.mkdirSync(symlinkEscapeTarget);
+fs.mkdirSync(symlinkOutside);
+expectJson(["init", "--locale", "en-US", "--capabilities", "core", symlinkEscapeTarget]);
+git(symlinkEscapeTarget, ["init"]);
+git(symlinkEscapeTarget, ["config", "user.name", "Harness Test"]);
+git(symlinkEscapeTarget, ["config", "user.email", "harness-test@example.invalid"]);
+const symlinkPath = path.join(symlinkEscapeTarget, "escape-link");
+const symlinkCreated = createDirectorySymlink(symlinkOutside, symlinkPath);
+if (symlinkCreated) {
+  git(symlinkEscapeTarget, ["add", "."]);
+  git(symlinkEscapeTarget, ["commit", "-m", "test fixture baseline"]);
+  const symlinkEscapeTransaction = createGovernanceHarnessTransaction(normalizeTarget(symlinkEscapeTarget));
+  let symlinkRejected = false;
+  try {
+    const symlinkEscapePlan = symlinkEscapeTransaction.plan({
+      operation: "transaction-symlink-escape",
+      writes: [{ path: "escape-link/outside.txt", content: "escaped\n" }],
+      commit: {
+        message: "chore(harness): symlink escape fixture",
+        defer: true,
+      },
+    });
+    const symlinkEscapeResult = symlinkEscapeTransaction.apply(symlinkEscapePlan);
+    symlinkRejected = symlinkEscapeResult.success === false && symlinkEscapeResult.error.message.includes("inside the transaction target");
+  } catch (error) {
+    symlinkRejected = errorMessage(error).includes("inside the transaction target");
+  }
+  assert(symlinkRejected, "transaction paths should reject symlink escapes outside target");
+  assert(!fs.existsSync(path.join(symlinkOutside, "outside.txt")), "symlink escape must not write outside target");
+}
+
+const emptyAllowlistTarget = path.join(tmpRoot, "harness-transaction-empty-allowlist-target");
+fs.mkdirSync(emptyAllowlistTarget);
+expectJson(["init", "--locale", "en-US", "--capabilities", "core", emptyAllowlistTarget]);
+git(emptyAllowlistTarget, ["init"]);
+git(emptyAllowlistTarget, ["config", "user.name", "Harness Test"]);
+git(emptyAllowlistTarget, ["config", "user.email", "harness-test@example.invalid"]);
+git(emptyAllowlistTarget, ["add", "."]);
+git(emptyAllowlistTarget, ["commit", "-m", "test fixture baseline"]);
+const emptyAllowlistTransaction = createGovernanceHarnessTransaction(normalizeTarget(emptyAllowlistTarget));
+const emptyAllowlistPlan = emptyAllowlistTransaction.plan({
+  operation: "transaction-empty-allowlist-callback-write",
+  commit: { message: "chore(harness): empty allowlist callback fixture" },
+  apply() {
+    fs.writeFileSync(path.join(emptyAllowlistTarget, "UNDECLARED_AUTO.txt"), "undeclared\n");
+  },
+});
+const emptyAllowlistResult = emptyAllowlistTransaction.apply(emptyAllowlistPlan);
+assert(emptyAllowlistResult.success === false, "transactions should reject callback writes when the allowlist is empty");
+assert(emptyAllowlistResult.error.message.includes("outside the transaction write scope"), "empty allowlist rejection should explain write scope");
+
 const dirtyCallbackTarget = path.join(tmpRoot, "harness-transaction-dirty-callback-target");
 fs.mkdirSync(dirtyCallbackTarget);
 expectJson(["init", "--locale", "en-US", "--capabilities", "core", dirtyCallbackTarget]);
@@ -208,4 +261,13 @@ function git(cwd: string, args: string[]): SpawnSyncReturns<string> {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function createDirectorySymlink(targetPath: string, linkPath: string): boolean {
+  try {
+    fs.symlinkSync(targetPath, linkPath, process.platform === "win32" ? "junction" : "dir");
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -170,7 +170,7 @@ export function createGovernanceHarnessTransaction(targetInput: string | Harness
         assertLateAllowedPathsAreSafe(plan, mutationAllowedPaths, commitOptions);
         allowedPaths = normalizeAllowedPaths(target, [...allowedPaths, ...mutationAllowedPaths]);
         generatedSurfaces = [...new Set([...generatedSurfaces, ...generatedSurfaceNames(mutationGeneratedSurfaces)])].sort();
-        if (commitOptions.defer === true) assertNoOutOfScopeTransactionChanges(target, allowedPaths, initialEntries);
+        assertNoOutOfScopeTransactionChanges(target, allowedPaths, initialEntries);
         const commit = commitOptions.defer === true
           ? { committed: false, reason: "deferred", allowedPaths }
           : commitGovernanceSync(context, allowedPaths, { message: commitOptions.message || "chore(harness): sync governance state" });
@@ -254,7 +254,7 @@ function detectPlanConflicts(git: GitInspection, allowedPaths: string[], commit:
 function applyDeclarativeChanges(target: HarnessTransactionTarget, plan: TransactionPlan): void {
   if (plan.dryRun) return;
   for (const write of plan.changeSet.writes || []) {
-    const destination = path.join(target.projectRoot, relativeTargetPath(target, write.path));
+    const destination = absoluteTargetPath(target, write.path);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     if (typeof write.content === "string") {
       fs.writeFileSync(destination, write.content, write.encoding || "utf8");
@@ -264,7 +264,7 @@ function applyDeclarativeChanges(target: HarnessTransactionTarget, plan: Transac
     if (write.mode !== undefined) fs.chmodSync(destination, write.mode);
   }
   for (const deleted of plan.changeSet.deletes || []) {
-    const destination = path.join(target.projectRoot, relativeTargetPath(target, deleted.path));
+    const destination = absoluteTargetPath(target, deleted.path);
     fs.rmSync(destination, { recursive: deleted.recursive === true, force: deleted.force !== false });
   }
 }
@@ -278,13 +278,25 @@ function deletePaths(target: HarnessTransactionTarget, deletes: FileDelete[]): s
 }
 
 function relativeTargetPath(target: HarnessTransactionTarget, rawPath: string): string {
+  return transactionPath(target, rawPath).relative;
+}
+
+function absoluteTargetPath(target: HarnessTransactionTarget, rawPath: string): string {
+  return transactionPath(target, rawPath).absolute;
+}
+
+function transactionPath(target: HarnessTransactionTarget, rawPath: string): { absolute: string; relative: string } {
   const stripped = String(rawPath || "").replace(/^TARGET:/, "").replace(/^\.\//, "");
   if (!stripped || stripped === ".") throw transactionPathError(target, rawPath);
   const targetRoot = path.resolve(target.projectRoot);
   const absolute = path.isAbsolute(stripped) ? path.resolve(stripped) : path.resolve(targetRoot, stripped);
   const relative = path.relative(targetRoot, absolute);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) throw transactionPathError(target, rawPath);
-  return toPosix(relative);
+  const realTargetRoot = fs.realpathSync(targetRoot);
+  const resolved = resolveExistingAncestorPath(absolute);
+  const realRelative = path.relative(realTargetRoot, resolved);
+  if (!realRelative || realRelative.startsWith("..") || path.isAbsolute(realRelative)) throw transactionPathError(target, rawPath);
+  return { absolute, relative: toPosix(relative) };
 }
 
 function assertLateAllowedPathsAreSafe(plan: TransactionPlan, mutationAllowedPaths: string[], commitOptions: Partial<TransactionCommitOptions>): void {
@@ -344,6 +356,19 @@ function transactionPathError(target: HarnessTransactionTarget, rawPath: string)
     details: { path: rawPath, targetRoot: target.projectRoot },
     recovery: ["Use a path inside the target project root."],
   });
+}
+
+function resolveExistingAncestorPath(absolutePath: string): string {
+  const missingSegments: string[] = [];
+  let current = path.resolve(absolutePath);
+  while (!fs.existsSync(current)) {
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    missingSegments.unshift(path.basename(current));
+    current = parent;
+  }
+  const realAncestor = fs.realpathSync(current);
+  return path.resolve(realAncestor, ...missingSegments);
 }
 
 function releaseGovernanceContext(context: ReturnType<typeof beginGovernanceSync> | null, lockPath: string): TransactionReleaseSummary {
