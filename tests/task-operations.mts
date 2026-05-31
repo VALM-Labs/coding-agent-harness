@@ -46,6 +46,23 @@ const cliComplete = run(["task-complete", "demo-task", "--message", "try closeou
 assert(cliComplete.status !== 0, "CLI task-complete should reject the same closeout precondition");
 assert(cliComplete.stderr.includes(completeResult.reason), "CLI task-complete should surface the TaskOperations closeout reason");
 
+const ambiguousTarget = path.join(tmpRoot, "task-operations-ambiguous-target");
+fs.cpSync(path.join(repoRoot, "examples/minimal-project"), ambiguousTarget, { recursive: true });
+const sourceTaskDir = path.join(ambiguousTarget, "coding-agent-harness/planning/tasks/demo-task");
+const moduleTaskDir = path.join(ambiguousTarget, "coding-agent-harness/planning/modules/auth/tasks/demo-task");
+fs.mkdirSync(path.dirname(moduleTaskDir), { recursive: true });
+fs.cpSync(sourceTaskDir, moduleTaskDir, { recursive: true });
+const ambiguousResult = createTaskOperations(ambiguousTarget).complete({
+  taskId: "demo-task",
+  message: "try ambiguous closeout",
+});
+assertFailure(ambiguousResult, "ambiguous task references should be rejected");
+assert(ambiguousResult.status === 400, "ambiguous task references should be a bad request, not a not-found");
+assert(ambiguousResult.reason.includes("Ambiguous task reference"), "ambiguous task references should preserve the repository diagnostic");
+assert(ambiguousResult.payload.error === ambiguousResult.reason, "ambiguous payload should expose the full diagnostic");
+assert(String(ambiguousResult.payload.error).includes("TASKS/demo-task"), "ambiguous payload should list the task candidate");
+assert(String(ambiguousResult.payload.error).includes("MODULES/auth/demo-task"), "ambiguous payload should list the module candidate");
+
 console.log("TaskOperations use-case tests passed");
 
 function assertFailure(result: unknown, message: string): asserts result is FailureResult {

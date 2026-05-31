@@ -240,8 +240,9 @@ function getOperationTask(repository: TaskRepository, taskId: string): Operation
   if (!String(taskId || "").trim()) return failure("Missing task id", { status: 400 });
   try {
     return { success: true, status: 200, data: repository.get({ id: taskId }) as OperationTask };
-  } catch {
-    return failure("Task not found", { status: 404 });
+  } catch (error) {
+    const reason = errorMessage(error);
+    return failure(reason, { status: reason.startsWith("Task not found") ? 404 : 400 });
   }
 }
 
