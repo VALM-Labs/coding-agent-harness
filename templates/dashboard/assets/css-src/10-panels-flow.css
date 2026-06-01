@@ -74,6 +74,10 @@
   background: var(--accent);
 }
 
+.progress-segment.queued {
+  background: color-mix(in srgb, var(--accent) 46%, var(--paper-2));
+}
+
 .progress-segment.planned {
   background: var(--paper-2);
   border-right: 1px solid var(--line);
@@ -103,6 +107,7 @@
 
 .legend-dot.done { background: #16a34a; }
 .legend-dot.active { background: var(--accent); }
+.legend-dot.queued { background: color-mix(in srgb, var(--accent) 46%, var(--paper-2)); }
 .legend-dot.planned { background: var(--paper-2); border: 1px solid var(--line); }
 
 .runway-breakdown,

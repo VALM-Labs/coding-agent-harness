@@ -103,6 +103,7 @@ const swimlaneColumnLabelKeys: Record<string, string> = {
   "confirmed-finalization-pending": "state_confirmed-finalization-pending",
   finalized: "state_finalized",
   "soft-deleted-superseded": "queueSoftDeletedSuperseded",
+  planned: "planned",
 };
 
 export function buildTaskSemanticProjection(task: TaskSemanticProjectionInput): TaskSemanticProjection {
@@ -208,7 +209,7 @@ export function buildReviewWorkbenchQueueView(
   return {
     queues: taskQueues,
     primaryQueue,
-    inQueue: lifecycle.reviewQueueState !== "not-in-queue" || taskQueues.some((queue) => queue !== "active"),
+    inQueue: lifecycle.reviewQueueState !== "not-in-queue" || taskQueues.some((queue) => !["active", "planned", "done", "unknown"].includes(queue)),
     humanConfirmable,
     blocked: lifecycle.reviewStatus === "blocked-open-findings" || taskQueues.includes("blocked") || blockingRiskCount(task) > 0,
     needsMaterials: lifecycle.reviewQueueState === "needs-material" || taskQueues.includes("missing-materials"),
@@ -223,7 +224,9 @@ export function buildReviewWorkbenchQueueView(
 
 function normalizedTaskQueues(task: TaskSemanticProjectionInput): string[] {
   const queues = Array.isArray(task.taskQueues) ? task.taskQueues.map((queue) => stringValue(queue, "")).filter(Boolean) : [];
-  return queues.length ? [...new Set(queues)] : ["active"];
+  const normalized = queues.filter((queue) => queue !== "active" || taskIsCurrentlyActive(task));
+  if (queues.includes("active") && !taskIsCurrentlyActive(task)) normalized.push(nonActiveLifecycleQueue(task));
+  return normalized.length ? [...new Set(normalized.filter(Boolean))] : [taskIsCurrentlyActive(task) ? "active" : nonActiveLifecycleQueue(task)];
 }
 
 function normalizedQueueReasons(task: TaskSemanticProjectionInput): QueueReason[] {
@@ -240,7 +243,7 @@ function normalizedQueueReasons(task: TaskSemanticProjectionInput): QueueReason[
 }
 
 function primaryReviewQueue(queues: string[]): string {
-  const order = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active"];
+  const order = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active", "planned", "done", "unknown"];
   return order.find((queue) => queues.includes(queue)) || queues[0] || "active";
 }
 
@@ -252,6 +255,29 @@ function taskVisibleInSwimlane(task: TaskSemanticProjectionInput, lifecycle: Tas
   return ["active", "planned", "not_started", "in_progress", "review", "blocked", "reopened", "current-evidence"].includes(lifecycle.state)
     || reviewView.inQueue
     || ["confirmed", "blocked-open-findings"].includes(lifecycle.reviewStatus);
+}
+
+function taskIsCurrentlyActive(task: TaskSemanticProjectionInput): boolean {
+  return stringValue(task.deletionState, "active") === "active"
+    && stringValue(task.state, "unknown") === "in_progress"
+    && ["active", "unknown"].includes(stringValue(task.lifecycleState, "unknown"))
+    && stringValue(task.closeoutStatus, "missing") !== "closed"
+    && clampCompletion(task.completion) < 100;
+}
+
+function nonActiveLifecycleQueue(task: TaskSemanticProjectionInput): string {
+  if (stringValue(task.deletionState, "active") !== "active") return "soft-deleted-superseded";
+  const state = stringValue(task.state, "unknown");
+  const lifecycleState = stringValue(task.lifecycleState, "unknown");
+  const closeoutStatus = stringValue(task.closeoutStatus, "missing");
+  const reviewStatus = stringValue(task.reviewStatus, "missing");
+  if (closeoutStatus === "closed" || ["closed", "finalized"].includes(lifecycleState)) return "finalized";
+  if (reviewStatus === "confirmed") return "confirmed";
+  if (state === "blocked" || lifecycleState === "blocked") return "blocked";
+  if (state === "review" || lifecycleState === "in_review") return "review";
+  if (["planned", "not_started"].includes(state) || lifecycleState === "ready") return "planned";
+  if (state === "done") return "done";
+  return "unknown";
 }
 
 function taskNeedsEvidence(task: TaskSemanticProjectionInput): boolean {

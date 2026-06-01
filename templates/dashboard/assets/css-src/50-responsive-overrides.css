@@ -214,8 +214,8 @@
   align-items: center;
   justify-content: center;
   min-width: 44px;
-  min-height: 44px;
-  padding: 6px 14px;
+  min-height: 36px;
+  padding: 8px 14px;
   background: var(--paper-2);
   border: 1px solid var(--line);
   border-radius: 6px;

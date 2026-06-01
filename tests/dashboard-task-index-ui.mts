@@ -55,11 +55,14 @@ function task(overrides: Record<string, unknown> = {}) {
     queueReasons: [],
     ...overrides,
   } as Record<string, unknown>;
-  const queues = Array.isArray(item.taskQueues) && item.taskQueues.length ? item.taskQueues as string[] : ["active"];
-  const primaryQueue = queues.find((queue) => ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active"].includes(queue)) || queues[0] || "active";
+  const fallbackQueue = item.state === "in_progress" ? "active" : ["planned", "not_started"].includes(String(item.state)) ? "planned" : item.state === "done" ? "done" : "unknown";
+  const queues = Array.isArray(item.taskQueues) && item.taskQueues.length ? item.taskQueues as string[] : [fallbackQueue];
+  const primaryQueue = queues.find((queue) => ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active", "planned", "done", "unknown"].includes(queue)) || queues[0] || "unknown";
+  const rawState = String(item.state || "");
+  const lifecycleState = rawState === "in_progress" ? "active" : ["planned", "not_started"].includes(rawState) ? "ready" : rawState === "done" ? "closed" : rawState;
   item.taskLifecycleProjection ??= {
     state: item.state,
-    lifecycleState: item.state,
+    lifecycleState,
     reviewStatus: item.reviewStatus,
     reviewQueueState: item.reviewQueueState,
     closeoutStatus: item.closeoutStatus,
@@ -70,7 +73,7 @@ function task(overrides: Record<string, unknown> = {}) {
   item.reviewWorkbenchQueueView ??= {
     queues,
     primaryQueue,
-    inQueue: primaryQueue !== "active",
+    inQueue: !["active", "planned", "done", "unknown"].includes(primaryQueue),
     humanConfirmable: item.reviewQueueState === "ready-to-confirm" && primaryQueue === "review",
     blocked: primaryQueue === "blocked",
     needsMaterials: primaryQueue === "missing-materials",
@@ -144,6 +147,51 @@ assert(statsHtml.includes(">7</span>"), "task stats total should include all tas
 assert(statsHtml.includes("Active"), "task stats should expose lifecycle queue buckets so displayed buckets add up");
 assert(!statsHtml.includes("not started"), "task stats should not expose raw task states as primary task index buckets");
 assert(!statsHtml.includes("unknown"), "task stats should not expose raw unknown states as primary task index buckets");
+
+vm.runInContext(`
+  __result = JSON.stringify({ layout: state.taskLayout, hasSwimlane: taskIndex().includes('class="task-swimlane"') });
+`, stats);
+const defaultLayoutResult = JSON.parse(String(stats.__result)) as { layout: string; hasSwimlane: boolean };
+assert(defaultLayoutResult.layout === "swimlane", "task index should default to swimlane layout");
+assert(defaultLayoutResult.hasSwimlane === true, "default task index render should show the swimlane view");
+
+vm.runInContext(`
+  __result = JSON.stringify({
+    rows: taskStatRows(normalCycleTasks()).map((row) => [row.state, row.count]),
+    activeBriefIds: activeTasks().map((item) => item.id),
+    flow: flowPanel(),
+    briefs: activeTaskBriefs(),
+  });
+`, stats);
+const activeSemanticsResult = JSON.parse(String(stats.__result)) as { rows: Array<[string, number]>; activeBriefIds: string[]; flow: string; briefs: string };
+assert(activeSemanticsResult.rows.some(([state, count]) => state === "active" && count === 1), "only in-progress tasks should count as active");
+assert(activeSemanticsResult.rows.some(([state, count]) => state === "planned" && count === 2), "planned and not-started tasks should be planned, not active");
+assert(activeSemanticsResult.activeBriefIds.length === 1 && activeSemanticsResult.activeBriefIds[0] === "TASKS/in-progress", "active briefs should include only current in-progress tasks");
+assert(!activeSemanticsResult.briefs.includes("Open task index"), "overview active brief section should not render the redundant task-index CTA");
+assert(activeSemanticsResult.flow.includes("Queued"), "overview progress should expose non-active queue work separately from active work");
+
+const legacyActiveSandbox = createSandbox();
+vm.runInContext(`
+  bundle.status.tasks = [{
+    id: "TASKS/legacy-active-unknown-lifecycle",
+    shortId: "legacy-active-unknown-lifecycle",
+    title: "Legacy active unknown lifecycle",
+    path: "TARGET:coding-agent-harness/planning/tasks/legacy-active-unknown-lifecycle",
+    state: "in_progress",
+    module: "dashboard",
+    completion: 25,
+    taskQueues: ["active"],
+    taskLifecycleProjection: {
+      state: "in_progress",
+      lifecycleState: "unknown",
+      closeoutStatus: "open",
+      taskQueues: ["active"],
+    },
+  }];
+  __result = JSON.stringify({ active: activeTasks().map((item) => item.id) });
+`, legacyActiveSandbox);
+const legacyActiveResult = JSON.parse(String(legacyActiveSandbox.__result)) as { active: string[] };
+assert(legacyActiveResult.active.includes("TASKS/legacy-active-unknown-lifecycle"), "legacy in-progress tasks with unknown lifecycle should still count as active");
 
 const missingProjectionSandbox = createSandbox();
 vm.runInContext(`
@@ -456,6 +504,118 @@ assert(typeof bulkErrorSandbox.__result === "string", "bulk action error detail 
 assert(!bulkErrorSandbox.__result.includes("[object Object]"), "bulk action error detail must not stringify payload objects");
 assert(bulkErrorSandbox.__result.includes("3 failed"), "bulk action error detail should include failed count");
 assert(bulkErrorSandbox.__result.includes("human-controlled runtime"), "bulk action error detail should expose per-task failure reason");
+
+const reviewSelectionSandbox = createSandbox();
+vm.runInContext(`
+  bundle.status.tasks = [
+    {
+      id: "TASKS/review-alpha",
+      shortId: "review-alpha",
+      title: "Alpha review",
+      path: "TARGET:coding-agent-harness/planning/tasks/review-alpha",
+      state: "review",
+      module: "dashboard",
+      completion: 100,
+      taskLifecycleProjection: {
+        state: "review",
+        lifecycleState: "in_review",
+        reviewStatus: "agent-reviewed",
+        reviewQueueState: "ready-to-confirm",
+        closeoutStatus: "missing",
+        taskQueues: ["review"],
+        materialsReady: true,
+        reviewSubmitted: true,
+      },
+      reviewWorkbenchQueueView: {
+        queues: ["review"],
+        primaryQueue: "review",
+        inQueue: true,
+        humanConfirmable: true,
+        reasonCodes: [],
+      },
+    },
+    {
+      id: "TASKS/review-beta",
+      shortId: "review-beta",
+      title: "Beta review",
+      path: "TARGET:coding-agent-harness/planning/tasks/review-beta",
+      state: "review",
+      module: "dashboard",
+      completion: 100,
+      taskLifecycleProjection: {
+        state: "review",
+        lifecycleState: "in_review",
+        reviewStatus: "agent-reviewed",
+        reviewQueueState: "ready-to-confirm",
+        closeoutStatus: "missing",
+        taskQueues: ["review"],
+        materialsReady: true,
+        reviewSubmitted: true,
+      },
+      reviewWorkbenchQueueView: {
+        queues: ["review"],
+        primaryQueue: "review",
+        inQueue: true,
+        humanConfirmable: true,
+        reasonCodes: [],
+      },
+    },
+  ];
+  state.reviewQueueTab = "review";
+  state.reviewSort = "id";
+  state.reviewReasonFilter = "all";
+  state.reviewBulkSelection = { "TASKS/review-beta": true };
+  state.query = "alpha";
+  reviewQueue();
+  const retainedWhileHidden = state.reviewBulkSelection["TASKS/review-beta"] === true;
+  state.query = "beta";
+  const betaHtml = reviewQueue();
+  __result = JSON.stringify({ retainedWhileHidden, betaChecked: betaHtml.includes('data-review-bulk-select="TASKS/review-beta"') && betaHtml.includes("checked") });
+`, reviewSelectionSandbox);
+const reviewSelectionResult = JSON.parse(String(reviewSelectionSandbox.__result)) as { retainedWhileHidden: boolean; betaChecked: boolean };
+assert(reviewSelectionResult.retainedWhileHidden === true, "review bulk selection should survive search filters that hide selected tasks");
+assert(reviewSelectionResult.betaChecked === true, "review bulk selection should restore checkbox state when the task becomes visible again");
+
+const oldReviewShell = { scrollTop: 480 };
+const newReviewShell = { scrollTop: 0 };
+const scrollSandbox = createSandbox({
+  window: {
+    __HARNESS_LOCALE__: "en",
+    __HARNESS_WORKBENCH__: false,
+    __HARNESS_DASHBOARD__: { schemaVersion: "dashboard-bundle/v1", status: { tasks: [], summary: {}, checkState: { details: { warnings: [], failures: [] } } }, documents: { documents: [] }, graph: { nodes: [], edges: [] }, adoption: { warnings: [] } },
+    location: { hash: "#/review", protocol: "http:" },
+    matchMedia: () => ({ matches: false }),
+    HarnessI18n: {},
+    scrollX: 0,
+    scrollY: 960,
+    scrollTo(this: { scrollX: number; scrollY: number }, x: number, y: number) {
+      this.scrollX = x;
+      this.scrollY = y;
+    },
+  },
+  document: {
+    documentElement: { dataset: {}, lang: "", scrollLeft: 0, scrollTop: 960 },
+    body: { scrollTop: 960 },
+    querySelector: () => oldReviewShell,
+    querySelectorAll: () => [],
+    getElementById: () => null,
+  },
+  requestAnimationFrame: (callback: () => void) => {
+    callback();
+    return 1;
+  },
+});
+vm.runInContext(`
+  app = () => {
+    document.querySelector = () => __nextReviewShell;
+  };
+  __nextReviewShell = ${JSON.stringify(newReviewShell)};
+  rerenderPreservingScroll();
+  __result = JSON.stringify({ scrollY: window.scrollY, shellTop: __nextReviewShell.scrollTop });
+`, scrollSandbox);
+const scrollResult = JSON.parse(String(scrollSandbox.__result)) as { scrollY: number; shellTop: number };
+assert(scrollResult.scrollY === 960, "bulk selection rerender should preserve window scroll");
+assert(scrollResult.shellTop === 480, "bulk selection rerender should preserve review list scroll");
 
 function fakeInput(value: string): FakeInput {
   return {

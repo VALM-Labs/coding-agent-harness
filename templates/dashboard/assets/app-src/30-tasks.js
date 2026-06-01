@@ -4,17 +4,13 @@ function clampCompletion(value) {
 }
 
 function stateToColorVar(state) {
-  const map = { active: "--accent", in_progress: "--accent", review: "--accent-2", "missing-materials": "--warn", lessons: "--accent-3", blocked: "--danger", confirmed: "--ok", "confirmed-finalization-pending": "--ok", finalized: "--ok", "soft-deleted-superseded": "--muted", done: "--ok", planned: "--muted", not_started: "--muted" };
+  const map = { active: "--accent", in_progress: "--accent", review: "--accent-2", "missing-materials": "--warn", lessons: "--accent-3", blocked: "--danger", confirmed: "--ok", "confirmed-finalization-pending": "--ok", finalized: "--ok", "soft-deleted-superseded": "--muted", done: "--ok", planned: "--muted", not_started: "--muted", unknown: "--muted" };
   return map[state] || "--muted";
 }
 
 function taskLifecycleDisplay(task) {
   const projection = taskLifecycleProjection(task);
-  return [
-    projection.lifecycleState,
-    projection.reviewStatus,
-    projection.closeoutStatus,
-  ].filter(Boolean).map((item) => label(item)).join(" · ");
+  return [projection.lifecycleState, projection.reviewStatus, projection.closeoutStatus].filter(Boolean).map((item) => label(item)).join(" · ");
 }
 
 function taskStatRows(tasks) {
@@ -28,6 +24,7 @@ function taskStatRows(tasks) {
     { state: "confirmed-finalization-pending", label: label("confirmed-finalization-pending"), className: "confirmed-finalization-pending" },
     { state: "finalized", label: label("finalized"), className: "finalized" },
     { state: "soft-deleted-superseded", label: t("queueSoftDeletedSuperseded"), className: "soft-deleted-superseded" },
+    { state: "planned", label: t("planned"), className: "planned" },
   ].map((row) => ({
     ...row,
     count: tasks.filter((task) => taskStateValue(task) === row.state).length,
@@ -239,9 +236,11 @@ function taskRow(task) {
   return `<article class="task-row-card" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateToColorVar(stateValue)})">
     <div class="row-accent-bar"></div>
     <div class="row-main">
-      <strong>${escapeHtml(task.title)}</strong>
+      <div class="row-title-line">
+        <strong>${escapeHtml(task.title)}</strong>
+        ${taskCopyButton(task, "row-copy")}
+      </div>
       <span class="row-meta">${escapeHtml(task.id)} · ${escapeHtml(moduleLabel)}${lifecycle ? ` · ${escapeHtml(lifecycle)}` : ""}</span>
-      ${taskCopyButton(task, "row-copy")}
     </div>
     <div class="row-status">${tag(stateValue)}</div>
     <div class="row-progress">
@@ -276,7 +275,7 @@ function taskIndex() {
     <div class="tasks-main stack">
       ${taskStatsBar()}
       ${swimlane ? taskSwimlane(tasks) : visibleGroups.map(([group, groupTasks]) => taskGroup(group, groupTasks)).join("")}
-      ${swimlane ? "" : `<section class="group-pager">
+      ${swimlane || groupPageCount <= 1 ? "" : `<section class="group-pager">
         <span>${t("showingGroups")} ${visibleGroups.length ? (groupPage - 1) * taskGroupsPerPage + 1 : 0}-${Math.min(groupPage * taskGroupsPerPage, orderedGroups.length)} / ${orderedGroups.length}</span>
         ${pager("task-groups", groupPage, groupPageCount)}
       </section>`}
@@ -369,7 +368,7 @@ function taskGroup(group, tasks) {
             <div class="group-progress-track"><div class="group-progress-fill" style="width:${avgCompletion}%"></div></div>
             <span>${avgCompletion}%</span>
           </div>
-          ${pager("task", page, pageCount, group)}
+          ${pageCount > 1 ? pager("task", page, pageCount, group) : ""}
         </div>
       </div>
       <div class="${layoutClass}">

@@ -427,7 +427,12 @@ export function deriveTaskQueues({
     }
   }
   const normalizedTaskQueues = [...new Set(taskQueues)];
-  if (normalizedTaskQueues.length === 0) normalizedTaskQueues.push("active");
+  if (normalizedTaskQueues.length === 0) {
+    if (state === "in_progress") normalizedTaskQueues.push("active");
+    else if (["planned", "not_started"].includes(state)) normalizedTaskQueues.push("planned");
+    else if (state === "done") normalizedTaskQueues.push("done");
+    else normalizedTaskQueues.push("unknown");
+  }
   return {
     taskQueues: normalizedTaskQueues,
     queueReasons,

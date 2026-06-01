@@ -69,13 +69,15 @@ function flowPanel() {
   const tasks = normalCycleTasks();
   const total = tasks.length;
   if (total === 0) return "";
-  const active = tasks.filter((task) => isActiveTaskState(taskStateValue(task))).length;
-  const done = tasks.filter((task) => !isActiveTaskState(taskStateValue(task)) && (taskStateValue(task) === "done" || task.completion === 100)).length;
-  const planned = Math.max(0, total - done - active);
+  const active = tasks.filter(taskIsCurrentlyActive).length;
+  const done = tasks.filter(taskCountsAsCompleted).length;
+  const queued = tasks.filter((task) => !taskIsCurrentlyActive(task) && !taskCountsAsCompleted(task) && taskIsNonActiveQueueWork(task)).length;
+  const planned = Math.max(0, total - done - active - queued);
   const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
   const progressText = t("taskProgressAria")
     .replaceAll("{done}", String(done))
     .replaceAll("{active}", String(active))
+    .replaceAll("{queued}", String(queued))
     .replaceAll("{planned}", String(planned))
     .replaceAll("{total}", String(total));
   return `<section class="flow-panel">
@@ -90,11 +92,13 @@ function flowPanel() {
       <div class="progress-bar" role="progressbar" aria-label="${escapeAttr(t("projectProgress"))}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}" aria-valuetext="${escapeAttr(progressText)}">
         ${done > 0 ? `<div class="progress-segment done" style="width:${pct(done)}%" title="${t("done")}: ${done}" aria-hidden="true"></div>` : ""}
         ${active > 0 ? `<div class="progress-segment active" style="width:${pct(active)}%" title="${t("active")}: ${active}" aria-hidden="true"></div>` : ""}
+        ${queued > 0 ? `<div class="progress-segment queued" style="width:${pct(queued)}%" title="${t("queued")}: ${queued}" aria-hidden="true"></div>` : ""}
         ${planned > 0 ? `<div class="progress-segment planned" style="width:${pct(planned)}%" title="${t("planned")}: ${planned}" aria-hidden="true"></div>` : ""}
       </div>
       <div class="progress-legend">
         <span class="legend-item"><span class="legend-dot done"></span>${t("done")} ${done}</span>
         <span class="legend-item"><span class="legend-dot active"></span>${t("active")} ${active}</span>
+        <span class="legend-item"><span class="legend-dot queued"></span>${t("queued")} ${queued}</span>
         <span class="legend-item"><span class="legend-dot planned"></span>${t("planned")} ${planned}</span>
       </div>
     </div>
@@ -189,7 +193,6 @@ function activeTaskBriefs() {
       </div>
       <div class="section-actions">
         <span class="subtle">${t("activeBriefCount").replace("{count}", tasks.length).replace("{order}", taskSortLabel())}</span>
-        <a href="#/tasks">${t("openTaskIndex")}</a>
       </div>
     </div>
     <div class="brief-scroll">
@@ -200,16 +203,35 @@ function activeTaskBriefs() {
 
 function activeTasks() {
   const tasks = normalCycleTasks();
-  const active = tasks.filter((task) => {
-    const stateValue = taskStateValue(task);
-    return isActiveTaskState(stateValue);
-  });
-  if (active.length > 0) return sortTasksByTime(active);
-  return sortTasksByTime(tasks.filter((task) => taskMaterialsView(task).briefReady === true));
+  return sortTasksByTime(tasks.filter(taskIsCurrentlyActive));
 }
 
 function isActiveTaskState(state) {
-  return ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(state);
+  return state === "active" || state === "in_progress";
+}
+
+function taskIsCurrentlyActive(task) {
+  const projection = taskLifecycleProjection(task);
+  const queues = taskQueueValues(task);
+  return String(projection.deletionState || task.deletionState || "active") === "active"
+    && String(projection.state || task.state || "") === "in_progress"
+    && ["active", "unknown"].includes(String(projection.lifecycleState || task.lifecycleState || "unknown"))
+    && String(projection.closeoutStatus || task.closeoutStatus || "") !== "closed"
+    && queues.includes("active")
+    && clampCompletion(task.completion) < 100;
+}
+
+function taskCountsAsCompleted(task) {
+  const stateValue = taskStateValue(task);
+  const projection = taskLifecycleProjection(task);
+  return ["finalized", "done", "soft-deleted-superseded"].includes(stateValue)
+    || String(projection.closeoutStatus || task.closeoutStatus || "") === "closed"
+    || String(projection.lifecycleState || task.lifecycleState || "") === "closed";
+}
+
+function taskIsNonActiveQueueWork(task) {
+  const stateValue = taskStateValue(task);
+  return ["missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(stateValue);
 }
 
 function taskBriefCard(task, { compact = true } = {}) {

@@ -54,7 +54,7 @@ const state = {
   lessonBulkResult: null,
   renderMode: "rendered",
   theme: localStorage.getItem("harness.theme") || "system",
-  taskLayout: localStorage.getItem("harness.taskLayout") || "list",
+  taskLayout: localStorage.getItem("harness.taskLayout") || "swimlane",
   taskSortOrder: localStorage.getItem("harness.taskSortOrder") === "asc" ? "asc" : "desc",
   runtime: { mode: "static", csrfToken: "", writableActions: [] },
   runtimeLoaded: false,
@@ -245,13 +245,15 @@ function flowPanel() {
   const tasks = normalCycleTasks();
   const total = tasks.length;
   if (total === 0) return "";
-  const active = tasks.filter((task) => isActiveTaskState(taskStateValue(task))).length;
-  const done = tasks.filter((task) => !isActiveTaskState(taskStateValue(task)) && (taskStateValue(task) === "done" || task.completion === 100)).length;
-  const planned = Math.max(0, total - done - active);
+  const active = tasks.filter(taskIsCurrentlyActive).length;
+  const done = tasks.filter(taskCountsAsCompleted).length;
+  const queued = tasks.filter((task) => !taskIsCurrentlyActive(task) && !taskCountsAsCompleted(task) && taskIsNonActiveQueueWork(task)).length;
+  const planned = Math.max(0, total - done - active - queued);
   const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
   const progressText = t("taskProgressAria")
     .replaceAll("{done}", String(done))
     .replaceAll("{active}", String(active))
+    .replaceAll("{queued}", String(queued))
     .replaceAll("{planned}", String(planned))
     .replaceAll("{total}", String(total));
   return `<section class="flow-panel">
@@ -266,11 +268,13 @@ function flowPanel() {
       <div class="progress-bar" role="progressbar" aria-label="${escapeAttr(t("projectProgress"))}" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}" aria-valuetext="${escapeAttr(progressText)}">
         ${done > 0 ? `<div class="progress-segment done" style="width:${pct(done)}%" title="${t("done")}: ${done}" aria-hidden="true"></div>` : ""}
         ${active > 0 ? `<div class="progress-segment active" style="width:${pct(active)}%" title="${t("active")}: ${active}" aria-hidden="true"></div>` : ""}
+        ${queued > 0 ? `<div class="progress-segment queued" style="width:${pct(queued)}%" title="${t("queued")}: ${queued}" aria-hidden="true"></div>` : ""}
         ${planned > 0 ? `<div class="progress-segment planned" style="width:${pct(planned)}%" title="${t("planned")}: ${planned}" aria-hidden="true"></div>` : ""}
       </div>
       <div class="progress-legend">
         <span class="legend-item"><span class="legend-dot done"></span>${t("done")} ${done}</span>
         <span class="legend-item"><span class="legend-dot active"></span>${t("active")} ${active}</span>
+        <span class="legend-item"><span class="legend-dot queued"></span>${t("queued")} ${queued}</span>
         <span class="legend-item"><span class="legend-dot planned"></span>${t("planned")} ${planned}</span>
       </div>
     </div>
@@ -365,7 +369,6 @@ function activeTaskBriefs() {
       </div>
       <div class="section-actions">
         <span class="subtle">${t("activeBriefCount").replace("{count}", tasks.length).replace("{order}", taskSortLabel())}</span>
-        <a href="#/tasks">${t("openTaskIndex")}</a>
       </div>
     </div>
     <div class="brief-scroll">
@@ -376,16 +379,35 @@ function activeTaskBriefs() {
 
 function activeTasks() {
   const tasks = normalCycleTasks();
-  const active = tasks.filter((task) => {
-    const stateValue = taskStateValue(task);
-    return isActiveTaskState(stateValue);
-  });
-  if (active.length > 0) return sortTasksByTime(active);
-  return sortTasksByTime(tasks.filter((task) => taskMaterialsView(task).briefReady === true));
+  return sortTasksByTime(tasks.filter(taskIsCurrentlyActive));
 }
 
 function isActiveTaskState(state) {
-  return ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(state);
+  return state === "active" || state === "in_progress";
+}
+
+function taskIsCurrentlyActive(task) {
+  const projection = taskLifecycleProjection(task);
+  const queues = taskQueueValues(task);
+  return String(projection.deletionState || task.deletionState || "active") === "active"
+    && String(projection.state || task.state || "") === "in_progress"
+    && ["active", "unknown"].includes(String(projection.lifecycleState || task.lifecycleState || "unknown"))
+    && String(projection.closeoutStatus || task.closeoutStatus || "") !== "closed"
+    && queues.includes("active")
+    && clampCompletion(task.completion) < 100;
+}
+
+function taskCountsAsCompleted(task) {
+  const stateValue = taskStateValue(task);
+  const projection = taskLifecycleProjection(task);
+  return ["finalized", "done", "soft-deleted-superseded"].includes(stateValue)
+    || String(projection.closeoutStatus || task.closeoutStatus || "") === "closed"
+    || String(projection.lifecycleState || task.lifecycleState || "") === "closed";
+}
+
+function taskIsNonActiveQueueWork(task) {
+  const stateValue = taskStateValue(task);
+  return ["missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(stateValue);
 }
 
 function taskBriefCard(task, { compact = true } = {}) {
@@ -441,17 +463,13 @@ function clampCompletion(value) {
 }
 
 function stateToColorVar(state) {
-  const map = { active: "--accent", in_progress: "--accent", review: "--accent-2", "missing-materials": "--warn", lessons: "--accent-3", blocked: "--danger", confirmed: "--ok", "confirmed-finalization-pending": "--ok", finalized: "--ok", "soft-deleted-superseded": "--muted", done: "--ok", planned: "--muted", not_started: "--muted" };
+  const map = { active: "--accent", in_progress: "--accent", review: "--accent-2", "missing-materials": "--warn", lessons: "--accent-3", blocked: "--danger", confirmed: "--ok", "confirmed-finalization-pending": "--ok", finalized: "--ok", "soft-deleted-superseded": "--muted", done: "--ok", planned: "--muted", not_started: "--muted", unknown: "--muted" };
   return map[state] || "--muted";
 }
 
 function taskLifecycleDisplay(task) {
   const projection = taskLifecycleProjection(task);
-  return [
-    projection.lifecycleState,
-    projection.reviewStatus,
-    projection.closeoutStatus,
-  ].filter(Boolean).map((item) => label(item)).join(" · ");
+  return [projection.lifecycleState, projection.reviewStatus, projection.closeoutStatus].filter(Boolean).map((item) => label(item)).join(" · ");
 }
 
 function taskStatRows(tasks) {
@@ -465,6 +483,7 @@ function taskStatRows(tasks) {
     { state: "confirmed-finalization-pending", label: label("confirmed-finalization-pending"), className: "confirmed-finalization-pending" },
     { state: "finalized", label: label("finalized"), className: "finalized" },
     { state: "soft-deleted-superseded", label: t("queueSoftDeletedSuperseded"), className: "soft-deleted-superseded" },
+    { state: "planned", label: t("planned"), className: "planned" },
   ].map((row) => ({
     ...row,
     count: tasks.filter((task) => taskStateValue(task) === row.state).length,
@@ -676,9 +695,11 @@ function taskRow(task) {
   return `<article class="task-row-card" data-open-drawer="${escapeAttr(task.id)}" style="--row-accent: var(${stateToColorVar(stateValue)})">
     <div class="row-accent-bar"></div>
     <div class="row-main">
-      <strong>${escapeHtml(task.title)}</strong>
+      <div class="row-title-line">
+        <strong>${escapeHtml(task.title)}</strong>
+        ${taskCopyButton(task, "row-copy")}
+      </div>
       <span class="row-meta">${escapeHtml(task.id)} · ${escapeHtml(moduleLabel)}${lifecycle ? ` · ${escapeHtml(lifecycle)}` : ""}</span>
-      ${taskCopyButton(task, "row-copy")}
     </div>
     <div class="row-status">${tag(stateValue)}</div>
     <div class="row-progress">
@@ -713,7 +734,7 @@ function taskIndex() {
     <div class="tasks-main stack">
       ${taskStatsBar()}
       ${swimlane ? taskSwimlane(tasks) : visibleGroups.map(([group, groupTasks]) => taskGroup(group, groupTasks)).join("")}
-      ${swimlane ? "" : `<section class="group-pager">
+      ${swimlane || groupPageCount <= 1 ? "" : `<section class="group-pager">
         <span>${t("showingGroups")} ${visibleGroups.length ? (groupPage - 1) * taskGroupsPerPage + 1 : 0}-${Math.min(groupPage * taskGroupsPerPage, orderedGroups.length)} / ${orderedGroups.length}</span>
         ${pager("task-groups", groupPage, groupPageCount)}
       </section>`}
@@ -806,7 +827,7 @@ function taskGroup(group, tasks) {
             <div class="group-progress-track"><div class="group-progress-fill" style="width:${avgCompletion}%"></div></div>
             <span>${avgCompletion}%</span>
           </div>
-          ${pager("task", page, pageCount, group)}
+          ${pageCount > 1 ? pager("task", page, pageCount, group) : ""}
         </div>
       </div>
       <div class="${layoutClass}">
@@ -957,6 +978,7 @@ function archiveTaskRow(task) {
 
 const swimlaneStageOrder = [
   ["active", "active"],
+  ["planned", "planned"],
   ["missing-materials", "queueMissingMaterials"],
   ["blocked", "queueBlocked"],
   ["review", "queueReview"],
@@ -1276,7 +1298,7 @@ function taskReviewProjection(task) {
   return task?.reviewWorkbenchQueueView || task?.semanticProjection?.reviewWorkbenchQueueView || {};
 }
 
-const taskPrimaryQueueOrder = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active"];
+const taskPrimaryQueueOrder = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active", "planned"];
 
 function taskQueueFilterLabel(queue) {
   const labels = {
@@ -1289,6 +1311,7 @@ function taskQueueFilterLabel(queue) {
     "confirmed-finalization-pending": label("confirmed-finalization-pending"),
     finalized: label("finalized"),
     "soft-deleted-superseded": t("queueSoftDeletedSuperseded"),
+    planned: t("planned"),
   };
   return labels[queue] || label(queue);
 }
@@ -1757,7 +1780,7 @@ function taskGroupContext(group, tasks) {
 
 function moduleCountsForTasks(tasks) {
   return {
-    active: tasks.filter((task) => ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(taskStateValue(task))).length,
+    active: tasks.filter(taskIsCurrentlyActive).length,
     review: tasks.filter((task) => taskStateValue(task) === "review").length,
     blocked: tasks.filter((task) => taskStateValue(task) === "blocked").length,
     risk: tasks.filter(uiDashboardTaskHasRisk).length,
@@ -1834,7 +1857,7 @@ function accumulateUiModuleTask(module, task) {
   if (!module.tasks.some((item) => item.id === task.id)) module.tasks.push(task);
   if (module.__countsAuthoritative) return;
   module.counts.total = (module.counts.total || 0) + 1;
-  if (["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(stateValue)) {
+  if (taskIsCurrentlyActive(task)) {
     module.counts.active = (module.counts.active || 0) + 1;
   }
   if (stateValue !== "active") module.counts[stateValue] = (module.counts[stateValue] || 0) + 1;
@@ -1884,7 +1907,7 @@ function moduleListItem(module, active) {
 
 function moduleDetail(module) {
   const tasks = normalCycleTasks().filter((task) => taskModuleKey(task) === module.key);
-  const activeTasks = tasks.filter((task) => isActiveTaskState(taskStateValue(task)));
+  const activeTasks = tasks.filter(taskIsCurrentlyActive);
   const riskTasks = tasks.filter(uiDashboardTaskHasRisk);
   const brief = findDocument(module.briefPath || `TARGET:coding-agent-harness/planning/modules/${module.key}/brief.md`);
   const plan = findDocument(module.modulePlanPath || "");
@@ -1984,7 +2007,8 @@ function reviewQueue() {
   normalizeReviewReasonFilter(reasonOptions);
   const tasks = reviewFilteredTasks(baseTasks);
   const confirmableTasks = activeTab.id === "review" ? tasks.filter(taskCanBeHumanConfirmed) : [];
-  syncReviewBulkSelection(confirmableTasks);
+  const allConfirmableTasks = activeTab.id === "review" ? baseTasks.filter(taskCanBeHumanConfirmed) : [];
+  syncReviewBulkSelection(allConfirmableTasks);
   if (activeTab.id === "lessons") syncLessonBulkSelection(lessonBulkActionableSelections());
   else syncLessonBulkSelection([]);
   const pageCount = Math.max(1, Math.ceil(tasks.length / taskPageSize));
@@ -2029,7 +2053,7 @@ function reviewQueue() {
             ${visibleTasks.map((task) => reviewQueueCard(task, activeTab)).join("") || emptyState(t("noQueueTasks"))}
           </div>
         </div>
-        <div class="review-queue-pager">
+        <div class="review-queue-pager" ${pageCount <= 1 ? "hidden" : ""}>
           ${pager("review", page, pageCount)}
         </div>
       </section>
@@ -3095,6 +3119,20 @@ function rerenderPreservingFieldFocus(field, selector) {
   }
 }
 
+function rerenderPreservingScroll() {
+  const scrollX = window.scrollX || document.documentElement?.scrollLeft || 0;
+  const scrollY = window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+  const reviewShellTop = document.querySelector(".review-queue-list-shell")?.scrollTop || 0;
+  app();
+  const restore = () => {
+    window.scrollTo?.(scrollX, scrollY);
+    const nextReviewShell = document.querySelector(".review-queue-list-shell");
+    if (nextReviewShell) nextReviewShell.scrollTop = reviewShellTop;
+  };
+  restore();
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+}
+
 function bind() {
   if (typeof document.querySelector === "function") document.querySelector(".skip-link")?.addEventListener("click", (event) => {
     const main = document.getElementById("main");
@@ -3232,7 +3270,7 @@ function bind() {
     state.reviewBulkSelection = state.reviewBulkSelection || {};
     state.reviewBulkSelection[input.dataset.reviewBulkSelect || ""] = input.checked;
     state.reviewBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-review-bulk-select-all]").forEach((input) => input.addEventListener("change", () => {
     const activeTab = reviewQueueTabs().find((tab) => tab.id === state.reviewQueueTab) || reviewQueueTabs()[0];
@@ -3243,7 +3281,7 @@ function bind() {
       else delete state.reviewBulkSelection[task.id];
     });
     state.reviewBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-review-bulk-clear]").forEach((button) => button.addEventListener("click", () => {
     state.reviewBulkSelection = {};
@@ -3255,7 +3293,7 @@ function bind() {
     state.lessonBulkSelection = state.lessonBulkSelection || {};
     state.lessonBulkSelection[input.dataset.lessonBulkSelect || ""] = input.checked;
     state.lessonBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-lesson-bulk-select-all]").forEach((input) => input.addEventListener("change", () => {
     state.lessonBulkSelection = state.lessonBulkSelection || {};
@@ -3265,7 +3303,7 @@ function bind() {
       else delete state.lessonBulkSelection[key];
     });
     state.lessonBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-lesson-bulk-clear]").forEach((button) => button.addEventListener("click", () => {
     state.lessonBulkSelection = {};

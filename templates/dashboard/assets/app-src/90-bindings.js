@@ -18,6 +18,20 @@ function rerenderPreservingFieldFocus(field, selector) {
   }
 }
 
+function rerenderPreservingScroll() {
+  const scrollX = window.scrollX || document.documentElement?.scrollLeft || 0;
+  const scrollY = window.scrollY || document.documentElement?.scrollTop || document.body?.scrollTop || 0;
+  const reviewShellTop = document.querySelector(".review-queue-list-shell")?.scrollTop || 0;
+  app();
+  const restore = () => {
+    window.scrollTo?.(scrollX, scrollY);
+    const nextReviewShell = document.querySelector(".review-queue-list-shell");
+    if (nextReviewShell) nextReviewShell.scrollTop = reviewShellTop;
+  };
+  restore();
+  if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+}
+
 function bind() {
   if (typeof document.querySelector === "function") document.querySelector(".skip-link")?.addEventListener("click", (event) => {
     const main = document.getElementById("main");
@@ -155,7 +169,7 @@ function bind() {
     state.reviewBulkSelection = state.reviewBulkSelection || {};
     state.reviewBulkSelection[input.dataset.reviewBulkSelect || ""] = input.checked;
     state.reviewBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-review-bulk-select-all]").forEach((input) => input.addEventListener("change", () => {
     const activeTab = reviewQueueTabs().find((tab) => tab.id === state.reviewQueueTab) || reviewQueueTabs()[0];
@@ -166,7 +180,7 @@ function bind() {
       else delete state.reviewBulkSelection[task.id];
     });
     state.reviewBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-review-bulk-clear]").forEach((button) => button.addEventListener("click", () => {
     state.reviewBulkSelection = {};
@@ -178,7 +192,7 @@ function bind() {
     state.lessonBulkSelection = state.lessonBulkSelection || {};
     state.lessonBulkSelection[input.dataset.lessonBulkSelect || ""] = input.checked;
     state.lessonBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-lesson-bulk-select-all]").forEach((input) => input.addEventListener("change", () => {
     state.lessonBulkSelection = state.lessonBulkSelection || {};
@@ -188,7 +202,7 @@ function bind() {
       else delete state.lessonBulkSelection[key];
     });
     state.lessonBulkResult = null;
-    app();
+    rerenderPreservingScroll();
   }));
   document.querySelectorAll("[data-lesson-bulk-clear]").forEach((button) => button.addEventListener("click", () => {
     state.lessonBulkSelection = {};

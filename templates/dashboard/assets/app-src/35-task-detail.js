@@ -6,7 +6,7 @@ function taskReviewProjection(task) {
   return task?.reviewWorkbenchQueueView || task?.semanticProjection?.reviewWorkbenchQueueView || {};
 }
 
-const taskPrimaryQueueOrder = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active"];
+const taskPrimaryQueueOrder = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active", "planned"];
 
 function taskQueueFilterLabel(queue) {
   const labels = {
@@ -19,6 +19,7 @@ function taskQueueFilterLabel(queue) {
     "confirmed-finalization-pending": label("confirmed-finalization-pending"),
     finalized: label("finalized"),
     "soft-deleted-superseded": t("queueSoftDeletedSuperseded"),
+    planned: t("planned"),
   };
   return labels[queue] || label(queue);
 }

@@ -376,8 +376,8 @@ const moduleMetrics = renderTasks(`
 `);
 assert(moduleMetrics.moduleCounts?.risk === 1, "moduleCountsForTasks should count materialIssues/queueReasons as risk");
 assert(moduleMetrics.fallbackModuleCounts?.risk === 1, "UI module fallback risk counts should match server dashboard risk semantics");
-assert(moduleMetrics.moduleCounts?.active === 2, "moduleCountsForTasks should count projected active state and ignore unreachable raw active state");
-assert(moduleMetrics.fallbackModuleCounts?.active === 2, "UI module fallback active counts should use projection-first module semantics");
+assert(moduleMetrics.moduleCounts?.active === 1, "moduleCountsForTasks should count only projected current in-progress active tasks");
+assert(moduleMetrics.fallbackModuleCounts?.active === 1, "UI module fallback active counts should use projection-first active semantics");
 
 const pagedDrilldown = renderTasks(`
   for (let index = 1; index <= 12; index += 1) {
@@ -652,33 +652,33 @@ const moduleCurrentWorkProjection = renderTasks(`
     {
       ...bundle.status.tasks[0],
       id: "TASKS/module-active-queue",
-      title: "Module active queue",
-      state: "done",
+      title: "Module current active",
+      state: "in_progress",
       module: "core",
-      taskQueues: ["finalized"],
+      taskQueues: ["active"],
       queueReasons: [],
       materialIssues: [],
       risks: [],
       taskLifecycleProjection: {
-        state: "review",
-        lifecycleState: "in_review",
-        reviewStatus: "agent-reviewed",
-        reviewQueueState: "needs-material",
-        closeoutStatus: "missing",
-        taskQueues: ["missing-materials"],
+        state: "in_progress",
+        lifecycleState: "active",
+        reviewStatus: "none",
+        reviewQueueState: "not-in-queue",
+        closeoutStatus: "open",
+        taskQueues: ["active"],
       },
       reviewWorkbenchQueueView: {
-        queues: ["missing-materials"],
-        primaryQueue: "missing-materials",
-        inQueue: true,
+        queues: ["active"],
+        primaryQueue: "active",
+        inQueue: false,
         humanConfirmable: false,
         blocked: false,
-        needsMaterials: true,
+        needsMaterials: false,
         confirmed: false,
         finalized: false,
         hasPendingLessonWork: false,
         readyForCloseout: false,
-        reasonCodes: ["missing-material"],
+        reasonCodes: [],
       },
     },
     {
@@ -746,7 +746,7 @@ const moduleCurrentWorkProjection = renderTasks(`
 `);
 
 const moduleCurrentWorkHtml = moduleCurrentWorkProjection.html.match(/<section class="module-work-panel">[\s\S]*?<\/section>/)?.[0] || "";
-assert(moduleCurrentWorkHtml.includes("Module active queue"), "module detail current work should use semantic active queue states");
+assert(moduleCurrentWorkHtml.includes("Module current active"), "module detail current work should show only currently active tasks");
 assert(!moduleCurrentWorkHtml.includes("Module finalized queue"), "module detail current work should not show finalized queue tasks just because raw state is active");
 
 const missingProjectionFailClosed = renderTasks(`
@@ -785,13 +785,13 @@ const overviewProjection = renderTasks(`
       shortId: "projected-overview-active",
       title: "Projected overview active",
       state: "done",
-      completion: 100,
+      completion: 64,
       taskLifecycleProjection: {
         state: "in_progress",
         lifecycleState: "active",
-        reviewStatus: "missing",
+        reviewStatus: "none",
         reviewQueueState: "not-in-queue",
-        closeoutStatus: "missing",
+        closeoutStatus: "open",
         taskQueues: ["active"],
       },
     },
