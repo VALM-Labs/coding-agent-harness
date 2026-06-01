@@ -75,9 +75,10 @@ const agentReviewedPlanned = buildTaskSemanticProjection({
   deletionState: "active",
 });
 
-assert(agentReviewedPlanned.reviewWorkbenchQueueView.primaryQueue === "active", "agent-reviewed tasks outside the review queue should stay in the active queue");
 assert(agentReviewedPlanned.reviewWorkbenchQueueView.humanConfirmable === false, "agent-reviewed evidence alone must not make a task human-confirmable");
-assert(agentReviewedPlanned.dashboardTaskView.swimlane.columnKey === "active", "agent-reviewed evidence alone must not project a not-started task into the review swimlane column");
+assert(agentReviewedPlanned.reviewWorkbenchQueueView.primaryQueue === "planned", "not-started tasks must not be projected as active work");
+assert(agentReviewedPlanned.reviewWorkbenchQueueView.inQueue === false, "planned tasks must not enter review workbench queues");
+assert(agentReviewedPlanned.dashboardTaskView.swimlane.columnKey === "planned", "agent-reviewed evidence alone must not project a not-started task into the active or review swimlane column");
 
 const agentReviewedUnknown = buildTaskSemanticProjection({
   state: "unknown",

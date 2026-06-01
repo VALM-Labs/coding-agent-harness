@@ -1,5 +1,6 @@
 const swimlaneStageOrder = [
   ["active", "active"],
+  ["planned", "planned"],
   ["missing-materials", "queueMissingMaterials"],
   ["blocked", "queueBlocked"],
   ["review", "queueReview"],

@@ -94,7 +94,7 @@ function taskGroupContext(group, tasks) {
 
 function moduleCountsForTasks(tasks) {
   return {
-    active: tasks.filter((task) => ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(taskStateValue(task))).length,
+    active: tasks.filter(taskIsCurrentlyActive).length,
     review: tasks.filter((task) => taskStateValue(task) === "review").length,
     blocked: tasks.filter((task) => taskStateValue(task) === "blocked").length,
     risk: tasks.filter(uiDashboardTaskHasRisk).length,
@@ -171,7 +171,7 @@ function accumulateUiModuleTask(module, task) {
   if (!module.tasks.some((item) => item.id === task.id)) module.tasks.push(task);
   if (module.__countsAuthoritative) return;
   module.counts.total = (module.counts.total || 0) + 1;
-  if (["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(stateValue)) {
+  if (taskIsCurrentlyActive(task)) {
     module.counts.active = (module.counts.active || 0) + 1;
   }
   if (stateValue !== "active") module.counts[stateValue] = (module.counts[stateValue] || 0) + 1;
@@ -221,7 +221,7 @@ function moduleListItem(module, active) {
 
 function moduleDetail(module) {
   const tasks = normalCycleTasks().filter((task) => taskModuleKey(task) === module.key);
-  const activeTasks = tasks.filter((task) => isActiveTaskState(taskStateValue(task)));
+  const activeTasks = tasks.filter(taskIsCurrentlyActive);
   const riskTasks = tasks.filter(uiDashboardTaskHasRisk);
   const brief = findDocument(module.briefPath || `TARGET:coding-agent-harness/planning/modules/${module.key}/brief.md`);
   const plan = findDocument(module.modulePlanPath || "");

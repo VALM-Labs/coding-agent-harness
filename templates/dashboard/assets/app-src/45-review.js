@@ -7,7 +7,8 @@ function reviewQueue() {
   normalizeReviewReasonFilter(reasonOptions);
   const tasks = reviewFilteredTasks(baseTasks);
   const confirmableTasks = activeTab.id === "review" ? tasks.filter(taskCanBeHumanConfirmed) : [];
-  syncReviewBulkSelection(confirmableTasks);
+  const allConfirmableTasks = activeTab.id === "review" ? baseTasks.filter(taskCanBeHumanConfirmed) : [];
+  syncReviewBulkSelection(allConfirmableTasks);
   if (activeTab.id === "lessons") syncLessonBulkSelection(lessonBulkActionableSelections());
   else syncLessonBulkSelection([]);
   const pageCount = Math.max(1, Math.ceil(tasks.length / taskPageSize));
@@ -52,7 +53,7 @@ function reviewQueue() {
             ${visibleTasks.map((task) => reviewQueueCard(task, activeTab)).join("") || emptyState(t("noQueueTasks"))}
           </div>
         </div>
-        <div class="review-queue-pager">
+        <div class="review-queue-pager" ${pageCount <= 1 ? "hidden" : ""}>
           ${pager("review", page, pageCount)}
         </div>
       </section>

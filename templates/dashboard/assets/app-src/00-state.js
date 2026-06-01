@@ -54,7 +54,7 @@ const state = {
   lessonBulkResult: null,
   renderMode: "rendered",
   theme: localStorage.getItem("harness.theme") || "system",
-  taskLayout: localStorage.getItem("harness.taskLayout") || "list",
+  taskLayout: localStorage.getItem("harness.taskLayout") || "swimlane",
   taskSortOrder: localStorage.getItem("harness.taskSortOrder") === "asc" ? "asc" : "desc",
   runtime: { mode: "static", csrfToken: "", writableActions: [] },
   runtimeLoaded: false,
