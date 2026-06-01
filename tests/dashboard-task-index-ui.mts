@@ -105,9 +105,9 @@ const statsHtml = stats.__result;
 assert(typeof statsHtml === "string", "task stats should render html");
 assert(statsHtml.includes("Total"), "task stats should include total count");
 assert(statsHtml.includes(">7</span>"), "task stats total should include all tasks");
-assert(statsHtml.includes("planned"), "task stats should expose planned tasks so displayed buckets add up");
-assert(statsHtml.includes("not started"), "task stats should expose not_started tasks so displayed buckets add up");
-assert(statsHtml.includes("unknown"), "task stats should expose unknown tasks so displayed buckets add up");
+assert(statsHtml.includes("Active"), "task stats should expose lifecycle queue buckets so displayed buckets add up");
+assert(!statsHtml.includes("not started"), "task stats should not expose raw task states as primary task index buckets");
+assert(!statsHtml.includes("unknown"), "task stats should not expose raw unknown states as primary task index buckets");
 
 const projectionSandbox = createSandbox();
 vm.runInContext(`
@@ -160,6 +160,67 @@ assert(projectionResult.stats.some(([state, count]) => state === "review" && cou
 assert(!projectionResult.stats.some(([state]) => state === "done"), "task stats should not count raw done state when projection overrides it");
 assert(projectionResult.filtered.includes("TASKS/projection-conflict"), "task filter/search should match projected state and queues");
 assert(projectionResult.row.includes("agent reviewed"), "task rows should display projected review lifecycle");
+
+const lifecycleQueueSandbox = createSandbox();
+vm.runInContext(`
+  bundle.status.tasks = [{
+    id: "TASKS/raw-review-missing-materials",
+    shortId: "raw-review-missing-materials",
+    title: "Raw review missing materials",
+    path: "TARGET:coding-agent-harness/planning/tasks/raw-review-missing-materials",
+    state: "review",
+    module: "dashboard",
+    inferredModule: "",
+    completion: 80,
+    reviewStatus: "agent-reviewed",
+    reviewQueueState: "needs-material",
+    closeoutStatus: "missing",
+    visualMapStatus: "present",
+    briefSource: "standalone",
+    taskQueues: ["missing-materials"],
+    queueReasons: [{ code: "missing-review-submission", message: "missing packet" }],
+    taskLifecycleProjection: {
+      state: "review",
+      lifecycleState: "in_review",
+      reviewStatus: "agent-reviewed",
+      reviewQueueState: "needs-material",
+      closeoutStatus: "missing",
+      taskQueues: ["missing-materials"],
+    },
+    reviewWorkbenchQueueView: {
+      queues: ["missing-materials"],
+      primaryQueue: "missing-materials",
+      inQueue: true,
+      humanConfirmable: false,
+      blocked: false,
+      needsMaterials: true,
+      confirmed: false,
+      finalized: false,
+      hasPendingLessonWork: false,
+      readyForCloseout: false,
+      reasonCodes: ["missing-review-submission"],
+    },
+  }];
+  state.taskState = "missing-materials";
+  state.query = "";
+  __result = JSON.stringify({
+    stats: taskStatRows(normalCycleTasks()).map((row) => [row.state, row.count]),
+    filtered: filteredTasks().map((item) => item.id),
+    row: taskRow(bundle.status.tasks[0]),
+    swimlaneCards: taskSwimlaneModel(filteredTasks()).cards.map((card) => [card.id, card.stage]),
+  });
+`, lifecycleQueueSandbox);
+const lifecycleQueueResult = JSON.parse(String(lifecycleQueueSandbox.__result)) as {
+  stats: Array<[string, number]>;
+  filtered: string[];
+  row: string;
+  swimlaneCards: Array<[string, string]>;
+};
+assert(lifecycleQueueResult.stats.some(([state, count]) => state === "missing-materials" && count === 1), "task stats should count lifecycle primary queue instead of raw review state");
+assert(!lifecycleQueueResult.stats.some(([state]) => state === "review"), "raw review state must not inflate the task index review count when the primary lifecycle queue is missing-materials");
+assert(lifecycleQueueResult.filtered.includes("TASKS/raw-review-missing-materials"), "task state filter should use lifecycle primary queue values");
+assert(lifecycleQueueResult.row.includes("missing materials"), "task row should display the lifecycle primary queue label");
+assert(lifecycleQueueResult.swimlaneCards.some(([id, stage]) => id === "TASKS/raw-review-missing-materials" && stage === "missing-materials"), "task swimlane should use the same lifecycle primary queue as list/grid views");
 
 const reviewAffordanceSandbox = createSandbox();
 vm.runInContext(`

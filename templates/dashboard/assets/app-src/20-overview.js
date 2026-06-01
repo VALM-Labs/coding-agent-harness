@@ -197,14 +197,14 @@ function activeTasks() {
   const tasks = normalCycleTasks();
   const active = tasks.filter((task) => {
     const stateValue = taskStateValue(task);
-    return isActiveTaskState(stateValue) || ["planned", "not_started"].includes(stateValue);
+    return isActiveTaskState(stateValue);
   });
   if (active.length > 0) return sortTasksByTime(active);
   return sortTasksByTime(tasks.filter((task) => task.briefSource === "standalone"));
 }
 
 function isActiveTaskState(state) {
-  return ["active", "in_progress", "review", "blocked", "reopened", "current-evidence"].includes(state);
+  return ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(state);
 }
 
 function taskBriefCard(task, { compact = true } = {}) {

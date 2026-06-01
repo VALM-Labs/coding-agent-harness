@@ -6,7 +6,42 @@ function taskReviewProjection(task) {
   return task?.reviewWorkbenchQueueView || task?.semanticProjection?.reviewWorkbenchQueueView || {};
 }
 
+const taskPrimaryQueueOrder = ["blocked", "missing-materials", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded", "active"];
+
+function taskQueueFilterLabel(queue) {
+  const labels = {
+    active: t("active"),
+    "missing-materials": t("queueMissingMaterials"),
+    blocked: t("queueBlocked"),
+    review: t("queueReview"),
+    lessons: t("queueLessons"),
+    confirmed: label("confirmed"),
+    "confirmed-finalization-pending": label("confirmed-finalization-pending"),
+    finalized: label("finalized"),
+    "soft-deleted-superseded": t("queueSoftDeletedSuperseded"),
+  };
+  return labels[queue] || label(queue);
+}
+
+function taskPrimaryQueueValue(task) {
+  const reviewProjection = taskReviewProjection(task);
+  const lifecycleProjection = taskLifecycleProjection(task);
+  if (reviewProjection.primaryQueue) return reviewProjection.primaryQueue;
+  const queues = Array.isArray(reviewProjection.queues)
+    ? reviewProjection.queues
+    : Array.isArray(lifecycleProjection.taskQueues)
+      ? lifecycleProjection.taskQueues
+    : Array.isArray(task?.taskQueues)
+      ? task.taskQueues
+      : [];
+  return taskPrimaryQueueOrder.find((queue) => queues.includes(queue)) || queues[0] || "active";
+}
+
 function taskStateValue(task) {
+  return taskPrimaryQueueValue(task);
+}
+
+function taskRawStateValue(task) {
   const projection = taskLifecycleProjection(task);
   return projection.state || task?.state || "unknown";
 }
@@ -54,7 +89,7 @@ function taskStateSummary(task) {
   return `<section class="task-state-summary">
     <div>
       <span>${t("legacyState")}</span>
-      ${tag(lifecycle.state || task.state)}
+      ${tag(taskRawStateValue(task))}
     </div>
     <div>
       <span>${t("lifecycleState")}</span>
