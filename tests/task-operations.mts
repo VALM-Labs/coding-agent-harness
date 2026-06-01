@@ -63,6 +63,160 @@ assert(ambiguousResult.payload.error === ambiguousResult.reason, "ambiguous payl
 assert(String(ambiguousResult.payload.error).includes("TASKS/demo-task"), "ambiguous payload should list the task candidate");
 assert(String(ambiguousResult.payload.error).includes("MODULES/auth/demo-task"), "ambiguous payload should list the module candidate");
 
+const projectionQueueOperations = createTaskOperations(target, {
+  repository: {
+    list: () => [],
+    resolve: () => { throw new Error("not used"); },
+    readMaterials: () => { throw new Error("not used"); },
+    get: () => ({
+      id: "projection-queue-task",
+      taskKey: "projection-queue-task",
+      state: "not_started",
+      lifecycleState: "ready",
+      reviewStatus: "agent-reviewed",
+      reviewQueueState: "ready-to-confirm",
+      taskQueues: ["review"],
+      semanticProjection: {
+        taskLifecycleProjection: {
+          state: "not_started",
+          lifecycleState: "ready",
+          reviewStatus: "agent-reviewed",
+          reviewQueueState: "not-in-queue",
+          closeoutStatus: "missing",
+          taskQueues: ["planned"],
+          materialsReady: true,
+          reviewSubmitted: false,
+          lessonCandidateDecisionComplete: true,
+          deletionState: "active",
+        },
+        dashboardTaskView: {
+          visibleInSwimlane: true,
+          swimlaneStage: "planned",
+          swimlane: {
+            visible: true,
+            rowKey: "architecture",
+            rowLabelKey: "",
+            columnKey: "planned",
+            columnLabelKey: "planned",
+            tone: "muted",
+            sortKey: "projection-queue-task",
+          },
+          materials: {
+            briefReady: true,
+            visualMapReady: true,
+            evidenceReady: true,
+            blockingReasonCodes: [],
+          },
+          needsEvidence: false,
+          reasonCode: "",
+          reasonMessage: "",
+        },
+        reviewWorkbenchQueueView: {
+          queues: ["planned"],
+          primaryQueue: "planned",
+          inQueue: false,
+          humanConfirmable: false,
+          blocked: false,
+          needsMaterials: false,
+          confirmed: false,
+          finalized: false,
+          hasPendingLessonWork: false,
+          readyForCloseout: false,
+          reasonCodes: [],
+          reasonSummaries: [],
+        },
+      },
+    }) as never,
+  },
+});
+
+const projectionQueueReview = projectionQueueOperations.confirmReview({
+  taskId: "projection-queue-task",
+  confirmText: "projection-queue-task",
+  reviewer: "Human Reviewer",
+});
+assertFailure(projectionQueueReview, "TaskOperations should reject according to semantic projection queue view");
+assert(Array.isArray(projectionQueueReview.payload.taskQueues), "projection queue rejection should include taskQueues");
+assert((projectionQueueReview.payload.taskQueues as unknown[]).includes("planned"), "TaskOperations should expose projected task queues, not stale raw review queues");
+
+const projectionFirstOperations = createTaskOperations(target, {
+  repository: {
+    list: () => [],
+    resolve: () => { throw new Error("not used"); },
+    readMaterials: () => { throw new Error("not used"); },
+    get: () => ({
+      id: "projection-first-task",
+      taskKey: "projection-first-task",
+      state: "review",
+      lifecycleState: "in_review",
+      reviewStatus: "agent-reviewed",
+      reviewQueueState: "ready-to-confirm",
+      closeoutStatus: "missing",
+      taskQueues: ["review"],
+      reviewConfirmation: { confirmed: false },
+      semanticProjection: {
+        taskLifecycleProjection: {
+          state: "review",
+          lifecycleState: "in_review",
+          reviewStatus: "confirmed",
+          reviewQueueState: "confirmed",
+          closeoutStatus: "missing",
+          taskQueues: ["confirmed"],
+          materialsReady: true,
+          reviewSubmitted: true,
+          lessonCandidateDecisionComplete: true,
+          deletionState: "active",
+        },
+        dashboardTaskView: {
+          visibleInSwimlane: true,
+          swimlaneStage: "confirmed",
+          swimlane: {
+            visible: true,
+            rowKey: "architecture",
+            rowLabelKey: "",
+            columnKey: "confirmed",
+            columnLabelKey: "state_confirmed",
+            tone: "pass",
+            sortKey: "projection-first-task",
+          },
+          materials: {
+            briefReady: true,
+            visualMapReady: true,
+            evidenceReady: true,
+            blockingReasonCodes: [],
+          },
+          needsEvidence: false,
+          reasonCode: "",
+          reasonMessage: "",
+        },
+        reviewWorkbenchQueueView: {
+          queues: ["confirmed"],
+          primaryQueue: "confirmed",
+          inQueue: true,
+          humanConfirmable: false,
+          blocked: false,
+          needsMaterials: false,
+          confirmed: true,
+          finalized: false,
+          hasPendingLessonWork: false,
+          readyForCloseout: true,
+          reasonCodes: [],
+          reasonSummaries: [],
+        },
+      },
+    }) as never,
+  },
+});
+
+const projectionFirstReview = projectionFirstOperations.confirmReview({
+  taskId: "projection-first-task",
+  confirmText: "projection-first-task",
+  reviewer: "Human Reviewer",
+});
+assertFailure(projectionFirstReview, "TaskOperations should honor semantic projection before raw review fields");
+assert(projectionFirstReview.reason.includes("already confirmed"), "projection-confirmed tasks should reject duplicate confirmation");
+assert(projectionFirstReview.payload.reviewStatus === "confirmed", "duplicate confirmation payload should come from projection lifecycle status");
+
 console.log("TaskOperations use-case tests passed");
 
 function assertFailure(result: unknown, message: string): asserts result is FailureResult {

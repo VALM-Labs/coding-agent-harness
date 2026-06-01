@@ -136,4 +136,24 @@ const closedHistorical = buildTaskSemanticProjection({
 assert(closedHistorical.dashboardTaskView.visibleInSwimlane === false, "closed historical work should be hidden from active swimlane");
 assert(closedHistorical.reviewWorkbenchQueueView.finalized === true, "closed work should project finalized review workbench state");
 
+const confirmedByAudit = buildTaskSemanticProjection({
+  state: "review",
+  lifecycleState: "in_review",
+  reviewStatus: "agent-reviewed",
+  reviewQueueState: "ready-to-confirm",
+  closeoutStatus: "missing",
+  budget: "standard",
+  completion: 100,
+  taskQueues: ["review"],
+  materialsReady: true,
+  reviewSubmitted: true,
+  reviewConfirmation: { confirmed: true },
+  lessonCandidateStatus: "no-candidate-accepted",
+  lessonCandidateDecisionComplete: true,
+  deletionState: "active",
+});
+
+assert(confirmedByAudit.reviewWorkbenchQueueView.confirmed === true, "native review confirmation audit should project confirmed workbench state");
+assert(confirmedByAudit.reviewWorkbenchQueueView.readyForCloseout === true, "native review confirmation audit should make no-lesson tasks closeout-ready");
+
 console.log("Task semantic projection tests passed");
