@@ -68,7 +68,7 @@ function taskGroupContext(group, tasks) {
 
 function moduleCountsForTasks(tasks) {
   return {
-    active: tasks.filter((task) => ["in_progress", "review", "blocked", "planned", "not_started"].includes(taskStateValue(task))).length,
+    active: tasks.filter((task) => ["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(taskStateValue(task))).length,
     review: tasks.filter((task) => taskStateValue(task) === "review").length,
     blocked: tasks.filter((task) => taskStateValue(task) === "blocked").length,
     risk: tasks.filter(uiDashboardTaskHasRisk).length,
@@ -134,7 +134,7 @@ function accumulateUiModuleTask(module, task) {
   const stateValue = taskStateValue(task);
   if (!module.tasks.some((item) => item.id === task.id)) module.tasks.push(task);
   module.counts.total = (module.counts.total || 0) + 1;
-  if (["in_progress", "review", "blocked", "planned", "not_started"].includes(stateValue)) {
+  if (["active", "missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending"].includes(stateValue)) {
     module.counts.active = (module.counts.active || 0) + 1;
   }
   if (stateValue !== "active") module.counts[stateValue] = (module.counts[stateValue] || 0) + 1;

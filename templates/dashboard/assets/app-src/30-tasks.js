@@ -4,7 +4,7 @@ function clampCompletion(value) {
 }
 
 function stateToColorVar(state) {
-  const map = { in_progress: "--accent", review: "--accent-2", blocked: "--danger", done: "--ok", planned: "--muted", not_started: "--muted" };
+  const map = { active: "--accent", in_progress: "--accent", review: "--accent-2", "missing-materials": "--warn", lessons: "--accent-3", blocked: "--danger", confirmed: "--ok", "confirmed-finalization-pending": "--ok", finalized: "--ok", "soft-deleted-superseded": "--muted", done: "--ok", planned: "--muted", not_started: "--muted" };
   return map[state] || "--muted";
 }
 
@@ -19,13 +19,15 @@ function taskLifecycleDisplay(task) {
 
 function taskStatRows(tasks) {
   return [
-    { state: "in_progress", label: t("statInProgress"), className: "in-progress" },
-    { state: "review", label: t("statReview"), className: "review" },
-    { state: "blocked", label: t("statBlocked"), className: "blocked" },
-    { state: "done", label: t("statDone"), className: "done" },
-    { state: "planned", label: label("planned"), className: "planned" },
-    { state: "not_started", label: label("not_started"), className: "not-started" },
-    { state: "unknown", label: label("unknown"), className: "unknown" },
+    { state: "active", label: t("active"), className: "active" },
+    { state: "missing-materials", label: t("queueMissingMaterials"), className: "missing-materials" },
+    { state: "blocked", label: t("queueBlocked"), className: "blocked" },
+    { state: "review", label: t("queueReview"), className: "review" },
+    { state: "lessons", label: t("queueLessons"), className: "lessons" },
+    { state: "confirmed", label: label("confirmed"), className: "confirmed" },
+    { state: "confirmed-finalization-pending", label: label("confirmed-finalization-pending"), className: "confirmed-finalization-pending" },
+    { state: "finalized", label: label("finalized"), className: "finalized" },
+    { state: "soft-deleted-superseded", label: t("queueSoftDeletedSuperseded"), className: "soft-deleted-superseded" },
   ].map((row) => ({
     ...row,
     count: tasks.filter((task) => taskStateValue(task) === row.state).length,
@@ -112,7 +114,7 @@ function taskToolbarCard(filteredCount) {
     <div class="select-group">
       <label>${t("stateFilter")}</label>
       <select data-state-filter aria-label="${t("stateFilter")}">
-        ${["all", "in_progress", "review", "blocked", "planned", "not_started", "done", "unknown"].map((value) => `<option value="${value}" ${state.taskState === value ? "selected" : ""}>${label(value)}</option>`).join("")}
+        ${["all", ...taskPrimaryQueueOrder].map((value) => `<option value="${value}" ${state.taskState === value ? "selected" : ""}>${value === "all" ? label(value) : taskQueueFilterLabel(value)}</option>`).join("")}
       </select>
     </div>
     <div class="select-group">
@@ -326,7 +328,7 @@ function taskGroups(tasks) {
   }
   return groupBy(tasks, (task) => {
     const stateValue = taskStateValue(task);
-    if (["in_progress", "review", "blocked", "planned", "not_started"].includes(stateValue)) return "active";
+    if (taskPrimaryQueueOrder.includes(stateValue) && !["finalized", "soft-deleted-superseded"].includes(stateValue)) return stateValue;
     if (task.briefSource === "standalone") return "brief-ready";
     const match = task.shortId?.match(/^(\d{4}-\d{2})/);
     return match ? `legacy:${match[1]}` : stateValue || "unknown";
@@ -421,6 +423,7 @@ function taskCard(task) {
 
 function taskGroupLabel(group) {
   if (group === "active") return t("activeCurrent");
+  if (["missing-materials", "blocked", "review", "lessons", "confirmed", "confirmed-finalization-pending", "finalized", "soft-deleted-superseded"].includes(group)) return taskQueueFilterLabel(group);
   if (group === "brief-ready") return t("briefReadyGroup");
   if (group.startsWith("legacy:")) return `${t("legacyMonth")} ${group.slice("legacy:".length)}`;
   if (group.startsWith("module:")) return taskGroupContext(group, []).title;

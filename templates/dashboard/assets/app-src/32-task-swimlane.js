@@ -1,11 +1,13 @@
 const swimlaneStageOrder = [
-  ["planned", "swimlaneStagePlanned"],
-  ["in_progress", "swimlaneStageInProgress"],
-  ["evidence", "swimlaneStageEvidence"],
-  ["review", "swimlaneStageReview"],
-  ["confirmed", "swimlaneStageConfirmed"],
-  ["closeout", "swimlaneStageCloseout"],
-  ["blocked", "swimlaneStageBlocked"],
+  ["active", "active"],
+  ["missing-materials", "queueMissingMaterials"],
+  ["blocked", "queueBlocked"],
+  ["review", "queueReview"],
+  ["lessons", "queueLessons"],
+  ["confirmed", "state_confirmed"],
+  ["confirmed-finalization-pending", "state_confirmed-finalization-pending"],
+  ["finalized", "state_finalized"],
+  ["soft-deleted-superseded", "queueSoftDeletedSuperseded"],
 ];
 const swimlaneCellPageSize = 10;
 const swimlaneMiniColumnLimit = 5;
@@ -38,34 +40,11 @@ function taskSwimlaneModel(tasks) {
 }
 
 function taskVisibleInSwimlane(task) {
-  const view = taskDashboardTaskView(task);
-  if (typeof view.visibleInSwimlane === "boolean") return view.visibleInSwimlane;
-  const stateValue = String(task.state || "");
-  const closeout = String(task.closeoutStatus || "");
-  if (["done", "closed", "finalized"].includes(stateValue)) return false;
-  if (["closed", "finalized"].includes(closeout)) return false;
-  if (clampCompletion(task.completion) >= 100 && !["review", "blocked", "reopened", "current-evidence"].includes(stateValue)) return false;
-  return ["active", "planned", "not_started", "in_progress", "review", "blocked", "reopened", "current-evidence"].includes(stateValue)
-    || ["ready-to-confirm", "needs-material", "review-blocked"].includes(String(task.reviewQueueState || ""))
-    || ["confirmed", "blocked-open-findings"].includes(String(task.reviewStatus || ""));
+  return !isArchivedTask(task);
 }
 
 function taskSwimlaneStage(task) {
-  const view = taskDashboardTaskView(task);
-  if (view.swimlaneStage) return view.swimlaneStage;
-  const stateValue = String(task.state || "");
-  const review = String(task.reviewStatus || "");
-  const reviewQueue = String(task.reviewQueueState || "");
-  const closeout = String(task.closeoutStatus || "");
-  if (stateValue === "blocked" || review.includes("blocked") || reviewQueue.includes("blocked")) return "blocked";
-  if (review === "confirmed" && taskHasPendingLessonWork(task)) return "closeout";
-  if (review === "confirmed" && ["missing", "pending", "required", "closing"].includes(closeout)) return "closeout";
-  if (review === "confirmed") return "confirmed";
-  if (stateValue === "review" || reviewQueue === "ready-to-confirm" || (task.taskQueues || []).includes("review")) return "review";
-  if (["planned", "not_started"].includes(stateValue)) return "planned";
-  if (taskNeedsEvidence(task)) return "evidence";
-  if (["active", "in_progress", "reopened", "current-evidence"].includes(stateValue)) return "in_progress";
-  return "planned";
+  return taskStateValue(task);
 }
 
 function taskNeedsEvidence(task) {
