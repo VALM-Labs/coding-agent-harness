@@ -22,6 +22,7 @@ type TaskSemanticProjectionInput = {
   taskQueues?: string[];
   queueReasons?: QueueReason[];
   materialsReady?: boolean;
+  reviewConfirmation?: { confirmed?: boolean } | null;
   reviewSubmitted?: boolean;
   lessonCandidateStatus?: string;
   lessonCandidatePromotionState?: string;
@@ -203,7 +204,8 @@ export function buildReviewWorkbenchQueueView(
 ): ReviewWorkbenchQueueView {
   const hasPendingLessonWork = taskHasPendingLessonWork(task, taskQueues);
   const humanConfirmable = lifecycle.reviewQueueState === "ready-to-confirm" && taskQueues.includes("review");
-  const readyForCloseout = lifecycle.reviewStatus === "confirmed" && lifecycle.closeoutStatus !== "closed" && !hasPendingLessonWork && ["no-candidate-accepted", "promoted", "rejected"].includes(stringValue(task.lessonCandidateStatus, ""));
+  const confirmed = lifecycle.reviewStatus === "confirmed" || task.reviewConfirmation?.confirmed === true || taskQueues.includes("confirmed");
+  const readyForCloseout = confirmed && lifecycle.closeoutStatus !== "closed" && !hasPendingLessonWork && ["no-candidate-accepted", "promoted", "rejected"].includes(stringValue(task.lessonCandidateStatus, ""));
   const primaryQueue = primaryReviewQueue(taskQueues);
   const reasonSummaries = normalizedQueueReasons(task);
   return {
@@ -213,7 +215,7 @@ export function buildReviewWorkbenchQueueView(
     humanConfirmable,
     blocked: lifecycle.reviewStatus === "blocked-open-findings" || taskQueues.includes("blocked") || blockingRiskCount(task) > 0,
     needsMaterials: lifecycle.reviewQueueState === "needs-material" || taskQueues.includes("missing-materials"),
-    confirmed: lifecycle.reviewStatus === "confirmed" || taskQueues.includes("confirmed"),
+    confirmed,
     finalized: lifecycle.closeoutStatus === "closed" || taskQueues.includes("finalized"),
     hasPendingLessonWork,
     readyForCloseout,

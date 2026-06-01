@@ -4,6 +4,8 @@ import { createLessonSedimentationTask } from "./task-lesson-sedimentation.mjs";
 import { archiveTask, deleteTask, reopenTask, supersedeTask } from "./task-tombstone-commands.mjs";
 import { createScannerTaskRepository } from "./task-repository.mjs";
 import type { TaskRecord, TaskRepository } from "./task-repository.mjs";
+import { buildTaskSemanticProjection } from "./task-semantic-projection.mjs";
+import type { ReviewWorkbenchQueueView, TaskLifecycleProjection, TaskSemanticProjection } from "./task-semantic-projection.mjs";
 import type { CreateTaskOptions, LifecycleUpdateOptions, ReviewConfirmOptions } from "./types/task-lifecycle.js";
 
 type JsonPayload = Record<string, unknown>;
@@ -21,7 +23,10 @@ type OperationTask = TaskRecord & {
   reviewQueueState?: string;
   reviewStatus?: string;
   risks?: Array<{ id?: string; open?: unknown; blocksRelease?: unknown; severity?: unknown }>;
+  reviewWorkbenchQueueView?: ReviewWorkbenchQueueView;
+  semanticProjection?: TaskSemanticProjection;
   state?: string;
+  taskLifecycleProjection?: TaskLifecycleProjection;
   taskQueues?: string[];
 };
 
@@ -247,19 +252,21 @@ function getOperationTask(repository: TaskRepository, taskId: string): Operation
 }
 
 function reviewConfirmationBlock(task: OperationTask): OperationFailure | null {
-  if (task.reviewStatus === "confirmed" || task.reviewConfirmation?.confirmed === true) {
-    return failure("Review is already confirmed.", { status: 409, payload: { reviewStatus: task.reviewStatus || "confirmed", taskId: task.id || "" } });
+  const projection = taskOperationProjection(task);
+  const lifecycle = projection.taskLifecycleProjection;
+  const reviewView = projection.reviewWorkbenchQueueView;
+  if (reviewView.confirmed) {
+    return failure("Review is already confirmed.", { status: 409, payload: { reviewStatus: lifecycle.reviewStatus || "confirmed", taskId: task.id || "" } });
   }
-  const queues = taskQueues(task);
-  if (task.reviewQueueState !== "ready-to-confirm" || !queues.includes("review")) {
+  if (!reviewView.humanConfirmable) {
     return failure("Review completion is only available for tasks in the review queue.", {
       status: 409,
       payload: {
-        reviewQueueState: task.reviewQueueState || "unknown",
-        taskQueues: queues,
+        reviewQueueState: lifecycle.reviewQueueState || "unknown",
+        taskQueues: reviewView.queues,
         queueReasons: Array.isArray(task.queueReasons) ? task.queueReasons : [],
         repairPrompt: task.repairPrompt || "",
-        reviewStatus: task.reviewStatus || "unknown",
+        reviewStatus: lifecycle.reviewStatus || "unknown",
         taskId: task.id || "",
       },
     });
@@ -268,10 +275,13 @@ function reviewConfirmationBlock(task: OperationTask): OperationFailure | null {
 }
 
 function taskCompleteBlock(task: OperationTask): OperationFailure | null {
+  const projection = taskOperationProjection(task);
+  const lifecycle = projection.taskLifecycleProjection;
+  const reviewView = projection.reviewWorkbenchQueueView;
   const budget = String(task.budget || "");
-  const state = String(task.state || "unknown");
+  const state = lifecycle.state || "unknown";
   if (budget === "simple") return null;
-  if (taskHasPendingLessonWork(task)) {
+  if (reviewView.hasPendingLessonWork) {
     return closeoutFailure(task, "Lesson candidate promotion or sedimentation work must be resolved before closeout.");
   }
   if (budget !== "simple" && state !== "review") {
@@ -282,10 +292,10 @@ function taskCompleteBlock(task: OperationTask): OperationFailure | null {
     const ids = blockingRisks.map((risk) => risk.id || risk.severity || "blocking-risk").join(", ");
     return closeoutFailure(task, `Open blocking review findings must be closed before task-complete: ${ids}`);
   }
-  if (task.reviewStatus !== "confirmed") {
+  if (!reviewView.confirmed) {
     return closeoutFailure(task, "Human review must be confirmed before task-complete. Confirm it from the local Dashboard workbench first.");
   }
-  if (task.closeoutStatus === "closed") {
+  if (lifecycle.closeoutStatus === "closed") {
     return closeoutFailure(task, "Task closeout is already closed.");
   }
   const lessonStatus = String(task.lessonCandidateStatus || "");
@@ -309,13 +319,15 @@ function openBlockingReviewRisks(task: OperationTask): Array<{ id?: string; open
 }
 
 function closeoutFailure(task: OperationTask, reason: string): OperationFailure {
+  const projection = taskOperationProjection(task);
+  const lifecycle = projection.taskLifecycleProjection;
   return failure(reason, {
     status: 409,
     payload: {
-      closeoutStatus: task.closeoutStatus || "unknown",
-      lifecycleState: task.lifecycleState || "unknown",
-      reviewStatus: task.reviewStatus || "unknown",
-      taskQueues: taskQueues(task),
+      closeoutStatus: lifecycle.closeoutStatus || "unknown",
+      lifecycleState: lifecycle.lifecycleState || "unknown",
+      reviewStatus: lifecycle.reviewStatus || "unknown",
+      taskQueues: projection.reviewWorkbenchQueueView.queues,
       lessonCandidateStatus: task.lessonCandidateStatus || "unknown",
       lessonCandidatePromotionState: task.lessonCandidatePromotionState || "unknown",
       taskId: task.id || "",
@@ -348,7 +360,19 @@ function failure(reason: string, { status = 400, code, details, recovery, payloa
 }
 
 function taskQueues(task: OperationTask): string[] {
-  return Array.isArray(task.taskQueues) ? task.taskQueues : [];
+  return taskOperationProjection(task).reviewWorkbenchQueueView.queues;
+}
+
+function taskOperationProjection(task: OperationTask): TaskSemanticProjection {
+  if (task.semanticProjection) return task.semanticProjection;
+  if (task.taskLifecycleProjection && task.reviewWorkbenchQueueView) {
+    return {
+      taskLifecycleProjection: task.taskLifecycleProjection,
+      reviewWorkbenchQueueView: task.reviewWorkbenchQueueView,
+      dashboardTaskView: buildTaskSemanticProjection(task).dashboardTaskView,
+    };
+  }
+  return buildTaskSemanticProjection(task);
 }
 
 function reviewBoolean(value: unknown): "yes" | "no" | "" {
