@@ -86,8 +86,10 @@ expectJson(["task-supersede", superseded.task.id, "--by", replacement.task.id, "
 
 const status = expectJsonAllowingValidationFailure(["status", "--json", target]);
 const taskIndex = expectJsonAllowingValidationFailure(["task-index", "--json", target]);
-const statusTasks = status.tasks as unknown as ContractTask[];
-const indexTasks = taskIndex.tasks as unknown as ContractTask[];
+assert(Array.isArray(status.tasks), "status --json tasks must be an array for the contract baseline");
+assert(Array.isArray(taskIndex.tasks), "task-index --json tasks must be an array for the contract baseline");
+const statusTasks: ContractTask[] = status.tasks.map((task) => task);
+const indexTasks: ContractTask[] = taskIndex.tasks.map((task) => task);
 
 assert(status.schemaVersion === 2, "status --json must expose schemaVersion 2 for the contract baseline");
 assert(taskIndex.schemaVersion === "task-index/v2", "task-index --json must expose task-index/v2 for the contract baseline");
