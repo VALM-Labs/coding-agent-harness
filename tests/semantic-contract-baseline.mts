@@ -160,9 +160,11 @@ assert(confirmedStatus.reviewWorkbenchQueueView?.finalized === true, "confirmed 
 assert(!confirmedStatus.taskQueues.includes("review"), "confirmed fixture must not remain in review queue");
 
 const archivedStatus = findTask(statusTasks, archived.task.id);
-assert(archivedStatus.reviewStatus === "confirmed", "archived fixture should preserve confirmed reviewStatus");
+assert(archivedStatus.reviewStatus === "agent-reviewed", "archived fixture should retain Agent Review Submission status after archive storage move");
 assert(archivedStatus.deletionState === "archived", "archived fixture should expose archived deletionState after task-archive");
 assert(archivedStatus.reviewQueueState === "not-in-queue", "archived fixture must not enter review queue");
+assert(!archivedStatus.taskQueues.includes("review"), "archived fixture must not remain in the review queue");
+assert(archivedStatus.taskQueues.includes("soft-deleted-superseded"), "archived fixture should route through the deleted/superseded workbench queue");
 
 const supersededStatus = findTask(statusTasks, superseded.task.id);
 assert(supersededStatus.deletionState === "superseded", "superseded fixture should expose superseded deletionState");
