@@ -89,6 +89,29 @@ assert(versionUpgradeCheck.status === "blocked", "version-upgrade check should s
 const upgradeVerify = JSON.parse(fs.readFileSync(path.join(versionUpgradeTaskDir, "artifacts/version-upgrade/upgrade-verify.json"), "utf8"));
 assert(upgradeVerify.status === "blocked", "version-upgrade check should write blocked verification evidence");
 assert(upgradeVerify.unresolvedManualConfirmations.length >= 1, "version-upgrade verification should list unresolved manual confirmations");
+const versionUpgradeEdges = [
+  ["1.0.0", "1.0.2"],
+  ["1.0.2", "1.0.3"],
+  ["1.0.3", "1.0.4"],
+  ["1.0.4", "1.0.5"],
+  ["1.0.5", "1.0.6"],
+  ["1.0.6", "1.0.7"],
+  ["1.0.7", "1.0.8"],
+  ["1.0.8", "1.0.9"],
+  ["1.0.9", "1.1.0"],
+];
+for (const [fromVersion, toVersion] of versionUpgradeEdges) {
+  const edgeTaskId = `upgrade-${fromVersion.replaceAll(".", "-")}-to-${toVersion.replaceAll(".", "-")}-coverage`;
+  const edgeTask = expectJson(["new-task", edgeTaskId, "--budget", "complex", "--preset", "version-upgrade", "--from-version", fromVersion, "--to-version", toVersion, target], { env });
+  const edgeTaskDir = path.join(target, edgeTask.task.path.replace(/^TARGET:/, ""));
+  expectJson<PresetRunResult>(["preset", "run", "version-upgrade", "plan", "--task", edgeTaskId, "--allow-scripts", "--json", target], { env });
+  const edgePlan = JSON.parse(fs.readFileSync(path.join(edgeTaskDir, "artifacts/version-upgrade/upgrade-plan.json"), "utf8"));
+  assert(edgePlan.summary.fromVersion === fromVersion && edgePlan.summary.toVersion === toVersion, `version-upgrade should plan ${fromVersion} -> ${toVersion}`);
+  assert(edgePlan.summary.manifestFile.endsWith(`${fromVersion}-to-${toVersion}.yaml`), `version-upgrade should record manifest file for ${fromVersion} -> ${toVersion}`);
+  assert(edgePlan.safeActions.length >= 1, `version-upgrade ${fromVersion} -> ${toVersion} should include safe actions`);
+  assert(edgePlan.manualConfirmations.length >= 1, `version-upgrade ${fromVersion} -> ${toVersion} should include manual confirmations`);
+  assert(edgePlan.blockedActions.length >= 1, `version-upgrade ${fromVersion} -> ${toVersion} should include blocked actions`);
+}
 
 const runnerPreset = path.join(tmpRoot, "runner-materialize-preset");
 fs.mkdirSync(path.join(runnerPreset, "scripts"), { recursive: true });

@@ -150,6 +150,7 @@ sequenceDiagram
 
 `version-upgrade` 使用一个通用 Preset 包承载升级工作流，再用 `presets/version-upgrade/releases/<from>-to-<to>.yaml`
 描述每个版本边的差异。这样 runner、安全边界、证据格式和检查逻辑保持通用；每次发版只需要新增或更新版本 manifest。
+当前 bundled manifest 覆盖 `1.0.0 -> 1.0.2`、`1.0.2 -> 1.0.3`、`1.0.3 -> 1.0.4`、`1.0.4 -> 1.0.5`、`1.0.5 -> 1.0.6`、`1.0.6 -> 1.0.7`、`1.0.7 -> 1.0.8`、`1.0.8 -> 1.0.9`、`1.0.9 -> 1.1.0`。
 
 工作流分三步：
 - `plan`：读取版本 manifest，生成 task-local `artifacts/version-upgrade/upgrade-plan.json`
