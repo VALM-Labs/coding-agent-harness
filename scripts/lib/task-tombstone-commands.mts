@@ -119,8 +119,9 @@ export function archiveTasks(targetInput: string, { release = "", taskIds = [], 
   const archiveAudits = tasks.map((task) => assertArchiveEligible(task, { archivedBy }));
   const normalizedArchiveFields = normalizeArchiveFields(archiveFields);
   assertNoReservedArchiveFields(normalizedArchiveFields);
-  const allowedPaths = taskPaths(target, ...tasks);
   const releaseLabel = String(release || "").trim();
+  const archiveMoves = tasks.map((task) => archiveMovePlan(target, task, releaseLabel));
+  const allowedPaths = archiveAllowedPaths(target, archiveMoves);
   const governanceContext = beginGovernanceSync(target, {
     operation: `task-archive-batch ${releaseLabel || `${tasks.length} tasks`}`,
     allowDirtyWorktree: true,
@@ -140,6 +141,7 @@ export function archiveTasks(targetInput: string, { release = "", taskIds = [], 
       });
       appendProgress(target, task, "task-archive-batch", reason || "archive");
     });
+    archiveMoves.forEach((move) => moveTaskDirectory(move));
     const message = releaseLabel
       ? `chore(harness): archive release ${releaseLabel} tasks`
       : `chore(harness): archive ${tasks.length} tasks`;
@@ -177,7 +179,8 @@ export function reopenTask(targetInput: string, taskRef: string, { reason = "" }
 
 function writeDeletionState(target: TombstoneTarget, task: TombstoneTask, deletionState: string, reason: string, action: string, archiveFields: TombstoneFields = {}) {
   const normalizedArchiveFields = normalizeArchiveFields(archiveFields);
-  const allowedPaths = taskPaths(target, task);
+  const archiveMove = deletionState === "archived" ? archiveMovePlan(target, task, "") : null;
+  const allowedPaths = archiveMove ? archiveAllowedPaths(target, [archiveMove]) : taskPaths(target, task);
   const governanceContext = beginGovernanceSync(target, {
     operation: `${action} ${task.id}`,
     allowDirtyWorktree: true,
@@ -194,6 +197,7 @@ function writeDeletionState(target: TombstoneTarget, task: TombstoneTask, deleti
       ...normalizedArchiveFields,
     });
     appendProgress(target, task, action, reason);
+    if (archiveMove) moveTaskDirectory(archiveMove);
     const commit = commitGovernanceSync(governanceContext, allowedPaths, {
       message: `chore(harness): ${action.replace(/\s+/g, " ")} ${task.id}`,
     });
@@ -205,6 +209,62 @@ function writeDeletionState(target: TombstoneTarget, task: TombstoneTask, deleti
 
 function taskPaths(target: TombstoneTarget, ...tasks: TombstoneTask[]): string[] {
   return [...new Set(tasks.flatMap((task) => [task.taskPlanPath, task.progressPath]).filter(Boolean).map((item) => toPosix(item.replace(/^TARGET:/, ""))))];
+}
+
+type ArchiveMovePlan = {
+  sourceDir: string;
+  destinationDir: string;
+  sourceRelativeFiles: string[];
+  destinationRelativeFiles: string[];
+};
+
+function archiveMovePlan(target: TombstoneTarget, task: TombstoneTask, release: string): ArchiveMovePlan {
+  const sourceDir = path.join(target.projectRoot, task.path.replace(/^TARGET:/, ""));
+  const taskIdParts = task.id.split("/").filter(Boolean);
+  const archiveRoot = release
+    ? path.join(target.projectRoot, "coding-agent-harness/governance/archive/releases", release, "tasks")
+    : path.join(target.projectRoot, "coding-agent-harness/governance/archive/tasks");
+  const destinationDir = path.join(archiveRoot, ...taskIdParts);
+  const sourceRelativeFiles = collectRelativeFiles(target, sourceDir);
+  const destinationRelativeFiles = sourceRelativeFiles.map((sourceRelative) => {
+    const absolute = path.join(target.projectRoot, sourceRelative);
+    return toPosix(path.relative(target.projectRoot, path.join(destinationDir, path.relative(sourceDir, absolute))));
+  });
+  return { sourceDir, destinationDir, sourceRelativeFiles, destinationRelativeFiles };
+}
+
+function archiveAllowedPaths(target: TombstoneTarget, moves: ArchiveMovePlan[]): string[] {
+  return [...new Set(moves.flatMap((move) => [
+    ...move.sourceRelativeFiles,
+    ...move.destinationRelativeFiles,
+  ]))].sort();
+}
+
+function moveTaskDirectory(move: ArchiveMovePlan): void {
+  if (!fs.existsSync(move.sourceDir)) return;
+  if (fs.existsSync(move.destinationDir)) {
+    throw new Error(`Archive destination already exists: ${toPosix(move.destinationDir)}`);
+  }
+  fs.mkdirSync(path.dirname(move.destinationDir), { recursive: true });
+  fs.renameSync(move.sourceDir, move.destinationDir);
+}
+
+function collectRelativeFiles(target: TombstoneTarget, directory: string): string[] {
+  if (!fs.existsSync(directory)) return [];
+  const result: string[] = [];
+  const stack = [directory];
+  while (stack.length) {
+    const current = stack.pop()!;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const absolute = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(absolute);
+      } else if (entry.isFile()) {
+        result.push(toPosix(path.relative(target.projectRoot, absolute)));
+      }
+    }
+  }
+  return result.sort();
 }
 
 function contextFor(_target: TombstoneTarget, context: GovernanceContext): GovernanceContext {
