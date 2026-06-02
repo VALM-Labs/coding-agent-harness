@@ -14,6 +14,13 @@ type ImportGraphNode = {
   layer: number;
 };
 type ImportGraph = {
+  architectureContract: {
+    version: string;
+    layers: { id: string; owns: string[]; mayImport: string[] }[];
+    phaseOpenExceptions: { id: string; source: string; target: string; ownerPhase: string; expiryPhase: string }[];
+    sharedFileLocks: { path: string; ownerPhase: string; reason: string }[];
+    boundaryRules: string[];
+  };
   summary: {
     fileCount: number;
     localEdgeCount: number;
@@ -82,6 +89,11 @@ assert(graph.summary.cycleNodes === 0, "valid graph should have no cycle nodes")
 assert(graph.summary.runtimeMjsToTsEdges === 0, "valid graph should have no .mjs to .ts/.mts edges");
 assert(graph.summary.typesValueImports === 0, "valid graph should allow import type from scripts/lib/types");
 assert(graph.summary.architectureBoundaryViolations === 0, "valid layered fixture should have no architecture boundary violations");
+assert(graph.architectureContract.version === "architecture-import-contract/2026-06-02-p03", "graph should expose the P03 architecture import contract version");
+assert(graph.architectureContract.layers.some((layer) => layer.id === "application" && layer.mayImport.includes("phase-open-exceptions")), "contract should expose application phase-open exception policy");
+assert(graph.architectureContract.phaseOpenExceptions.some((exception) => exception.source === "scripts/application/task/task-operations.mts" && exception.target === "scripts/lib/task-repository.mts"), "contract should list current TaskOperations repository bridge as a phase-open exception");
+assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/lib/task-scanner.mts" && lock.ownerPhase === "P05-repository-scanner-strangler"), "contract should expose scanner shared-file lock ownership");
+assert(graph.architectureContract.boundaryRules.includes("application-imports-unregistered-legacy-surface"), "contract should expose fail-closed application legacy import rule");
 
 assert(nodeByPath(graph, "scripts/harness.mjs").reachableFromBin === true, "bin entry should be bin-reachable");
 assert(nodeByPath(graph, "scripts/lib/harness-core.mjs").reachableFromBin === true, "harness-core should be bin-reachable");
@@ -103,6 +115,7 @@ writeFixture(fixtureRoot, "scripts/infrastructure/kernel/bad-kernel.mts", 'impor
 writeFixture(fixtureRoot, "scripts/domain/task/bad-domain.mts", 'import { adapter } from "../../adapters/cli/task-adapter.mjs";\nexport const bad = adapter;\n');
 writeFixture(fixtureRoot, "scripts/application/task/bad-use-case.mts", 'import { adapter } from "../../adapters/cli/task-adapter.mjs";\nexport const bad = adapter;\n');
 writeFixture(fixtureRoot, "scripts/lib/task-scanner.mts", "export const scan = 1;\n");
+writeFixture(fixtureRoot, "scripts/application/task/bad-legacy-use-case.mts", 'import { scan } from "../../lib/task-scanner.mjs";\nexport const badLegacy = scan;\n');
 writeFixture(fixtureRoot, "scripts/lib/dashboard-data.mts", 'import { scan } from "./task-scanner.mjs";\nexport const dashboard = scan;\n');
 writeFixture(fixtureRoot, "scripts/lib/task-lifecycle.mts", "export const lifecycle = 1;\n");
 writeFixture(fixtureRoot, "scripts/lib/dashboard-workbench.mts", 'import { lifecycle } from "./task-lifecycle.mjs";\nexport const workbench = lifecycle;\n');
@@ -122,6 +135,7 @@ assert(failed.violations.some((violation) => violation.code === "types-value-imp
 assert(failed.violations.some((violation) => violation.code === "kernel-imports-outer-layer"), "gate should report kernel imports from outer layers");
 assert(failed.violations.some((violation) => violation.code === "domain-imports-outer-layer"), "gate should report domain imports from adapters/application");
 assert(failed.violations.some((violation) => violation.code === "application-imports-adapter"), "gate should report application imports from adapters");
+assert(failed.violations.some((violation) => violation.code === "application-imports-unregistered-legacy-surface"), "gate should reject unregistered application imports from legacy task runtime surfaces");
 assert(failed.violations.some((violation) => violation.code === "dashboard-data-imports-task-internal"), "gate should report dashboard-data imports from task internals");
 assert(failed.violations.some((violation) => violation.code === "dashboard-workbench-imports-task-internal"), "gate should report dashboard-workbench imports from task internals");
 assert(failed.violations.some((violation) => violation.code === "generated-governance-imports-task-scanner"), "gate should report generated governance imports from task scanner internals");
