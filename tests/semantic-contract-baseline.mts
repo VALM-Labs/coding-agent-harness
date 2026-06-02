@@ -73,9 +73,12 @@ writeClosedCloseout(taskDirectory(closedButUnconfirmed));
 
 const confirmed = submitReviewReadyTask("contract-confirmed", "Contract Confirmed");
 acceptNoLessonCandidate(taskDirectory(confirmed));
+const archived = submitReviewReadyTask("contract-archived", "Contract Archived");
+acceptNoLessonCandidate(taskDirectory(archived));
 commitFixtureBaseline(target, "before contract confirmation");
 expectReviewConfirmJson(confirmed.task.id, confirmed.task.shortId);
-expectJson(["task-archive", confirmed.task.id, "--reason", "contract archive fixture", "--archived-by", "Contract Reviewer <contract@example.invalid>", "--archive-field", "retention bucket=contract-baseline", target]);
+expectReviewConfirmJson(archived.task.id, archived.task.shortId);
+expectJson(["task-archive", archived.task.id, "--reason", "contract archive fixture", "--archived-by", "Contract Reviewer <contract@example.invalid>", "--archive-field", "retention bucket=contract-baseline", target]);
 
 const replacement = expectJson(["new-task", "contract-superseding", "--title", "Contract Superseding", "--locale", "en-US", target]);
 const superseded = expectJson(["new-task", "contract-superseded", "--title", "Contract Superseded", "--locale", "en-US", target]);
@@ -99,6 +102,7 @@ const requiredIds = [
   noLessonDecision.task.id,
   closedButUnconfirmed.task.id,
   confirmed.task.id,
+  archived.task.id,
   replacement.task.id,
   superseded.task.id,
 ];
@@ -148,10 +152,15 @@ assert(blockedStatus.reviewWorkbenchQueueView?.blocked === true, "blocked fixtur
 assert(blockedStatus.taskQueues.includes("blocked"), "blocked fixture should enter blocked queue");
 
 const confirmedStatus = findTask(statusTasks, confirmed.task.id);
-assert(confirmedStatus.reviewStatus === "confirmed", "confirmed archived fixture should expose confirmed reviewStatus");
-assert(confirmedStatus.deletionState === "archived", "confirmed fixture should expose archived deletionState after task-archive");
+assert(confirmedStatus.reviewStatus === "confirmed", "confirmed fixture should expose confirmed reviewStatus");
+assert(confirmedStatus.deletionState === "active", "confirmed fixture should remain active for finalized projection coverage");
 assert(confirmedStatus.reviewWorkbenchQueueView?.finalized === true, "confirmed fixture should project finalized workbench state");
-assert(!confirmedStatus.taskQueues.includes("review"), "confirmed archived fixture must not remain in review queue");
+assert(!confirmedStatus.taskQueues.includes("review"), "confirmed fixture must not remain in review queue");
+
+const archivedStatus = findTask(statusTasks, archived.task.id);
+assert(archivedStatus.reviewStatus === "confirmed", "archived fixture should preserve confirmed reviewStatus");
+assert(archivedStatus.deletionState === "archived", "archived fixture should expose archived deletionState after task-archive");
+assert(archivedStatus.reviewQueueState === "not-in-queue", "archived fixture must not enter review queue");
 
 const supersededStatus = findTask(statusTasks, superseded.task.id);
 assert(supersededStatus.deletionState === "superseded", "superseded fixture should expose superseded deletionState");
