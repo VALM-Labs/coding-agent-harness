@@ -76,11 +76,27 @@ const p13IllegalClasses = new Set(["unknown", "bypass-to-migrate", "deletion-can
 const retiredFacadePatterns = [
   /(?:^|[/\\])scripts[/\\]lib[/\\]task-operations\.mts$/,
   /(?:^|[/\\])dist[/\\]lib[/\\]task-operations\.mjs$/,
+  /(?:^|[/\\])lib[/\\]task-operations(?:\.[cm]?js|\.mts)?$/,
 ];
 const retiredFacadeImportPattern = /(?:from\s+|import\s*\(\s*|import\s+|require\s*\(\s*)["'][^"']*(?:scripts\/lib\/task-operations|dist\/lib\/task-operations)/;
 const rawInferencePattern = /\binfer(?:Lifecycle|ReviewStatus|Queues|MaterialsReady|CloseoutStatus)\s*\(/;
 const legacyRuntimeFallbackToken = ["LEGACY", "RUNTIME", "FALLBACK"].join("_");
-const rawFactDecisionPattern = /(?:\b(?:if|switch|return)\b|[?]|&&|\|\|).*?\b(?:task|item|raw|record|entry)\.(?:state|lifecycleState|reviewStatus|reviewQueueState|taskQueues|materialsReady|closeoutStatus|lessonCandidateStatus|lessonCandidateReviewDecision|lessonCandidatePromotionState)\b/;
+const rawFactFields = [
+  "state",
+  "lifecycleState",
+  "reviewStatus",
+  "reviewQueueState",
+  "taskQueues",
+  "materialsReady",
+  "closeoutStatus",
+  "lessonCandidateStatus",
+  "lessonCandidateReviewDecision",
+  "lessonCandidatePromotionState",
+];
+const rawFactFieldAlternation = rawFactFields.join("|");
+const decisionTokenPattern = /\b(?:if|switch|return)\b|[?]|&&|\|\|/;
+const rawFactDecisionPattern = new RegExp(`(?:\\b(?:if|switch|return)\\b|[?]|&&|\\|\\|).*?\\b(?:task|item|raw|record|entry)\\.(?:${rawFactFieldAlternation})\\b`);
+const rawFactBracketDecisionPattern = new RegExp(`(?:\\b(?:if|switch|return)\\b|[?]|&&|\\|\\|).*?\\b(?:task|item|raw|record|entry)\\[["'](?:${rawFactFieldAlternation})["']\\]`);
 const compatExemptionPattern = /\bmigration-only\b|runtimeTruth["']?\s*:\s*false|legacy-migration-input\/v1|\bstable-kernel\b|pure helper|\btest-only-compat\b|test only compat/i;
 
 export function analyzeLegacyFallbackSurfaces(options: DetectorOptions = {}): LegacyFallbackReport {
@@ -103,9 +119,11 @@ export function analyzeLegacyFallbackSurfaces(options: DetectorOptions = {}): Le
 function scanSourceText(relativeFile: string, content: string): LegacyFallbackFinding[] {
   const findings: LegacyFallbackFinding[] = [];
   const lines = content.split(/\r?\n/);
+  const rawFactAliases = new Set<string>();
 
   for (const [index, line] of lines.entries()) {
     const exemptCompat = isCompatExemptLine(lines, index);
+    collectRawFactAliases(line, rawFactAliases);
     if (!exemptCompat && rawInferencePattern.test(line)) {
       findings.push({
         code: "legacy-raw-runtime-fallback",
@@ -124,7 +142,7 @@ function scanSourceText(relativeFile: string, content: string): LegacyFallbackFi
         text: line.trim(),
       });
     }
-    if (!exemptCompat && rawFactDecisionPattern.test(line)) {
+    if (!exemptCompat && (rawFactDecisionPattern.test(line) || rawFactBracketDecisionPattern.test(line) || hasRawFactAliasDecision(line, rawFactAliases))) {
       findings.push({
         code: "legacy-raw-runtime-fallback",
         file: relativeFile,
@@ -257,9 +275,26 @@ function walkTextFiles(current: string, repoRoot: string): string[] {
   return files;
 }
 
+function collectRawFactAliases(line: string, aliases: Set<string>): void {
+  const match = line.match(/\{\s*([^}]+?)\s*\}\s*=\s*(?:task|item|raw|record|entry)\b/);
+  if (!match) return;
+  for (const rawPart of match[1].split(",")) {
+    const part = rawPart.trim();
+    const aliasMatch = part.match(/^([A-Za-z_$][\w$]*)(?:\s*:\s*([A-Za-z_$][\w$]*))?$/);
+    if (!aliasMatch) continue;
+    const fieldName = aliasMatch[1];
+    const localName = aliasMatch[2] || aliasMatch[1];
+    if (rawFactFields.includes(fieldName)) aliases.add(localName);
+  }
+}
+
+function hasRawFactAliasDecision(line: string, aliases: Set<string>): boolean {
+  if (aliases.size === 0 || !decisionTokenPattern.test(line)) return false;
+  return [...aliases].some((alias) => new RegExp(`\\b${escapeRegExp(alias)}\\b`).test(line));
+}
+
 function isCompatExemptLine(lines: string[], index: number): boolean {
-  const start = Math.max(0, index - 2);
-  return compatExemptionPattern.test(lines.slice(start, index + 1).join("\n"));
+  return compatExemptionPattern.test(lines[index]);
 }
 
 function isPublishedText(relativeFile: string): boolean {
@@ -312,7 +347,10 @@ function collectStringEntries(value: unknown, line: number): PackageSurfaceEntry
   const ownEntry = typeof pathValue === "string" ? [{ value: pathValue, line }] : [];
   return [
     ...ownEntry,
-    ...Object.values(value).flatMap((entry, index) => collectStringEntries(entry, index + 1)),
+    ...Object.entries(value).flatMap(([key, entry], index) => [
+      { value: key, line: index + 1 },
+      ...collectStringEntries(entry, index + 1),
+    ]),
   ];
 }
 
@@ -326,6 +364,10 @@ function stripInlineCode(value: string): string {
 
 function toPosix(value: string): string {
   return value.split(path.sep).join("/");
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function parseArgs(argv: string[]): CliArgs {

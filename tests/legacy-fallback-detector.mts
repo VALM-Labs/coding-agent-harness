@@ -26,7 +26,9 @@ const inferQueuesName = ["infer", "Queues"].join("");
 const inferReviewStatusName = ["infer", "ReviewStatus"].join("");
 const retiredSourceFacade = ["scripts", "lib", "task-operations.mts"].join("/");
 const retiredDistFacade = ["dist", "lib", "task-operations.mjs"].join("/");
+const retiredExportKey = ["./lib", "task-operations"].join("/");
 const rawStateField = "state";
+const rawReviewStatusField = "reviewStatus";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -44,6 +46,19 @@ export function ${inferLifecycleName}(task: { ${rawStateField}?: string }) {
 export function project(task: { ${rawStateField}?: string }) {
   if (task.${rawStateField} === "done") return "done";
   return "active";
+}
+`);
+  writeFixture("src/positive/raw-field-bracket-decision.ts", `
+export function project(task: { ${rawReviewStatusField}?: string }) {
+  if (task["${rawReviewStatusField}"] === "agent-reviewed") return "reviewed";
+  return "open";
+}
+`);
+  writeFixture("src/positive/raw-field-destructured-decision.ts", `
+export function project(task: { ${rawReviewStatusField}?: string }) {
+  const { ${rawReviewStatusField} } = task;
+  if (${rawReviewStatusField} === "agent-reviewed") return "reviewed";
+  return "open";
 }
 `);
   writeFixture("src/positive/explicit-marker.ts", `
@@ -66,28 +81,29 @@ require("../../${retiredSourceFacade}");
 Use ${retiredSourceFacade} for runtime task writes.
 `);
   writeFixture("src/negative/migration-only.ts", `
-// migration-only runtimeTruth: false
-export function ${inferLifecycleName}() {
+export function ${inferLifecycleName}() { // migration-only runtimeTruth: false
   return "migration-only";
 }
 `);
   writeFixture("src/negative/stable-kernel.ts", `
-// stable-kernel pure helper
-export function ${inferQueuesName}() {
+export function ${inferQueuesName}() { // stable-kernel pure helper
   return [];
 }
 `);
   writeFixture("src/negative/test-only-compat.ts", `
-// test-only-compat fixture
-export function ${inferReviewStatusName}() {
+export function ${inferReviewStatusName}() { // test-only-compat fixture
   return "agent-reviewed";
 }
 `);
   writeFixture("src/positive/mixed-runtime.ts", `
 export const metadata = { schemaVersion: "legacy-migration-input/v1", runtimeTruth: false };
 
-
-
+export function ${inferLifecycleName}() {
+  return "runtime";
+}
+`);
+  writeFixture("src/positive/adjacent-migration-runtime.ts", `
+export const metadata = { schemaVersion: "legacy-migration-input/v1", runtimeTruth: false };
 export function ${inferLifecycleName}() {
   return "runtime";
 }
@@ -106,7 +122,7 @@ export function ${inferLifecycleName}() {
       harness: retiredDistFacade,
     },
     exports: {
-      "./lib/task-operations": `./${retiredDistFacade}`,
+      [retiredExportKey]: "./dist/lib/task-semantic-projection.mjs",
       ".": "./dist/index.mjs",
     },
     files: [
@@ -122,6 +138,12 @@ export function ${inferLifecycleName}() {
       { path: "dist/index.mjs" },
     ],
   }], null, 2));
+  writeFixture("pack-export-key.json", JSON.stringify({
+    exports: {
+      [retiredExportKey]: "./dist/lib/task-semantic-projection.mjs",
+      ".": "./dist/index.mjs",
+    },
+  }, null, 2));
 
   const report = analyzeLegacyFallbackSurfaces({
     repoRoot: tmpRoot,
@@ -135,6 +157,11 @@ export function ${inferLifecycleName}() {
     scanRoots: [],
     packageJsonPath: "pack-dry-run.json",
   });
+  const exportKeyReport = analyzeLegacyFallbackSurfaces({
+    repoRoot: tmpRoot,
+    scanRoots: [],
+    packageJsonPath: "pack-export-key.json",
+  });
   const selfScanReport = analyzeLegacyFallbackSurfaces({
     repoRoot,
     scanRoots: ["tests/legacy-fallback-detector.mts"],
@@ -142,8 +169,11 @@ export function ${inferLifecycleName}() {
 
   expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/raw-runtime.ts");
   expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/raw-field-decision.ts");
+  expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/raw-field-bracket-decision.ts");
+  expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/raw-field-destructured-decision.ts");
   expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/explicit-marker.ts");
   expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/mixed-runtime.ts");
+  expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/adjacent-migration-runtime.ts");
   expectFinding(report.findings, "retired-facade-import", "src/positive/retired-facade-from.ts");
   expectFinding(report.findings, "retired-facade-import", "src/positive/retired-facade-side-effect.ts");
   expectFinding(report.findings, "retired-facade-import", "src/positive/retired-facade-dynamic.ts");
@@ -155,6 +185,7 @@ export function ${inferLifecycleName}() {
   expectFinding(report.findings, "registry-p13-illegal-class", "registry.md");
   expectFinding(report.findings, "registry-open-review-state", "registry.md");
   expectFinding(packReport.findings, "stale-package-export", "pack-dry-run.json");
+  expectFinding(exportKeyReport.findings, "stale-package-export", "pack-export-key.json");
   expectNoFinding(report.findings, "src/negative/migration-only.ts");
   expectNoFinding(report.findings, "src/negative/stable-kernel.ts");
   expectNoFinding(report.findings, "src/negative/test-only-compat.ts");
