@@ -132,7 +132,12 @@ export const architectureImportContract: ArchitectureImportContract = {
     },
     {
       id: "adapters",
-      owns: ["scripts/adapters/**", "scripts/commands/**"],
+      owns: ["scripts/adapters/**"],
+      mayImport: ["scripts/application/**", "scripts/ports/**", "scripts/domain/**", "scripts/lib/types/**"],
+    },
+    {
+      id: "commands",
+      owns: ["scripts/commands/**"],
       mayImport: ["scripts/application/**", "scripts/ports/**", "scripts/domain/**", "scripts/lib/types/**"],
     },
     {
@@ -737,15 +742,14 @@ function isArchitecturePhaseOpenException(file: string, target: string): boolean
 }
 
 function isLegacyTaskRuntimeSurface(target: string): boolean {
-  return [
-    "scripts/lib/governance-sync.mts",
-    "scripts/lib/task-lifecycle.mts",
-    "scripts/lib/task-lesson-sedimentation.mts",
-    "scripts/lib/task-repository.mts",
-    "scripts/lib/task-scanner.mts",
-    "scripts/lib/task-semantic-projection.mts",
-    "scripts/lib/task-tombstone-commands.mts",
-  ].includes(target);
+  return target === "scripts/lib/governance-sync.mts"
+    || target === "scripts/lib/task-lifecycle.mts"
+    || target.startsWith("scripts/lib/task-lifecycle/")
+    || target === "scripts/lib/task-lesson-sedimentation.mts"
+    || target === "scripts/lib/task-repository.mts"
+    || target === "scripts/lib/task-scanner.mts"
+    || target === "scripts/lib/task-semantic-projection.mts"
+    || target === "scripts/lib/task-tombstone-commands.mts";
 }
 
 function isTaskSourceOfTruthInternal(target: string): boolean {
