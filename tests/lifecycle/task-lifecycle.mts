@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import type { SpawnSyncReturns } from "node:child_process";
-import { confirmTaskReview } from "../../scripts/lib/task-lifecycle.mjs";
+import { confirmTaskReview, createTask } from "../../scripts/lib/task-lifecycle.mjs";
 import type { HarnessTestLooseJson, HarnessTestLoosePhase } from "../helpers/harness-test-types.js";
 import {
   acceptNoLessonCandidate,
@@ -24,8 +24,27 @@ import {
 } from "../helpers/harness-test-utils.mjs";
 import { updateTaskLifecycle } from "../../scripts/lib/task-lifecycle.mjs";
 
+type TransactionPayload = {
+  governance?: {
+    commit?: {
+      committed?: boolean;
+      reason?: string;
+    };
+    transaction?: {
+      success?: boolean;
+      operation?: string;
+      allowedPaths?: string[];
+      generatedSurfaces?: string[];
+    };
+  };
+};
+
 const lifecycleTarget = path.join(tmpRoot, "lifecycle-target");
 fs.mkdirSync(lifecycleTarget);
+
+function git(cwd: string, args: string[]): SpawnSyncReturns<string> {
+  return spawnSync("git", args, { cwd, encoding: "utf8" });
+}
 
 function runReviewConfirm(target: string, taskId: string, confirmText: string, message = "review confirmed"): SpawnSyncReturns<string> {
   try {
@@ -102,9 +121,13 @@ assert(
   "new-task dry-run should plan a root task INDEX.md",
 );
 assert(!fs.existsSync(path.join(lifecycleTarget, `coding-agent-harness/planning/tasks/${todayLocal}-phase-2-lifecycle`)), "new-task dry-run should not mutate target");
-const lifecycleCreate = expectJson(["new-task", "phase-2-lifecycle", "--title", "阶段二任务生命周期", "--locale", "zh-CN", lifecycleTarget]);
+const lifecycleCreate = expectJson<HarnessTestLooseJson & TransactionPayload>(["new-task", "phase-2-lifecycle", "--title", "阶段二任务生命周期", "--locale", "zh-CN", lifecycleTarget]);
 assert(lifecycleCreate.task?.shortId === `${todayLocal}-phase-2-lifecycle`, "new-task should report normalized short task id");
 assert(lifecycleCreate.task?.id === `TASKS/${todayLocal}-phase-2-lifecycle`, "new-task should report relative task id");
+assert(lifecycleCreate.governance?.transaction?.success === true, "new-task should materialize through HarnessTransaction");
+assert(lifecycleCreate.governance?.transaction?.operation === `new-task ${todayLocal}-phase-2-lifecycle`, "new-task transaction should report the materialization operation");
+assert(lifecycleCreate.governance?.transaction?.allowedPaths?.some((item) => item.endsWith(`${todayLocal}-phase-2-lifecycle/task_plan.md`)), "new-task transaction should predeclare task package paths");
+assert(lifecycleCreate.governance?.transaction?.generatedSurfaces?.includes("task-package"), "new-task transaction should report task-package generated surface");
 for (const required of ["INDEX.md", "brief.md", "task_plan.md", "execution_strategy.md", "visual_map.md", "findings.md", "lesson_candidates.md", "progress.md", "review.md"]) {
   assert(
     fs.existsSync(path.join(lifecycleTarget, `coding-agent-harness/planning/tasks/${todayLocal}-phase-2-lifecycle`, required)),
@@ -144,6 +167,30 @@ assert(!lifecycleVisualMap.includes("<task-id>"), "new-task should not leave tas
 assert(lifecycleVisualMap.includes(`harness task-review ${todayLocal}-phase-2-lifecycle`), "standard task visual map should render a concrete review command");
 const duplicateLifecycle = run(["new-task", `${todayLocal}-phase-2-lifecycle`, "--title", "duplicate", lifecycleTarget]);
 assert(duplicateLifecycle.status !== 0, "new-task should refuse to overwrite an existing task directory");
+const deferredCreateTarget = path.join(tmpRoot, "deferred-create-transaction-target");
+fs.mkdirSync(deferredCreateTarget);
+expectJson(["init", "--locale", "en-US", "--capabilities", "core", deferredCreateTarget]);
+git(deferredCreateTarget, ["init"]);
+git(deferredCreateTarget, ["config", "user.name", "Harness Test"]);
+git(deferredCreateTarget, ["config", "user.email", "harness-test@example.invalid"]);
+git(deferredCreateTarget, ["add", "."]);
+git(deferredCreateTarget, ["commit", "-m", "deferred create fixture baseline"]);
+fs.writeFileSync(path.join(deferredCreateTarget, "LESSON_CANDIDATES.md"), "dirty lesson source\n");
+const deferredCreate = createTask(deferredCreateTarget, "transaction-deferred-create", {
+  title: "Transaction Deferred Create",
+  deferCommit: true,
+  allowDirtyRelativePaths: ["LESSON_CANDIDATES.md"],
+});
+assert(deferredCreate.governance?.commit?.committed === false, "deferred create-task transaction should not commit");
+assert(deferredCreate.governance?.commit?.reason === "deferred", "deferred create-task transaction should report deferred commit");
+assert(deferredCreate.governance?.transaction?.success === true, "deferred create-task should still use HarnessTransaction");
+assert(deferredCreate.governance?.transaction?.allowedPaths?.includes("LESSON_CANDIDATES.md"), "deferred create-task transaction should predeclare caller dirty scope");
+assert(deferredCreate.governance?.transaction?.generatedSurfaces?.includes("task-package"), "deferred create-task transaction should report generated task package surface");
+const deferredCreateTaskPlanPath = path.join(deferredCreateTarget, `coding-agent-harness/planning/tasks/${todayLocal}-transaction-deferred-create/task_plan.md`);
+const deferredCreateStatus = git(deferredCreateTarget, ["status", "--short", "--untracked-files=all"]).stdout;
+assert(deferredCreateStatus.includes("LESSON_CANDIDATES.md"), "deferred create-task should leave caller dirty scope uncommitted");
+assert(fs.existsSync(deferredCreateTaskPlanPath), "deferred create-task should materialize task package files");
+assert(deferredCreateStatus.includes(`${todayLocal}-transaction-deferred-create/task_plan.md`), "deferred create-task should leave task package writes for the caller commit");
 const simpleLifecycle = expectJson(["new-task", "simple-lifecycle", "--budget", "simple", "--title", "简单任务", "--locale", "zh-CN", lifecycleTarget]);
 assert(simpleLifecycle.task?.budget === "simple", "new-task --budget simple should report simple budget");
 for (const required of ["INDEX.md", "brief.md", "task_plan.md", "visual_map.md", "progress.md"]) {

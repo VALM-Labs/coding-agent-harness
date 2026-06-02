@@ -1,10 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { visualMapFile, legacyVisualRoadmapFile, allowedTaskStates, allowedTaskBudgets, allowedPhaseStates, allowedEvidenceStatus, normalizeTarget, normalizeLocale, toPosix, readFileSafe, readBundledTemplate, todayDate, localDate, datePrefix, normalizeTaskId, renderTaskTemplate } from "./core-shared.mjs";
+import { visualMapFile, legacyVisualRoadmapFile, allowedTaskStates, allowedTaskBudgets, allowedPhaseStates, allowedEvidenceStatus, normalizeTarget, normalizeLocale, toPosix, readFileSafe, todayDate, localDate, datePrefix, normalizeTaskId } from "./core-shared.mjs";
 import { readCapabilityRegistry } from "./capability-registry.mjs";
 import { readPresetPackage } from "./preset-registry.mjs";
-import { renderPresetResourceIndex } from "./preset-engine.mjs";
 import { parseTaskBudget } from "./task-metadata.mjs";
 import { createScannerTaskRepository } from "./task-repository.mjs";
 import { getColumn, firstColumn, updateMarkdownTableRow } from "./markdown-utils.mjs";
@@ -15,13 +14,13 @@ import { appendProgressLog, markWalkthroughClosed } from "./task-lifecycle/text-
 import { buildScaffoldProvenance } from "./task-lifecycle/scaffold-provenance.mjs";
 import { buildCreationTaskAudit } from "./task-audit-metadata.mjs";
 import { renderAgentReviewSubmission, replaceAgentReviewSubmission } from "./task-lifecycle/review-submission.mjs";
-import { appendLongRunningContractFile, moduleTemplateFiles, taskFilesForBudget } from "./task-lifecycle/template-files.mjs";
-import { planCreateTaskChanges, refreshPresetCommandAudit, resolveImplicitCreateTarget } from "./task-lifecycle/create-task-helpers.mjs";
+import { planCreateTaskChanges, resolveImplicitCreateTarget } from "./task-lifecycle/create-task-helpers.mjs";
+import { createTaskGeneratedSurfaces, createTaskTransactionSummary, materializeCreateTask, type CreateTaskMaterialization } from "./task-lifecycle/create-task-materialization.mjs";
 import { plannedLifecycleAllowedPaths } from "./task-lifecycle/planned-write-scope.mjs";
-import { beginGovernanceSync, commitGovernanceSync, governanceRelativePaths, releaseGovernanceSync, syncModuleStepGovernance, syncTaskGovernance } from "./governance-sync.mjs";
+import { governanceRelativePaths, syncModuleStepGovernance, syncTaskGovernance } from "./governance-sync.mjs";
 import { assertTransactionSucceeded, createGovernanceHarnessTransaction } from "./harness-transaction.mjs";
 import { normalizeHarnessModuleKey, prepareModuleRegistration, prepareModuleStepRegistrationUpdate, readHarnessModules, registeredHarnessModule } from "./module-registry.mjs";
-import { assertLifecyclePresetWriteScope, buildLifecyclePresetContext, evaluatePresetValues, renderLifecyclePresetTaskTemplate, resolveLifecyclePresetInputs } from "./task-lifecycle/preset-interop.mjs";
+import { buildLifecyclePresetContext, evaluatePresetValues, resolveLifecyclePresetInputs } from "./task-lifecycle/preset-interop.mjs";
 import { taskIdFromDirectory } from "./harness-paths.mjs";
 import type { TaskBudget } from "./types/task-scanner.js";
 import type { CreateTaskOptions, DeferredReviewConfirmOptions, LifecycleChange, LifecycleTarget, LifecycleTask, LifecycleUpdateOptions, ListLifecycleTasksOptions, ModuleStepOptions, PhaseUpdateOptions, PresetContext, PresetInputs, PresetPackage, ReviewConfirmOptions, TaskIdentity } from "./types/task-lifecycle.js";
@@ -225,143 +224,69 @@ export function createTask(targetInput: string, taskId: string, { title = "", lo
   });
   const plannedGovernance = syncTaskGovernance(target, task, { event: "new-task", state: "planned", message: "task registered by CLI", dryRun: true });
   const plannedWriteScopes = [...governanceRelativePaths(plannedModuleRegistration?.changes || []), ...changeDestinations(plannedChanges), ...governanceRelativePaths(plannedGovernance.changes)];
-  const changes: LifecycleChange[] = [];
-  const governanceContext = beginGovernanceSync(target, { operation: `new-task ${normalizedTaskId}`, dryRun, allowDirtyWorktree: true, allowedRelativePaths: [...plannedWriteScopes, ...(allowDirtyRelativePaths || [])], allowDirtyWriteScope: deferCommit });
-  try {
-  if (plannedModuleRegistration) {
-    const moduleRegistrationResult = prepareModuleRegistration(target, normalizedModuleKey, moduleRegistration, { dryRun });
-    changes.push(...moduleRegistrationResult.changes);
-  }
-  if (normalizedModuleKey) {
-    const moduleDirectory = target.harness.version === 2
-      ? path.join(target.harness.modulesRoot, normalizedModuleKey)
-      : path.dirname(directory);
-    for (const [destination, source] of moduleTemplateFiles({ locale: normalizedLocale })) {
-      const destinationPath = path.join(moduleDirectory, destination);
-      if (fs.existsSync(destinationPath)) continue;
-      changes.push({
-        destination: toPosix(path.relative(target.projectRoot, destinationPath)),
-        source,
-        action: dryRun ? "would-create" : "create",
-      });
-      if (presetPackage) assertLifecyclePresetWriteScope(presetPackage, toPosix(path.relative(target.projectRoot, destinationPath)), target);
-      if (dryRun) continue;
-      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fs.writeFileSync(
-        destinationPath,
-        renderTaskTemplate(readBundledTemplate(source), {
-          taskId: normalizedModuleKey,
-          title: normalizedModuleKey,
-          locale: normalizedLocale,
-          budget: normalizedBudget,
-          moduleKey: normalizedModuleKey,
-          preset: normalizedPreset,
-          presetVersion: presetContext?.presetVersion || "",
-          evidenceBundle: presetContext?.evidenceBundle || "",
-          longRunning,
-          scaffoldProvenance,
-          taskAudit: buildCreationTaskAudit({ ...scaffoldProvenance, templateSource: source }, { projectRoot: target.projectRoot }),
-          target,
-        }),
-      );
-    }
-  }
-  const files = appendLongRunningContractFile(taskFilesForBudget({ budget: normalizedBudget, locale: normalizedLocale }), {
-    locale: normalizedLocale,
+  const materializationOptions = {
+    target,
+    directory,
+    normalizedTaskId,
+    normalizedModuleKey,
+    normalizedLocale,
+    normalizedBudget,
+    normalizedPreset,
+    taskTitle,
     longRunning,
+    dryRun,
+    presetPackage,
+    presetContext,
+    scaffoldProvenance,
+    baseTaskAudit,
+    plannedModuleRegistration,
+    moduleRegistration,
+    task,
+  };
+  const predeclaredGeneratedSurfaces = createTaskGeneratedSurfaces([
+    ...(plannedModuleRegistration?.changes || []),
+    ...plannedChanges,
+    ...plannedGovernance.changes,
+  ]);
+  let materialization: CreateTaskMaterialization | null = dryRun ? materializeCreateTask(materializationOptions) : null;
+  const transaction = createGovernanceHarnessTransaction(target);
+  const plan = transaction.plan({
+    operation: `new-task ${normalizedTaskId}`,
+    allowedPaths: [...plannedWriteScopes, ...(deferCommit ? allowDirtyRelativePaths || [] : [])],
+    generatedSurfaces: predeclaredGeneratedSurfaces,
+    commit: {
+      message: `chore(harness): register task ${task.id}`,
+      allowDirtyWorktree: true,
+      allowDirtyWriteScope: deferCommit,
+      defer: deferCommit,
+    },
+    dryRun,
+    apply() {
+      materialization = materializeCreateTask(materializationOptions);
+      return {
+        allowedPaths: materialization.commandWriteScopes,
+        generatedSurfaces: materialization.generatedSurfaces,
+      };
+    },
   });
-  for (const [destination, source] of files) {
-    const destinationPath = path.join(directory, destination);
-    changes.push({
-      destination: toPosix(path.relative(target.projectRoot, destinationPath)),
-      source,
-      action: dryRun ? "would-create" : "create",
-    });
-    if (presetPackage) assertLifecyclePresetWriteScope(presetPackage, toPosix(path.relative(target.projectRoot, destinationPath)), target);
-    if (dryRun) continue;
-    fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-    fs.writeFileSync(
-      destinationPath,
-      renderLifecyclePresetTaskTemplate(destination, renderTaskTemplate(readBundledTemplate(source), {
-        taskId: normalizedTaskId,
-        title: taskTitle,
-        locale: normalizedLocale,
-        budget: normalizedBudget,
-        moduleKey: normalizedModuleKey,
-        preset: normalizedPreset,
-        presetVersion: presetContext?.presetVersion || "",
-        evidenceBundle: presetContext?.evidenceBundle || "",
-        longRunning,
-        scaffoldProvenance: {
-          ...scaffoldProvenance,
-          templateSource: source,
-        },
-        taskAudit: destination === "INDEX.md"
-          ? buildCreationTaskAudit({ ...scaffoldProvenance, templateSource: source }, { projectRoot: target.projectRoot })
-          : baseTaskAudit,
-        target,
-      }), presetContext),
-    );
-  }
-  if (presetContext) {
-    for (const evidence of presetContext.evidenceFiles || []) {
-      const destinationPath = path.join(target.projectRoot, evidence.relativePath);
-      changes.push({
-        destination: toPosix(evidence.relativePath),
-        source: evidence.source,
-        action: dryRun ? "would-create" : "create",
-      });
-      if (presetPackage) assertLifecyclePresetWriteScope(presetPackage, toPosix(evidence.relativePath), target);
-      if (dryRun) continue;
-      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fs.writeFileSync(destinationPath, evidence.content);
-    }
-    for (const resource of presetContext.resourceFiles || []) {
-      const destinationPath = path.join(target.projectRoot, resource.relativePath);
-      changes.push({
-        destination: toPosix(resource.relativePath),
-        source: resource.source,
-        action: dryRun ? "would-create" : "create",
-      });
-      if (presetPackage) assertLifecyclePresetWriteScope(presetPackage, toPosix(resource.relativePath), target);
-      if (dryRun) continue;
-      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      fs.writeFileSync(destinationPath, resource.content);
-    }
-    for (const [kind, rows] of Object.entries(presetContext.resourceIndexRows || {})) {
-      if (!rows.length) continue;
-      const destination = kind === "references" ? "references/INDEX.md" : "artifacts/INDEX.md";
-      const destinationPath = path.join(directory, destination);
-      const relativePath = toPosix(path.relative(target.projectRoot, destinationPath));
-      changes.push({
-        destination: relativePath,
-        source: `preset-${kind}-index`,
-        action: dryRun ? "would-update" : "update",
-      });
-      if (presetPackage) assertLifecyclePresetWriteScope(presetPackage, relativePath, target);
-      if (dryRun) continue;
-      fs.mkdirSync(path.dirname(destinationPath), { recursive: true });
-      const existing = fs.existsSync(destinationPath) ? fs.readFileSync(destinationPath, "utf8") : "";
-      fs.writeFileSync(destinationPath, renderPresetResourceIndex(existing, kind, rows));
-    }
-  }
-  const governance = syncTaskGovernance(target, task, { event: "new-task", state: "planned", message: "task registered by CLI", dryRun });
-  changes.push(...governance.changes);
-  const commandWriteScopes = [...changeDestinations(changes), ...governanceRelativePaths(governance.changes)];
-  if (presetContext) {
-    refreshPresetCommandAudit(target, presetContext, { commandWriteScopes, dryRun });
-    task.presetAudit = presetContext.audit;
-  }
-  const commit = deferCommit ? { committed: false, reason: "deferred", allowedPaths: commandWriteScopes } : commitGovernanceSync(governanceContext, commandWriteScopes, { message: `chore(harness): register task ${task.id}` });
+  const transactionResult = transaction.apply(plan);
+  assertTransactionSucceeded(transactionResult);
+  const finalMaterialization = materialization || {
+    changes: [],
+    governance: plannedGovernance,
+    commandWriteScopes: plannedWriteScopes,
+    generatedSurfaces: predeclaredGeneratedSurfaces,
+  };
   return {
     dryRun,
     task,
-    changes,
-    governance: { ...governance, commit },
+    changes: finalMaterialization.changes,
+    governance: {
+      ...finalMaterialization.governance,
+      commit: transactionResult.commit,
+      transaction: createTaskTransactionSummary(transactionResult),
+    },
   };
-  } finally {
-    releaseGovernanceSync(governanceContext);
-  }
 }
 
 export function updateTaskLifecycle(targetInput: string, taskId: string, { event = "task-log", state = "", message = "", evidence = "" }: LifecycleUpdateOptions = {}) {
