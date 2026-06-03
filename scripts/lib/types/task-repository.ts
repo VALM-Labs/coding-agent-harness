@@ -250,6 +250,20 @@ export type TaskPlanContractReader = {
   listPlanContractTasks(query?: TaskQuery): TaskPlanContractTask[];
 };
 
+export type TaskCheckProfileMigrationSnapshot = {
+  evidencePresent?: boolean;
+  sessionPresent?: boolean;
+  sessionResult?: string;
+  strictDeferred?: unknown;
+  strictStatus?: string;
+  warnings?: number;
+  taskActions?: number;
+  reviewSchemaGaps?: number;
+  legacyReferenceGaps?: number;
+  legacyResiduals?: number;
+  fullCutoverEligible?: boolean;
+};
+
 export type TaskStatusIssue = {
   code?: string;
   queue?: string;
@@ -334,6 +348,35 @@ export type TaskStatusPhase = {
   evidenceStatus?: string;
   blockingRisk?: string;
   owner?: string;
+};
+
+export type TaskCheckProfileTask = {
+  briefQuality?: TaskStatusBriefQuality;
+  briefSource?: string;
+  budget?: TaskStatusBudget;
+  closeoutStatus?: string;
+  evidenceBundle?: string;
+  materialIssues?: TaskStatusIssue[];
+  migrationAchievedLevel?: string;
+  migrationClassification?: string;
+  migrationSnapshot?: TaskCheckProfileMigrationSnapshot | null;
+  migrationTargetLevel?: string;
+  path?: string;
+  phases?: TaskStatusPhase[];
+  presetVersion?: string;
+  state?: string;
+  stateRaw?: string;
+  stateSource?: string;
+  taskKind?: string;
+  taskPlanPath?: string;
+  taskPreset?: string;
+  visualMapPath?: string;
+  visualMapSource?: string;
+  visualMapStatus?: string;
+};
+
+export type TaskCheckProfileReader = {
+  listCheckProfileTasks(query?: TaskQuery): TaskCheckProfileTask[];
 };
 
 export type TaskStatusProjection = {

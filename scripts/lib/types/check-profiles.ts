@@ -1,5 +1,5 @@
 import type { normalizeTarget } from "../core-shared.mjs";
-import type { TaskStatusProjection } from "../task-repository.mjs";
+import type { TaskCheckProfileTask } from "../task-repository.mjs";
 
 export type CheckHarnessPaths = {
   version: number;
@@ -47,9 +47,8 @@ export type PresetPackage = {
 };
 
 export type ScannedTask = Omit<
-  TaskStatusProjection,
+  TaskCheckProfileTask,
   | "path"
-  | "shortId"
   | "state"
   | "budget"
   | "briefSource"
@@ -59,14 +58,10 @@ export type ScannedTask = Omit<
   | "taskPreset"
   | "migrationTargetLevel"
   | "migrationAchievedLevel"
-  | "evidenceBundle"
-  | "briefQuality"
-  | "migrationSnapshot"
 > & {
   path: string;
-  shortId: string;
   state: string;
-  budget: NonNullable<TaskStatusProjection["budget"]>;
+  budget: NonNullable<TaskCheckProfileTask["budget"]>;
   briefSource: string;
   visualMapStatus: string;
   visualMapSource: string;
@@ -74,22 +69,4 @@ export type ScannedTask = Omit<
   taskPreset: string;
   migrationTargetLevel: string;
   migrationAchievedLevel: string;
-  evidenceBundle?: string;
-  briefQuality?: {
-    status: "pass" | "fail";
-    issues: string[];
-  };
-  migrationSnapshot?: {
-    evidencePresent?: boolean;
-    sessionPresent?: boolean;
-    sessionResult?: string;
-    strictDeferred?: unknown;
-    strictStatus?: string;
-    warnings?: number;
-    taskActions?: number;
-    reviewSchemaGaps?: number;
-    legacyReferenceGaps?: number;
-    legacyResiduals?: number;
-    fullCutoverEligible?: boolean;
-  };
 };

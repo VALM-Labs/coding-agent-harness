@@ -18,7 +18,8 @@ import {
 import { readCapabilityRegistry, detectCapabilities } from "./capability-registry.mjs";
 import { buildStatus } from "./check-profiles.mjs";
 import { listTaskPlanPaths } from "./task-scanner.mjs";
-import type { CheckTarget, ScannedTask } from "./types/check-profiles.js";
+import type { TaskStatusProjection } from "./task-repository.mjs";
+import type { CheckTarget } from "./types/check-profiles.js";
 
 type MigrationTarget = CheckTarget;
 type MigrationStatus = ReturnType<typeof buildStatus>;
@@ -236,11 +237,11 @@ export function validateFullCutoverSession(session: MigrationSession, failures: 
   if (!session.target || !fs.existsSync(session.target)) return;
   const status = buildStatus(session.target, { strict: true, strictLegacy: true, allowLegacyTarget: true });
   if (status.checkState.status !== "pass") failures.push(`full cutover current strict status is ${status.checkState.status}`);
-  for (const task of status.tasks as ScannedTask[]) {
+  for (const task of status.tasks as TaskStatusProjection[]) {
     if (task.briefQuality?.status !== "pass") failures.push(`${task.path} weak brief: ${(task.briefQuality?.issues || []).join(", ")}`);
     if (task.migrationClassification === "unknown-needs-human") failures.push(`${task.path} has unknown migration classification`);
     if (task.visualMapStatus === "legacy-only") failures.push(`${task.path} only has legacy visual_roadmap.md`);
-    if (["active", "reopened", "current-evidence", "historical-with-diagram"].includes(task.migrationClassification) && task.visualMapSource !== "canonical") {
+    if (["active", "reopened", "current-evidence", "historical-with-diagram"].includes(String(task.migrationClassification || "")) && task.visualMapSource !== "canonical") {
       failures.push(`${task.path} needs canonical visual_map.md for ${task.migrationClassification}`);
     }
   }

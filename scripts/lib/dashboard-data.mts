@@ -46,7 +46,8 @@ import { listPresetPackageLayers } from "./preset-registry.mjs";
 import { validateGovernanceTableBoundaries } from "./governance-table-boundary.mjs";
 import { summarizeGitState } from "./git-status-summary.mjs";
 import type { ResolvedHarnessPaths } from "./harness-paths.mjs";
-import type { CheckTarget, ScannedTask } from "./types/check-profiles.js";
+import type { TaskStatusProjection } from "./task-repository.mjs";
+import type { CheckTarget } from "./types/check-profiles.js";
 
 type DashboardTarget = CheckTarget & {
   harness: ResolvedHarnessPaths;
@@ -112,7 +113,7 @@ export type DashboardBundle = {
   adoption: ReturnType<typeof collectAdoption>;
   presetCatalog: ReturnType<typeof collectPresetCatalog>;
 };
-type DashboardTaskRef = Partial<ScannedTask> & {
+type DashboardTaskRef = Partial<TaskStatusProjection> & {
   closeoutStatus?: string;
   id?: string;
   taskPlanPath?: string;

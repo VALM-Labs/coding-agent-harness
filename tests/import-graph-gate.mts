@@ -97,6 +97,7 @@ const checkProfilesTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/li
 const taskRepositorySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-repository.mts"), "utf8");
 const taskRepositoryTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/task-repository.ts"), "utf8");
 const statusProjectionReaderSource = taskRepositorySource.match(/export function createTaskStatusProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
+const checkProfileReaderSource = taskRepositorySource.match(/export function createTaskCheckProfileReader[\s\S]*?\n}\n/)?.[0] || "";
 const taskIndexProjectionReaderSource = taskRepositorySource.match(/export function createTaskIndexProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
 const taskPlanContractReaderSource = taskRepositorySource.match(/export function createTaskPlanContractReader[\s\S]*?\n}\n/)?.[0] || "";
 const resolveTaskDirectorySource = taskRepositorySource.match(/export function resolveTaskDirectory[\s\S]*?\n}\n/)?.[0] || "";
@@ -116,9 +117,11 @@ assert(!taskIndexSource.includes("createScannerTaskRepository"), "task-index sho
 assert(!taskIndexSource.includes("TaskRecord"), "task-index should not import or retype raw scanner TaskRecord objects");
 assert(!taskIndexSource.includes("task-semantic-projection"), "task-index should consume materialized visibility scopes instead of reinterpreting raw task visibility facts");
 assert(taskIndexSource.includes("createTaskIndexProjectionReader"), "task-index should compose through the task-index projection reader seam");
-assert(!checkProfilesSource.includes("createScannerTaskRepository"), "check-profiles should consume status projections instead of creating the broad scanner-backed repository");
-assert(checkProfilesSource.includes("createTaskStatusProjectionReader"), "check-profiles should compose through the status projection reader seam");
+assert(!checkProfilesSource.includes("createScannerTaskRepository"), "check-profiles should consume a narrow checker reader instead of creating the broad scanner-backed repository");
+assert(!checkProfilesSource.includes("createTaskStatusProjectionReader"), "check-profiles should not consume the broad status/dashboard projection for checker validation");
+assert(checkProfilesSource.includes("createTaskCheckProfileReader"), "check-profiles should compose through the check-profile reader seam");
 assert(!checkProfilesTypesSource.includes("TaskRecord"), "checker task types should not alias raw scanner TaskRecord objects");
+assert(!checkProfilesTypesSource.includes("TaskStatusProjection"), "checker task types should not alias broad status/dashboard projection objects");
 assert(!dashboardWorkbenchSource.includes("subjects: taskRepository"), "dashboard workbench task actions should use narrow subject readers instead of the broad TaskRepository identity");
 assert(!dashboardWorkbenchSource.includes("createScannerTaskRepository"), "dashboard workbench bulk review cache should consume workbench review subjects instead of creating the broad scanner-backed repository");
 assert(!taskTombstoneCommandsSource.includes("createScannerTaskRepository"), "task-tombstone compatibility commands should use the narrow tombstone subject reader instead of the broad scanner-backed repository");
@@ -132,8 +135,10 @@ assert(!lifecycleReviewTaskByDirectorySource.includes("createScannerTaskReposito
 assert(!lifecycleReviewTaskByDirectorySource.includes(".get({ path: taskDir })"), "task-lifecycle review-confirm lookup should not retrieve raw TaskRecord by directory");
 assert(!/export type TaskStatusProjection = \{\s*\[key: string\]: unknown;/m.test(taskRepositoryTypesSource), "TaskStatusProjection should be an explicit status/dashboard contract, not an arbitrary scanner record bag");
 assert(!statusProjectionReaderSource.includes("createScannerTaskRepository"), "TaskStatusProjectionReader should not recreate the broad scanner-backed TaskRepository identity");
+assert(!checkProfileReaderSource.includes("createScannerTaskRepository"), "TaskCheckProfileReader should not recreate the broad scanner-backed TaskRepository identity");
 assert(!taskIndexProjectionReaderSource.includes("createScannerTaskRepository"), "TaskIndexProjectionReader should not recreate the broad scanner-backed TaskRepository identity");
 assert(taskRepositoryTypesSource.includes("export type TaskIndexProjectionReader"), "task repository type island should expose the narrow task-index projection reader contract");
+assert(taskRepositoryTypesSource.includes("export type TaskCheckProfileReader"), "task repository type island should expose the narrow check-profile reader contract");
 assert(!checkTaskContractsSource.includes("createScannerTaskRepository"), "check-task-contracts should consume a narrow plan-contract reader instead of the broad scanner-backed repository");
 assert(checkTaskContractsSource.includes("createTaskPlanContractReader"), "check-task-contracts should compose through the task plan-contract reader seam");
 assert(!taskPlanContractReaderSource.includes("createScannerTaskRepository"), "TaskPlanContractReader should not recreate the broad scanner-backed TaskRepository identity");
