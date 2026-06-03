@@ -29,7 +29,7 @@ import { validateCapabilities } from "./capability-registry.mjs";
 import { readPresetPackage } from "./preset-registry.mjs";
 import { validateRegularTaskPresetContract } from "./task-preset-contract-drift.mjs";
 import { parseTaskBudget } from "./task-metadata.mjs";
-import { createScannerTaskRepository, parsePhases, readVisualMapContractFile, taskPlanPathFromRecord } from "./task-repository.mjs";
+import { createTaskStatusProjectionReader, parsePhases, readVisualMapContractFile, taskPlanPathFromRecord } from "./task-repository.mjs";
 import { normalizeReviewBoolean, reviewFindingColumns } from "./task-review-model.mjs";
 import { allowedPhaseActors, allowedPhaseKinds } from "./phase-kind.mjs";
 import { validateTaskCompletionConsistency } from "./task-completion-consistency.mjs";
@@ -58,6 +58,10 @@ export { renderDashboard } from "./status-dashboard-renderer.mjs";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function listCheckerTasks(target: CheckTarget, options: { requireGeneratedScaffoldProvenance?: boolean; closeoutContent?: string } = {}): ScannedTask[] {
+  return createTaskStatusProjectionReader(target, options).listStatusTasks() as ScannedTask[];
 }
 
 export function runCompatibilityCheck(target: CheckTarget) {
@@ -163,7 +167,7 @@ export function validateReviewSchema(target: CheckTarget, { strict = true }: { s
 export function validateVisualMaps(target: CheckTarget, { tasks }: { tasks?: ScannedTask[] } = {}): ValidationResult {
   const failures: string[] = [];
   const warnings: string[] = [];
-  const taskRecords = tasks || createScannerTaskRepository(target).list();
+  const taskRecords = tasks || listCheckerTasks(target);
   for (const task of taskRecords) {
     const taskPlanPath = taskPlanPathFromRecord(target, task);
     const taskDir = path.dirname(taskPlanPath);
@@ -217,7 +221,7 @@ export function validateTaskPresetContracts(target: CheckTarget, { tasks }: { ta
     "migration-full-cutover",
     "migration-deferred",
   ]);
-  for (const task of tasks || createScannerTaskRepository(target).list()) {
+  for (const task of tasks || listCheckerTasks(target)) {
     if (!task.taskPreset || task.taskPreset === "none") continue;
     let presetPackage: PresetPackage | null = null;
     try {
@@ -348,7 +352,7 @@ export function buildStatus(targetInput: string | undefined, options: BuildStatu
   const legacy = shouldRunLegacy ? runCompatibilityCheck(target) : { status: "skipped", code: 0, stdout: "", stderr: "" };
   const contractStrict = Boolean(options.strict) || (capabilityState.registry.mode !== legacyCompatMode && !safeAdoptionMode);
   const closeoutContent = target.harness?.version === 2 ? "" : readFileSafe(path.join(target.projectRoot, legacyPath(legacyCloseoutFile)));
-  const tasks = createScannerTaskRepository(target, { requireGeneratedScaffoldProvenance: contractStrict, closeoutContent }).list();
+  const tasks = listCheckerTasks(target, { requireGeneratedScaffoldProvenance: contractStrict, closeoutContent });
   const reviews = validateReviewSchema(target, { strict: contractStrict });
   const visualMaps = validateVisualMaps(target, { tasks });
   const planContracts = validatePlanContracts(target, { strict: contractStrict, tasks });
