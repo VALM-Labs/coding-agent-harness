@@ -6,17 +6,13 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { URL } from "node:url";
-import { commitWorkbenchBatch } from "../application/workbench/review-confirmation.mjs";
+import { confirmWorkbenchReviewBatch } from "../application/workbench/review-confirmation.mjs";
 import { createAggregateLessonSedimentationTask } from "./task-lesson-sedimentation.mjs";
-import { normalizeTarget, toPosix } from "./core-shared.mjs";
+import { normalizeTarget } from "./core-shared.mjs";
 import { dashboardWatchRoots } from "./harness-paths.mjs";
 import { createTaskWorkbenchReviewSubjectReader } from "./task-repository.mjs";
 import { taskOperationFailurePayload } from "../application/task/task-operations.mjs";
 import { createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
-import {
-  confirmTaskReview as confirmTaskReviewWithContext,
-  finalizeDeferredTaskReviewConfirmation as finalizeDeferredTaskReviewConfirmationWithContext,
-} from "./task-lifecycle/review-confirm.mjs";
 import { writeDashboardFolder } from "./dashboard-data.mjs";
 import {
   checkPresetPackage,
@@ -28,7 +24,6 @@ import {
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ResolvedHarnessPaths } from "./harness-paths.mjs";
 import type { CheckTarget } from "./types/check-profiles.js";
-import type { TaskWorkbenchReviewSubject, TaskWorkbenchReviewSubjectReader } from "./task-repository.mjs";
 
 const jsonHeaders = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "connection": "close" };
 
@@ -62,22 +57,6 @@ type WorkbenchBody = {
   scope?: string;
   force?: boolean;
   dryRun?: boolean;
-};
-
-type WorkbenchBatchResult = {
-  taskId: string;
-  ok: boolean;
-  status: number;
-  audit?: {
-    allowedPaths?: string[];
-    commitSha?: string;
-    auditCommitSha?: string;
-    auditStatus?: string;
-  };
-  task?: {
-    id: string;
-  };
-  [key: string]: unknown;
 };
 
 type BulkLessonSelection = {
@@ -168,64 +147,13 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
           writeJson(response, 400, { error: "No review tasks selected" });
           return;
         }
-        const results: WorkbenchBatchResult[] = [];
-        const taskCache = buildWorkbenchTaskCache(workbenchReviewSubjects);
-        for (const taskId of taskIds) {
-          const subject = findCachedWorkbenchTask(taskCache, taskId);
-          const block = subject ? bulkReviewConfirmationBlock(subject) : { status: 404, reason: `Task not found: ${taskId}`, payload: { taskId } };
-          if (!subject || block) {
-            results.push({ taskId, ok: false, status: block?.status || 404, error: block?.reason || `Task not found: ${taskId}`, payload: block?.payload || { taskId } });
-            continue;
-          }
-          try {
-            const payload = confirmTaskReviewWithContext(
-              {
-                target,
-                taskDir: subject.paths.directory,
-                findTaskByDirectory: (_target, taskDir) => findCachedTaskByDirectory(taskCache, taskDir)?.reviewTask,
-              },
-              {
-                reviewer: body.reviewer || "Human Reviewer",
-                message: body.message || "bulk confirmed from dashboard workbench",
-                evidence: body.evidence || "",
-                confirmText: subject.confirmText || taskId,
-                deferCommit: true,
-              },
-            ) as { audit?: WorkbenchBatchResult["audit"]; task?: { id?: string } };
-            results.push({ taskId, ok: true, status: 200, audit: payload.audit, task: { id: payload.task?.id || taskId } });
-          } catch (error) {
-            results.push({ taskId, ok: false, status: errorStatus(error), ...errorPayload(error) });
-          }
-        }
-        const confirmed = results.filter((result) => result.ok).length;
-        const failed = results.length - confirmed;
-        if (confirmed > 0) {
-          const allowedPaths = uniqueValues(results.filter((result) => result.ok).flatMap((result) => result.audit?.allowedPaths || []));
-          const confirmCommit = commitWorkbenchBatch(target, allowedPaths, { operation: "review-complete-bulk", message: "chore: confirm selected reviews" });
-          for (const result of results.filter((item) => item.ok)) {
-            const subject = findCachedWorkbenchTask(taskCache, result.taskId);
-            if (!subject) continue;
-            finalizeDeferredTaskReviewConfirmationWithContext(
-              {
-                target,
-                taskDir: subject.paths.directory,
-                findTaskByDirectory: (_target, taskDir) => findCachedTaskByDirectory(taskCache, taskDir)?.reviewTask,
-              },
-              { commitSha: confirmCommit.commitSha },
-            );
-          }
-          const auditCommit = commitWorkbenchBatch(target, allowedPaths, { operation: "review-complete-bulk-audit", message: "chore: record selected review confirmation audit" });
-          for (const result of results.filter((item) => item.ok)) {
-            result.audit = {
-              ...result.audit,
-              commitSha: confirmCommit.commitSha,
-              auditCommitSha: auditCommit.commitSha,
-              auditStatus: "committed",
-              allowedPaths,
-            };
-          }
-        }
-        writeJson(response, confirmed > 0 ? 200 : 409, { ok: failed === 0, confirmed, failed, results });
+        const payload = confirmWorkbenchReviewBatch(target, workbenchReviewSubjects.listWorkbenchReviewSubjects(), taskIds, {
+          reviewer: body.reviewer || "Human Reviewer",
+          message: body.message || "bulk confirmed from dashboard workbench",
+          evidence: body.evidence || "",
+        });
+        if (payload.confirmed > 0) regenerate();
+        writeJson(response, payload.confirmed > 0 ? 200 : 409, payload);
         return;
       }
 
@@ -421,64 +349,6 @@ function normalizeBulkLessonSelections(rawSelections: unknown): BulkLessonSelect
     result.push({ taskId, candidateId });
   }
   return result;
-}
-
-type WorkbenchTaskCache = {
-  byId: Map<string, TaskWorkbenchReviewSubject>;
-  byDirectory: Map<string, TaskWorkbenchReviewSubject>;
-};
-
-type BulkReviewBlock = {
-  status: number;
-  reason: string;
-  payload: Record<string, unknown>;
-};
-
-function buildWorkbenchTaskCache(reader: TaskWorkbenchReviewSubjectReader): WorkbenchTaskCache {
-  const subjects = reader.listWorkbenchReviewSubjects();
-  const byId = new Map<string, TaskWorkbenchReviewSubject>();
-  const byDirectory = new Map<string, TaskWorkbenchReviewSubject>();
-  for (const subject of subjects) {
-    for (const id of subject.aliases) byId.set(id, subject);
-    byDirectory.set(normalizeWorkbenchPath(subject.paths.directory), subject);
-  }
-  return { byId, byDirectory };
-}
-
-function findCachedWorkbenchTask(cache: WorkbenchTaskCache, taskId: string): TaskWorkbenchReviewSubject | undefined {
-  return cache.byId.get(String(taskId || ""));
-}
-
-function findCachedTaskByDirectory(cache: WorkbenchTaskCache, taskDir: string): TaskWorkbenchReviewSubject | undefined {
-  return cache.byDirectory.get(normalizeWorkbenchPath(taskDir));
-}
-
-function normalizeWorkbenchPath(filePath: string): string {
-  return toPosix(path.resolve(filePath));
-}
-
-function bulkReviewConfirmationBlock(subject: TaskWorkbenchReviewSubject): BulkReviewBlock | null {
-  const projection = subject.semanticProjection;
-  const lifecycle = projection.taskLifecycleProjection;
-  const reviewView = projection.reviewWorkbenchQueueView;
-  if (reviewView.confirmed) {
-    return { status: 409, reason: "Review is already confirmed.", payload: { reviewStatus: lifecycle.reviewStatus || "confirmed", taskId: subject.id } };
-  }
-  if (!reviewView.humanConfirmable) {
-    return {
-      status: 409,
-      reason: "Review completion is only available for tasks in the review queue.",
-      payload: {
-        reviewQueueState: lifecycle.reviewQueueState || "unknown",
-        taskQueues: reviewView.queues,
-        queueReasons: subject.queueReasons,
-        repairPrompt: subject.repairPrompt,
-        reviewStatus: lifecycle.reviewStatus || "unknown",
-        taskId: subject.id,
-      },
-    };
-  }
-  return null;
 }
 
 function startPollingWatch(roots: string | string[], regenerate: () => void): ReturnType<typeof setInterval> {

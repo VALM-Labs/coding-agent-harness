@@ -201,6 +201,8 @@ assert(!taskTombstoneCommandsSource.includes("../adapters/cli/"), "task-tombston
 assert(taskTombstoneCommandsSource.includes("createScannerTaskTombstoneSubjectReader"), "task-tombstone compatibility commands should compose through the scanner-backed tombstone subject reader adapter");
 assert(!dashboardWorkbenchSource.includes("TaskRecord"), "dashboard workbench bulk review cache should not store raw scanner TaskRecord objects");
 assert(!dashboardWorkbenchSource.includes("buildTaskSemanticProjection"), "dashboard workbench bulk review gate should not interpret raw task facts locally");
+assert(!dashboardWorkbenchSource.includes("task-lifecycle/review-confirm"), "dashboard workbench should route review confirmation through the application workbench contract");
+assert(dashboardWorkbenchSource.includes("confirmWorkbenchReviewBatch"), "dashboard workbench should compose bulk review confirmation through the application workbench contract");
 assert(taskLifecycleSource.includes("createTaskReviewConfirmationSubjectReader"), "task-lifecycle review-confirm should consume the narrow review confirmation subject reader");
 assert(lifecycleReviewTaskByDirectorySource.includes("createTaskReviewConfirmationSubjectReader"), "task-lifecycle review-confirm lookup should use the narrow review confirmation subject reader");
 assert(!lifecycleReviewTaskByDirectorySource.includes("createScannerTaskRepository"), "task-lifecycle review-confirm lookup should not use the broad scanner-backed repository identity");
@@ -274,6 +276,7 @@ const taskInfrastructureLayer = graph.architectureContract.layers.find((layer) =
 assert(taskInfrastructureLayer?.owns.includes("scripts/infrastructure/task/**"), "contract should register task infrastructure adapter ownership");
 assert(taskInfrastructureLayer?.mayImport.includes("scripts/lib/task-scanner.mts"), "task infrastructure adapter contract should explicitly own scanner reads");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P05-domain-task-subject-semantic-projection-bridge"), "contract should not keep the retired task subject domain semantic projection bridge");
+assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P08-dashboard-workbench-review-confirm-internal-bridge"), "contract should not keep the retired dashboard workbench review-confirm internal bridge");
 assert(!taskSubjectsSource.includes("../../lib/task-semantic-projection"), "task subject domain mapper should consume the domain-owned semantic projection module");
 assert(taskSemanticProjectionSource.includes("export * from \"../domain/task/task-semantic-projection.mjs\""), "legacy task semantic projection module should be a compatibility re-export");
 const legacyWriterLifecycleBridge = graph.architectureContract.phaseOpenExceptions.find((exception) => exception.id === "P04-infrastructure-task-operation-lifecycle-writer-adapter");
