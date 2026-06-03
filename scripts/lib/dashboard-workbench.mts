@@ -11,11 +11,8 @@ import { createAggregateLessonSedimentationTask } from "./task-lesson-sedimentat
 import { normalizeTarget, toPosix } from "./core-shared.mjs";
 import { dashboardWatchRoots } from "./harness-paths.mjs";
 import { createTaskWorkbenchReviewSubjectReader } from "./task-repository.mjs";
-import { createTaskOperations, taskOperationFailurePayload } from "../application/task/task-operations.mjs";
-import {
-  createScannerTaskOperationSubjectReader,
-  createScannerTaskTombstoneSubjectReader,
-} from "../adapters/cli/task-operation-subject-reader.mjs";
+import { taskOperationFailurePayload } from "../application/task/task-operations.mjs";
+import { createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
 import {
   confirmTaskReview as confirmTaskReviewWithContext,
   finalizeDeferredTaskReviewConfirmation as finalizeDeferredTaskReviewConfirmationWithContext,
@@ -94,10 +91,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
   if (host !== "127.0.0.1") throw new Error("dashboard workbench only supports --host 127.0.0.1");
   const target = normalizeTarget(targetInput) as WorkbenchTarget;
   const workbenchReviewSubjects = createTaskWorkbenchReviewSubjectReader(target);
-  const taskOperations = createTaskOperations(target.projectRoot, {
-    subjects: createScannerTaskOperationSubjectReader(target),
-    tombstoneSubjects: createScannerTaskTombstoneSubjectReader(target),
-  });
+  const taskOperations = createScannerTaskOperations(target.projectRoot);
   const outputDir = path.resolve(outDir);
   const csrfToken = crypto.randomBytes(24).toString("hex");
   const options = localeOverride ? { localeOverride } : {};

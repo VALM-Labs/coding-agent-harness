@@ -1,9 +1,8 @@
 import { normalizeTarget } from "../../lib/core-shared.mjs";
-import { createTask, confirmTaskReview, updateTaskLifecycle } from "../../lib/task-lifecycle.mjs";
-import { createLessonSedimentationTask } from "../../lib/task-lesson-sedimentation.mjs";
 import { createTombstoneOperations } from "./tombstone-operations.mjs";
 import type { TaskOperationSubject, TaskOperationSubjectReader, TombstoneSubjectReader } from "../../lib/types/task-repository.js";
 import type { CreateTaskOptions, LifecycleUpdateOptions, ReviewConfirmOptions } from "../../lib/types/task-lifecycle.js";
+import type { TaskOperationWriters } from "../../ports/task/task-operation-writers.mjs";
 
 type JsonPayload = Record<string, unknown>;
 type OperationTask = TaskOperationSubject;
@@ -29,6 +28,7 @@ export type OperationResult<TData = unknown> = OperationSuccess<TData> | Operati
 export type TaskOperationsOptions = {
   subjects?: TaskOperationSubjectReader;
   tombstoneSubjects?: TombstoneSubjectReader;
+  writers?: TaskOperationWriters;
 };
 
 export type CreateTaskInput = CreateTaskOptions & {
@@ -129,6 +129,8 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
   const target = normalizeTarget(rawTargetInput);
   const subjects = options.subjects;
   if (!subjects) throw new Error("TaskOperations requires a TaskOperationSubjectReader.");
+  const writers = options.writers;
+  if (!writers) throw new Error("TaskOperations requires TaskOperationWriters.");
   const targetRoot = target.projectRoot;
   const tombstoneSubjects = options.tombstoneSubjects || combinedTombstoneSubjectReader(subjects);
   if (!tombstoneSubjects) throw new Error("TaskOperations requires a TombstoneSubjectReader.");
@@ -137,14 +139,14 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
   return {
     create(input) {
       const { taskId, targetInput: createTargetInput, ...createOptions } = input;
-      return runOperation(() => createTask(createTargetInput || rawTargetInput, taskId, createOptions));
+      return runOperation(() => writers.createTask(createTargetInput || rawTargetInput, taskId, createOptions));
     },
     updateLifecycle(input) {
       const { taskId, ...lifecycleOptions } = input;
       if (lifecycleOptions.event === "task-complete" || lifecycleOptions.state === "done") {
         return this.complete({ taskId, message: lifecycleOptions.message, evidence: lifecycleOptions.evidence });
       }
-      return runOperation(() => updateTaskLifecycle(targetRoot, taskId, lifecycleOptions));
+      return runOperation(() => writers.updateTaskLifecycle(targetRoot, taskId, lifecycleOptions));
     },
     start(input) {
       return this.updateLifecycle({ ...input, event: "task-start", state: "in_progress" });
@@ -157,7 +159,7 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
       if (!task.success) return task;
       const blocked = taskCompleteBlock(task.data);
       if (blocked) return blocked;
-      return runOperation(() => updateTaskLifecycle(targetRoot, input.taskId, {
+      return runOperation(() => writers.updateTaskLifecycle(targetRoot, input.taskId, {
         event: "task-complete",
         state: "done",
         message: input.message,
@@ -170,7 +172,7 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
       const blocked = reviewConfirmationBlock(task.data);
       if (blocked) return blocked;
       const { taskId, ...reviewOptions } = input;
-      return runOperation(() => confirmTaskReview(targetRoot, taskId, reviewOptions));
+      return runOperation(() => writers.confirmTaskReview(targetRoot, taskId, reviewOptions));
     },
     delete(input) {
       return runOperation(() => tombstones.delete(input.taskId, {
@@ -215,7 +217,7 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
       const task = getOperationTask(subjects, input.taskId);
       if (!task.success) return task;
       if (!String(input.candidateId || "").trim()) return failure("Missing lesson candidate id", { status: 400 });
-      return runOperation(() => createLessonSedimentationTask(targetRoot, input.taskId, input.candidateId, {
+      return runOperation(() => writers.createLessonSedimentationTask(targetRoot, input.taskId, input.candidateId, {
         dryRun: input.dryRun === true,
         title: input.title || "",
         deferCommit: input.deferCommit === true,

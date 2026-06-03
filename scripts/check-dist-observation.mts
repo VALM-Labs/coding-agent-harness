@@ -65,6 +65,7 @@ type InstallSmokeObservation = {
   bin?: string;
   binMode?: number;
   binExecutable?: boolean;
+  binShebang?: string;
   postinstall?: string;
   observeDist?: string;
   hasTests?: boolean;
@@ -313,7 +314,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
     maxBuffer: 32 * 1024 * 1024,
   });
   if (pack.status !== 0) {
-    failures.push({ code: "install-smoke-pack-failed", message: `npm pack failed\nSTDOUT:\n${pack.stdout}\nSTDERR:\n${pack.stderr}` });
+    failures.push({ code: "install-smoke-pack-failed", message: `npm pack failed\nERROR:\n${pack.error ? errorMessage(pack.error) : ""}\nSTDOUT:\n${pack.stdout ?? ""}\nSTDERR:\n${pack.stderr ?? ""}` });
     return;
   }
 
@@ -331,7 +332,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
     maxBuffer: 32 * 1024 * 1024,
   });
   if (install.status !== 0) {
-    failures.push({ code: "install-smoke-install-failed", message: `npm install packed tarball failed\nSTDOUT:\n${install.stdout}\nSTDERR:\n${install.stderr}` });
+    failures.push({ code: "install-smoke-install-failed", message: `npm install packed tarball failed\nERROR:\n${install.error ? errorMessage(install.error) : ""}\nSTDOUT:\n${install.stdout ?? ""}\nSTDERR:\n${install.stderr ?? ""}` });
     return;
   }
 
@@ -343,6 +344,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
   const binTarget = fs.existsSync(bin) ? fs.readlinkSync(bin) : "";
   const installedBinFile = path.join(packageRoot, "dist/harness.mjs");
   const installedBinMode = fs.existsSync(installedBinFile) ? fs.statSync(installedBinFile).mode : undefined;
+  const installedBinShebang = fs.existsSync(installedBinFile) ? fs.readFileSync(installedBinFile, "utf8").split(/\r?\n/, 1)[0] : "";
   const installSmoke: InstallSmokeObservation & {
     scriptsDisabled: string[];
     steps: CommandStep[];
@@ -353,6 +355,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
     bin: pkg.bin?.harness,
     binMode: installedBinMode,
     binExecutable: typeof installedBinMode === "number" && Boolean(installedBinMode & 0o111),
+    binShebang: installedBinShebang,
     postinstall: pkg.scripts?.postinstall,
     observeDist: pkg.scripts?.["observe:dist"],
     hasTests: fs.existsSync(path.join(packageRoot, "tests")),
@@ -371,6 +374,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
   if (!installSmoke.binExecutable) {
     failures.push({ code: "installed-bin-not-executable", file: "dist/harness.mjs", mode: installedBinMode, message: "installed package bin dist/harness.mjs must be executable" });
   }
+  expectEqual(failures, "installed-bin-shebang-not-node-env", installedBinShebang, "#!/usr/bin/env node", "installed package bin dist/harness.mjs must keep the portable node env shebang");
   for (const relative of ["postinstall.mjs", "run-dist.mjs", "dist/harness.mjs", "dist/postinstall.mjs", "dist/check-dist-observation.mjs"]) {
     if (!fs.existsSync(path.join(packageRoot, relative))) failures.push({ code: "installed-file-missing", file: relative, message: `installed package missing ${relative}` });
   }
@@ -384,7 +388,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
   }
 
   const runtimeEnv = isolatedEnv({ nodeBin, home, extraPath: [path.join(consumer, "node_modules", ".bin")] });
-  runInstalledMatrix(root, runtimeEnv, failures, installSmoke.steps);
+  runInstalledMatrix(root, runtimeEnv, failures, installSmoke.steps, node24, installedBinFile);
 
   const postinstall = spawnSync(node24, [path.join(packageRoot, "dist/postinstall.mjs")], {
     cwd: packageRoot,
@@ -423,7 +427,7 @@ function runInstalledPackageSmoke(root: string, failures: Failure[], observation
 
 }
 
-function runInstalledMatrix(root: string, runtimeEnv: NodeJS.ProcessEnv, failures: Failure[], steps: CommandStep[]) {
+function runInstalledMatrix(root: string, runtimeEnv: NodeJS.ProcessEnv, failures: Failure[], steps: CommandStep[], node24: string, installedBinFile: string) {
   const matrix = [
     { id: "installed-help", cwd: root, args: ["--help"] },
     { id: "installed-status", cwd: root, args: ["status", "--json", "examples/minimal-project"] },
@@ -437,7 +441,7 @@ function runInstalledMatrix(root: string, runtimeEnv: NodeJS.ProcessEnv, failure
   ];
 
   for (const entry of matrix) {
-    const result = spawnSync("harness", entry.args, {
+    const result = spawnSync(node24, [installedBinFile, ...entry.args], {
       cwd: entry.cwd,
       encoding: "utf8",
       env: runtimeEnv,
@@ -448,7 +452,7 @@ function runInstalledMatrix(root: string, runtimeEnv: NodeJS.ProcessEnv, failure
       failures.push({
         code: "installed-command-failed",
         command: entry.id,
-        message: `installed command ${entry.id} failed after scripts/ isolation\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`,
+        message: `installed command ${entry.id} failed after scripts/ isolation\nERROR:\n${result.error ? errorMessage(result.error) : ""}\nSIGNAL:\n${result.signal ?? ""}\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`,
       });
     }
   }
@@ -486,11 +490,13 @@ function isolatedEnv({
   home?: string;
   extraPath?: string[];
 }): NodeJS.ProcessEnv {
+  const nodePath = path.dirname(nodeBin);
+  const basePath = (process.env.PATH || "").split(path.delimiter).filter(Boolean);
   return {
     ...process.env,
     HOME: home,
     npm_config_cache: path.join(home, ".npm"),
-    PATH: [...extraPath, nodeBin, "/usr/bin", "/bin"].join(path.delimiter),
+    PATH: [...new Set([...extraPath, nodePath, "/usr/bin", "/bin", ...basePath])].join(path.delimiter),
   };
 }
 

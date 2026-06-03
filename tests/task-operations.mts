@@ -7,6 +7,7 @@ import {
   createScannerTaskOperationSubjectReader,
   createScannerTaskTombstoneSubjectReader,
 } from "../scripts/adapters/cli/task-operation-subject-reader.mjs";
+import { createLegacyTaskOperationWriters } from "../scripts/infrastructure/task/legacy-task-operation-writers.mjs";
 import { createScannerTaskRepository } from "../scripts/lib/task-repository.mjs";
 import {
   assert,
@@ -24,6 +25,9 @@ type FailureResult = {
 
 const target = path.join(tmpRoot, "task-operations-target");
 fs.cpSync(path.join(repoRoot, "examples/minimal-project"), target, { recursive: true });
+const harnessCore = await import("../scripts/lib/harness-core.mjs") as {
+  createLegacyTaskOperationWriters: typeof createLegacyTaskOperationWriters;
+};
 
 let missingSubjectsError = "";
 try {
@@ -33,9 +37,21 @@ try {
 }
 assert(missingSubjectsError.includes("TaskOperations requires a TaskOperationSubjectReader"), "TaskOperations should fail fast instead of creating a scanner-backed repository inside the application module");
 
+let missingWritersError = "";
+try {
+  createTaskOperations(target, {
+    subjects: createScannerTaskOperationSubjectReader(target),
+    tombstoneSubjects: createScannerTaskTombstoneSubjectReader(target),
+  });
+} catch (error) {
+  missingWritersError = error instanceof Error ? error.message : String(error);
+}
+assert(missingWritersError.includes("TaskOperations requires TaskOperationWriters"), "TaskOperations should fail fast instead of importing legacy lifecycle writers inside the application module");
+
 const operations = createTaskOperations(target, {
   subjects: createScannerTaskOperationSubjectReader(target),
   tombstoneSubjects: createScannerTaskTombstoneSubjectReader(target),
+  writers: createLegacyTaskOperationWriters(),
 });
 
 const reviewResult = operations.confirmReview({
@@ -62,13 +78,27 @@ const cliComplete = run(["task-complete", "demo-task", "--message", "try closeou
 assert(cliComplete.status !== 0, "CLI task-complete should reject the same closeout precondition");
 assert(cliComplete.stderr.includes(completeResult.reason), "CLI task-complete should surface the TaskOperations closeout reason");
 
-const combinedReaderOperations = createTaskOperations(target, { subjects: createScannerTaskRepository(target) });
+const combinedReaderOperations = createTaskOperations(target, {
+  subjects: createScannerTaskRepository(target),
+  writers: createLegacyTaskOperationWriters(),
+});
 const combinedReaderComplete = combinedReaderOperations.complete({
   taskId: "demo-task",
   message: "try closeout through legacy combined reader",
 });
 assertFailure(combinedReaderComplete, "combined TaskRepository readers should remain compatible with TaskOperations construction");
 assert(combinedReaderComplete.reason.includes("task-review"), "combined reader closeout rejection should preserve TaskOperations semantics");
+
+const barrelWriterOperations = createTaskOperations(target, {
+  subjects: createScannerTaskRepository(target),
+  writers: harnessCore.createLegacyTaskOperationWriters(),
+});
+const barrelWriterComplete = barrelWriterOperations.complete({
+  taskId: "demo-task",
+  message: "try closeout through harness-core writer factory",
+});
+assertFailure(barrelWriterComplete, "harness-core should expose the writer factory needed for package-facing TaskOperations construction");
+assert(barrelWriterComplete.reason.includes("task-review"), "harness-core writer factory should preserve TaskOperations semantics");
 
 const ambiguousTarget = path.join(tmpRoot, "task-operations-ambiguous-target");
 fs.cpSync(path.join(repoRoot, "examples/minimal-project"), ambiguousTarget, { recursive: true });
@@ -79,6 +109,7 @@ fs.cpSync(sourceTaskDir, moduleTaskDir, { recursive: true });
 const ambiguousResult = createTaskOperations(ambiguousTarget, {
   subjects: createScannerTaskOperationSubjectReader(ambiguousTarget),
   tombstoneSubjects: createScannerTaskTombstoneSubjectReader(ambiguousTarget),
+  writers: createLegacyTaskOperationWriters(),
 }).complete({
   taskId: "demo-task",
   message: "try ambiguous closeout",
@@ -153,6 +184,7 @@ const projectionQueueOperations = createTaskOperations(target, {
     }),
   },
   tombstoneSubjects: { getTombstoneSubject: () => { throw new Error("not used"); } },
+  writers: createLegacyTaskOperationWriters(),
 });
 
 const projectionQueueReview = projectionQueueOperations.confirmReview({
@@ -227,6 +259,7 @@ const projectionFirstOperations = createTaskOperations(target, {
     }),
   },
   tombstoneSubjects: { getTombstoneSubject: () => { throw new Error("not used"); } },
+  writers: createLegacyTaskOperationWriters(),
 });
 
 const projectionFirstReview = projectionFirstOperations.confirmReview({
@@ -246,6 +279,7 @@ const blockingRiskOperations = createTaskOperations(target, {
     }),
   },
   tombstoneSubjects: { getTombstoneSubject: () => { throw new Error("not used"); } },
+  writers: createLegacyTaskOperationWriters(),
 });
 const blockingRiskComplete = blockingRiskOperations.complete({
   taskId: "blocking-risk-task",
@@ -265,6 +299,7 @@ const pendingLessonOperations = createTaskOperations(target, {
     }),
   },
   tombstoneSubjects: { getTombstoneSubject: () => { throw new Error("not used"); } },
+  writers: createLegacyTaskOperationWriters(),
 });
 const pendingLessonComplete = pendingLessonOperations.complete({
   taskId: "pending-lesson-task",
