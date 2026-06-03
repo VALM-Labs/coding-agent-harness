@@ -10,7 +10,7 @@ import {
 } from "./core-shared.mjs";
 import { splitMarkdownRow } from "./markdown-utils.mjs";
 import { buildTaskIndex } from "./task-index.mjs";
-import { createScannerTaskRepository } from "./task-repository.mjs";
+import { createTaskGovernanceProjectionReader } from "./task-repository.mjs";
 import {
   beginGovernanceSync,
   commitGovernanceSync,
@@ -20,14 +20,14 @@ import {
 import { markdownCell } from "./task-lifecycle/text-utils.mjs";
 import type { ResolvedHarnessPaths } from "./harness-paths.mjs";
 import type { TaskLifecycleProjection } from "./task-semantic-projection.mjs";
-import type { TaskRecord } from "./task-repository.mjs";
+import type { TaskGovernanceProjection } from "./task-repository.mjs";
 
 type GovernanceTarget = ReturnType<typeof normalizeTarget> & {
   projectRoot: string;
   harness: ResolvedHarnessPaths;
 };
 
-type GovernanceTask = TaskRecord;
+type GovernanceTask = TaskGovernanceProjection;
 
 type GovernanceSurface = {
   surface: string;
@@ -54,7 +54,7 @@ export function rebuildGovernanceIndexes(targetInput: string, { dryRun = false, 
   const effectiveApply = Boolean(apply && !dryRun);
   const context = beginGovernanceSync(target, { operation: "governance rebuild", dryRun: !effectiveApply });
   try {
-    const tasks = createScannerTaskRepository(target).list({ includeArchived: true })
+    const tasks = createTaskGovernanceProjectionReader(target).listGovernanceTasks({ includeArchived: true })
       .filter((task) => task.deletionState !== "deleted")
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     const surfaces: RebuildSurface[] = [...governanceSurfaces(target, tasks), ...taskIndexSurfaces(target, tasks), ...moduleGeneratedIndexSurfaces(target, tasks)];
@@ -136,7 +136,7 @@ function taskIndexSurfaces(target: GovernanceTarget, tasks: GovernanceTask[]): G
   const taskIndexJson = buildTaskIndex(target.projectRoot);
   const taskIndexRows = tasks.map((task) => [
     task.taskKey || task.id,
-    task.title || task.shortId || task.id,
+    task.title || task.shortId || task.id || "task",
     taskLifecycleProjection(task).state,
     taskLifecycleProjection(task).lifecycleState,
     taskLifecycleProjection(task).reviewStatus,
@@ -234,7 +234,7 @@ function ledgerRow(task: GovernanceTask): string[] {
     taskLedgerId(task),
     scope,
     moduleKey,
-    task.title || task.shortId || task.id,
+    task.title || task.shortId || task.id || "task",
     mapLedgerState(taskLifecycleProjection(task).state),
     Array.isArray(task.taskQueues) && task.taskQueues.length ? task.taskQueues.join(",") : "none",
     plan,

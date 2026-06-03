@@ -32,6 +32,8 @@ import type {
   TaskOperationSemanticProjection as TaskRepositoryOperationSemanticProjection,
   TaskOperationSubject as TaskRepositoryOperationSubject,
   TaskOperationSubjectReader as TaskRepositoryOperationSubjectReader,
+  TaskGovernanceProjection as TaskRepositoryGovernanceProjection,
+  TaskGovernanceProjectionReader as TaskRepositoryGovernanceProjectionReader,
   TaskLifecycleReader as TaskRepositoryLifecycleReader,
   TaskLifecycleTask as TaskRepositoryLifecycleTask,
   TaskCheckProfileReader as TaskRepositoryCheckProfileReader,
@@ -78,6 +80,8 @@ export type TaskCheckProfileTask = TaskRepositoryCheckProfileTask;
 export type TaskCheckProfileReader = TaskRepositoryCheckProfileReader;
 export type TaskIndexProjection = TaskRepositoryIndexProjection;
 export type TaskIndexProjectionReader = TaskRepositoryIndexProjectionReader;
+export type TaskGovernanceProjection = TaskRepositoryGovernanceProjection;
+export type TaskGovernanceProjectionReader = TaskRepositoryGovernanceProjectionReader;
 export type TaskPlanContractTask = TaskRepositoryPlanContractTask;
 export type TaskPlanContractReader = TaskRepositoryPlanContractReader;
 export type TaskTombstonePolicyFacts = TaskRepositoryTombstonePolicyFacts;
@@ -241,6 +245,15 @@ export function createTaskIndexProjectionReader(targetInput: TaskScannerTarget |
   return {
     listTaskIndexTasks(query: TaskQuery = {}) {
       return collectTaskIndexTasks(target, defaults, query);
+    },
+  };
+}
+
+export function createTaskGovernanceProjectionReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskGovernanceProjectionReader {
+  const target = normalizeRepositoryTarget(targetInput);
+  return {
+    listGovernanceTasks(query: TaskQuery = {}) {
+      return collectGovernanceTasks(target, defaults, query);
     },
   };
 }
@@ -425,6 +438,15 @@ function collectTaskIndexTasks(target: TaskScannerTarget, defaults: ScannerRepos
   return applyTaskQuery(tasks, query).map(taskIndexProjectionFromRecord);
 }
 
+function collectGovernanceTasks(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, query: TaskQuery = {}): TaskGovernanceProjection[] {
+  const tasks = collectTasks(target, {
+    requireGeneratedScaffoldProvenance: query.requireGeneratedScaffoldProvenance ?? defaults.requireGeneratedScaffoldProvenance,
+    includeArchived: query.includeArchived !== false,
+    closeoutContent: query.closeoutContent ?? defaults.closeoutContent,
+  });
+  return applyTaskQuery(tasks, query).map(taskGovernanceProjectionFromRecord);
+}
+
 function collectPlanContractTasks(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, query: TaskQuery = {}): TaskPlanContractTask[] {
   const tasks = collectTasks(target, {
     requireGeneratedScaffoldProvenance: query.requireGeneratedScaffoldProvenance ?? defaults.requireGeneratedScaffoldProvenance,
@@ -524,6 +546,34 @@ function taskIndexProjectionFromRecord(task: TaskRecord): TaskIndexProjection {
     visibilityScopes: taskVisibilityScopes(task),
     visualMapPath: task.visualMapPath,
     walkthroughPath: task.walkthroughPath,
+  };
+}
+
+function taskGovernanceProjectionFromRecord(task: TaskRecord): TaskGovernanceProjection {
+  return {
+    id: task.id,
+    taskKey: task.taskKey,
+    shortId: task.shortId,
+    title: task.title,
+    path: task.path,
+    taskPlanPath: task.taskPlanPath,
+    module: task.module,
+    state: task.state,
+    lifecycleState: task.lifecycleState,
+    reviewStatus: task.reviewStatus,
+    reviewQueueState: task.reviewQueueState,
+    closeoutStatus: task.closeoutStatus,
+    materialsReady: task.materialsReady,
+    reviewSubmitted: task.reviewSubmitted,
+    reviewPath: task.reviewPath,
+    walkthroughPath: task.walkthroughPath,
+    lessonCandidateDecisionComplete: task.lessonCandidateDecisionComplete,
+    lessonCandidateStatus: task.lessonCandidateStatus,
+    taskQueues: task.taskQueues,
+    materialIssues: task.materialIssues,
+    stateConflicts: task.stateConflicts,
+    deletionState: task.deletionState,
+    taskLifecycleProjection: task.taskLifecycleProjection,
   };
 }
 

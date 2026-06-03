@@ -241,6 +241,36 @@ export type TaskIndexProjectionReader = {
   listTaskIndexTasks(query?: TaskQuery): TaskIndexProjection[];
 };
 
+export type TaskGovernanceProjection = {
+  id?: string;
+  taskKey?: string;
+  shortId?: string;
+  title?: string;
+  path: string;
+  taskPlanPath?: string;
+  module?: string | null;
+  state?: string;
+  lifecycleState?: string;
+  reviewStatus?: string;
+  reviewQueueState?: string;
+  closeoutStatus?: string;
+  materialsReady?: boolean;
+  reviewSubmitted?: boolean;
+  reviewPath?: string;
+  walkthroughPath?: string;
+  lessonCandidateDecisionComplete?: boolean;
+  lessonCandidateStatus?: string;
+  taskQueues?: string[];
+  materialIssues?: unknown[];
+  stateConflicts?: unknown[];
+  deletionState?: string;
+  taskLifecycleProjection?: TaskOperationLifecycleProjection;
+};
+
+export type TaskGovernanceProjectionReader = {
+  listGovernanceTasks(query?: TaskQuery): TaskGovernanceProjection[];
+};
+
 export type TaskPlanContractTask = {
   path?: string;
   taskPlanPath?: string;

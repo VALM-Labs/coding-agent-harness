@@ -11,7 +11,7 @@ import {
 import { buildTaskOperationSubject, buildTaskTombstoneSubject } from "../scripts/domain/task/task-subjects.mjs";
 import { buildStatusData } from "../scripts/lib/status-builder.mjs";
 import { collectTasks, listTaskPlanPaths } from "../scripts/lib/task-scanner.mjs";
-import { createScannerTaskRepository, createTaskCheckProfileReader, createTaskIndexProjectionReader, createTaskLifecycleReader, createTaskPlanContractReader, createTaskReviewConfirmationSubjectReader, createTaskStatusProjectionReader, createTaskWorkbenchReviewSubjectReader } from "../scripts/lib/task-repository.mjs";
+import { createScannerTaskRepository, createTaskCheckProfileReader, createTaskGovernanceProjectionReader, createTaskIndexProjectionReader, createTaskLifecycleReader, createTaskPlanContractReader, createTaskReviewConfirmationSubjectReader, createTaskStatusProjectionReader, createTaskWorkbenchReviewSubjectReader } from "../scripts/lib/task-repository.mjs";
 
 type ComparableTask = {
   id?: string;
@@ -205,6 +205,32 @@ const checkProfileTaskKeys = [
   "visualMapStatus",
 ].sort();
 
+const governanceProjectionKeys = [
+  "closeoutStatus",
+  "deletionState",
+  "id",
+  "lessonCandidateDecisionComplete",
+  "lessonCandidateStatus",
+  "lifecycleState",
+  "materialIssues",
+  "materialsReady",
+  "module",
+  "path",
+  "reviewPath",
+  "reviewQueueState",
+  "reviewStatus",
+  "reviewSubmitted",
+  "shortId",
+  "state",
+  "stateConflicts",
+  "taskKey",
+  "taskLifecycleProjection",
+  "taskPlanPath",
+  "taskQueues",
+  "title",
+  "walkthroughPath",
+].sort();
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -229,6 +255,12 @@ function queueComparable(task: ComparableTask): ComparableTask {
   };
 }
 
+function governanceQueueComparable(task: ComparableTask): ComparableTask {
+  const comparable = queueComparable(task);
+  delete comparable.queueReasons;
+  return comparable;
+}
+
 function statusProjectionComparable(task: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(statusProjectionKeys.map((key) => [key, task[key]]));
 }
@@ -239,6 +271,10 @@ function taskIndexProjectionComparable(task: Record<string, unknown>): Record<st
 
 function checkProfileTaskComparable(task: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(checkProfileTaskKeys.map((key) => [key, task[key]]));
+}
+
+function governanceProjectionComparable(task: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(governanceProjectionKeys.map((key) => [key, task[key]]));
 }
 
 function expectedTaskIndexProjectionComparableFromRepository(task: Record<string, unknown>): Record<string, unknown> {
@@ -260,6 +296,7 @@ const targetPath = copyMinimalProject("minimal");
 const target = normalizeTarget(targetPath);
 const repository = createScannerTaskRepository(target);
 const taskIndexProjectionReader = createTaskIndexProjectionReader(target);
+const governanceProjectionReader = createTaskGovernanceProjectionReader(target);
 const planContractReader = createTaskPlanContractReader(target);
 const checkProfileReader = createTaskCheckProfileReader(target);
 const lifecycleReader = createTaskLifecycleReader(target);
@@ -270,6 +307,7 @@ const legacyTaskPlanPaths = listTaskPlanPaths(target);
 const legacyTasks = collectTasks(target, { taskPlanPaths: legacyTaskPlanPaths });
 const repositoryTasks = repository.list();
 const taskIndexProjectionTasks = taskIndexProjectionReader.listTaskIndexTasks();
+const governanceProjectionTasks = governanceProjectionReader.listGovernanceTasks();
 const planContractTasks = planContractReader.listPlanContractTasks();
 const checkProfileTasks = checkProfileReader.listCheckProfileTasks();
 const lifecycleTasks = lifecycleReader.listLifecycleTasks();
@@ -278,15 +316,18 @@ const workbenchReviewSubjects = workbenchReviewSubjectReader.listWorkbenchReview
 const statusProjectionTypeKeys = topLevelStatusProjectionTypeKeys();
 const taskIndexProjectionTypeKeys = topLevelProjectionTypeKeys("TaskIndexProjection");
 const checkProfileTaskTypeKeys = topLevelProjectionTypeKeys("TaskCheckProfileTask");
+const governanceProjectionTypeKeys = topLevelProjectionTypeKeys("TaskGovernanceProjection");
 
 assert(repositoryTasks.length === legacyTasks.length, "repository list should preserve task count");
 assert(taskIndexProjectionTasks.length === repositoryTasks.length, "task-index projection reader should preserve task count without exposing scanner records to task-index");
+assert(governanceProjectionTasks.length === repositoryTasks.length, "governance projection reader should preserve task count without exposing scanner records to generated governance");
 assert(planContractTasks.length === repositoryTasks.length, "plan-contract reader should preserve task count without exposing scanner records to check-task-contracts");
 assert(checkProfileTasks.length === repositoryTasks.length, "check-profile reader should preserve task count without exposing scanner records to check-profiles");
 assert(lifecycleTasks.length === repositoryTasks.length, "lifecycle reader should preserve task count without exposing scanner records");
 assert(workbenchReviewSubjects.length === repositoryTasks.length, "workbench review subject reader should preserve task count without exposing scanner records");
 assertJsonEqual(repositoryTasks.map(queueComparable), legacyTasks.map(queueComparable), "repository list should preserve scanner queue/material fields");
 assertJsonEqual(taskIndexProjectionTasks.map(queueComparable), repositoryTasks.map(queueComparable), "task-index projection reader should preserve queue/material fields without exposing broad repository identity to task-index");
+assertJsonEqual(governanceProjectionTasks.map(governanceQueueComparable), repositoryTasks.map(governanceQueueComparable), "governance projection reader should preserve generated governance queue/material fields without exposing broad repository identity");
 assertJsonEqual(planContractTasks, repositoryTasks.map((item) => ({ path: item.path, taskPlanPath: item.taskPlanPath })), "plan-contract reader should preserve only the task path facts needed by contract validation");
 assertJsonEqual(
   checkProfileTasks.map((item) => checkProfileTaskComparable(item as Record<string, unknown>)),
@@ -299,7 +340,9 @@ assertJsonEqual(statusProjectionTasks.map(queueComparable), repositoryTasks.map(
 assertJsonEqual(statusProjectionTypeKeys, statusProjectionKeys, "TaskStatusProjection type keys must match the runtime status projection allowlist");
 assertJsonEqual(taskIndexProjectionTypeKeys, taskIndexProjectionKeys, "TaskIndexProjection type keys must match the runtime task-index projection allowlist");
 assertJsonEqual(checkProfileTaskTypeKeys, checkProfileTaskKeys, "TaskCheckProfileTask type keys must match the runtime check-profile allowlist");
+assertJsonEqual(governanceProjectionTypeKeys, governanceProjectionKeys, "TaskGovernanceProjection type keys must match the runtime governance projection allowlist");
 assertJsonEqual(Object.keys(taskIndexProjectionTasks[0] || {}).sort(), taskIndexProjectionKeys, "task-index projection reader should expose only the explicit task-index contract field allowlist");
+assertJsonEqual(Object.keys(governanceProjectionTasks[0] || {}).sort(), governanceProjectionKeys, "governance projection reader should expose only the generated governance contract field allowlist");
 assertJsonEqual(Object.keys(planContractTasks[0] || {}).sort(), planContractTaskKeys, "plan-contract reader should expose only the task path contract field allowlist");
 assertJsonEqual(Object.keys(checkProfileTasks[0] || {}).sort(), checkProfileTaskKeys, "check-profile reader should expose only the explicit checker validation field allowlist");
 assertJsonEqual(Object.keys(statusProjectionTasks[0] || {}).sort(), statusProjectionKeys, "status projection reader should expose only the explicit status/dashboard contract field allowlist");
@@ -313,6 +356,11 @@ assertJsonEqual(
   taskIndexProjectionTasks.map((item) => taskIndexProjectionComparable(item as Record<string, unknown>)),
   repositoryTasks.map((item) => expectedTaskIndexProjectionComparableFromRepository(item as Record<string, unknown>)),
   "task-index projection reader should preserve every explicit task-index contract field from the scanner-backed repository source",
+);
+assertJsonEqual(
+  governanceProjectionTasks.map((item) => governanceProjectionComparable(item as Record<string, unknown>)),
+  repositoryTasks.map((item) => governanceProjectionComparable(item as Record<string, unknown>)),
+  "governance projection reader should preserve every generated governance contract field from the scanner-backed repository source",
 );
 
 const task = repository.get({ id: "TASKS/demo-task" });
