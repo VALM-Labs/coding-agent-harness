@@ -6,20 +6,24 @@ import {
   lessonCandidatesFile,
 } from "../core-shared.mjs";
 import {
-  collectReviewRisks,
   isLessonCandidateDecisionComplete,
-  isBlockingReviewRisk,
   parseLessonCandidateStatus,
-  parseTaskAuditMetadata,
-  parsePhases,
+} from "../task-lesson-candidates.mjs";
+import {
+  collectReviewRisks,
+  isBlockingReviewRisk,
   parseReviewConfirmation,
+} from "../task-review-model.mjs";
+import { parseTaskAuditMetadata } from "../task-audit-metadata.mjs";
+import {
+  parsePhases,
   readVisualMapContractFile,
-} from "../task-scanner.mjs";
+} from "../task-visual-map-contract.mjs";
 import {
   implementationPhases,
   phaseHasRecordedProgress,
 } from "../phase-kind.mjs";
-import type { TaskBudget } from "../types/task-scanner.js";
+import type { TaskBudget } from "../task-metadata.mjs";
 
 type LifecycleEvent = "task-start" | "task-review" | "task-complete";
 

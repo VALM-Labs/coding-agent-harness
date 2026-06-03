@@ -18,10 +18,12 @@ import {
 import {
   collectTasks,
   listTaskPlanPaths,
-  readTaskContractFile,
-  readVisualMapContractFile,
   taskCutoverCounters,
 } from "./task-scanner.mjs";
+import {
+  readTaskContractFile,
+  readVisualMapContractFile,
+} from "./task-visual-map-contract.mjs";
 import { taskIdFromArchiveStoragePath } from "./task-archive-storage.mjs";
 import { buildTaskSemanticProjection, taskMatchesVisibilityScope, taskVisibilityScopes } from "../domain/task/task-semantic-projection.mjs";
 import { buildTaskOperationSubject, buildTaskTombstoneSubject } from "../domain/task/task-subjects.mjs";
@@ -63,15 +65,15 @@ import type {
 
 export {
   isActiveTaskState,
-  parsePhases,
   taskCutoverCounters,
 } from "./task-scanner.mjs";
+export { parsePhases } from "./task-visual-map-contract.mjs";
 export {
   parseTaskBudget,
   parseTaskContractInfo,
   parseTaskState,
 } from "./task-metadata.mjs";
-export { readVisualMapContractFile } from "./task-scanner.mjs";
+export { readVisualMapContractFile } from "./task-visual-map-contract.mjs";
 
 export type TaskRecord = ReturnType<typeof collectTasks>[number];
 export type TaskRef = TaskRepositoryRef;

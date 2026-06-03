@@ -100,6 +100,7 @@ const governanceSyncSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/go
 const lessonMaintenanceSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/lesson-maintenance.mts"), "utf8");
 const moduleRegistrySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/module-registry.mts"), "utf8");
 const reviewConfirmSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle/review-confirm.mts"), "utf8");
+const reviewGatesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle/review-gates.mts"), "utf8");
 const checkProfilesTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/check-profiles.ts"), "utf8");
 const taskRepositorySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-repository.mts"), "utf8");
 const taskRepositoryTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/task-repository.ts"), "utf8");
@@ -156,6 +157,11 @@ assert(reviewConfirmSource.includes("task-review-model"), "review-confirm should
 assert(reviewConfirmSource.includes("task-lesson-candidates"), "review-confirm should read lesson candidate status through the lesson candidate module");
 assert(reviewConfirmSource.includes("task-metadata"), "review-confirm should read budget through the task metadata module");
 assert(reviewConfirmSource.includes("harness-paths"), "review-confirm should derive task ids through harness path identity helpers");
+assert(!reviewGatesSource.includes("task-scanner"), "review gates should consume narrow review/lesson/audit/visual-map modules instead of the broad task-scanner facade");
+assert(reviewGatesSource.includes("task-review-model"), "review gates should read review risks through the review model module");
+assert(reviewGatesSource.includes("task-lesson-candidates"), "review gates should read lesson candidate status through the lesson candidate module");
+assert(reviewGatesSource.includes("task-audit-metadata"), "review gates should read audit metadata through the audit metadata module");
+assert(reviewGatesSource.includes("task-visual-map-contract"), "review gates should read Visual Map phases through the visual-map contract module");
 assert(!dashboardWorkbenchSource.includes("subjects: taskRepository"), "dashboard workbench task actions should use narrow subject readers instead of the broad TaskRepository identity");
 assert(!dashboardWorkbenchSource.includes("createScannerTaskRepository"), "dashboard workbench bulk review cache should consume workbench review subjects instead of creating the broad scanner-backed repository");
 assert(!taskTombstoneCommandsSource.includes("createScannerTaskRepository"), "task-tombstone compatibility commands should use the narrow tombstone subject reader instead of the broad scanner-backed repository");
