@@ -273,6 +273,9 @@ assert(blockedConfirm.stderr.includes("blocking review findings"), "blocked conf
 fs.writeFileSync(reviewPath, afterSubmitReview);
 commitFixtureBaseline(target, "before queue review confirmation");
 const confirmed = expectReviewConfirmJson(taskId, `${todayLocal}-queue-ready`, "review packet checked");
+assert(confirmed.task.id === taskId, "review-confirm should preserve task id in the result payload");
+assert(confirmed.task.shortId === `${todayLocal}-queue-ready`, "review-confirm should preserve task short id in the result payload");
+assert(confirmed.task.path.endsWith(`coding-agent-harness/planning/tasks/${todayLocal}-queue-ready`), "review-confirm should preserve task path in the result payload");
 assert(confirmed.task.reviewStatus === "confirmed", "review-confirm should produce confirmed status");
 const confirmationIndex = fs.readFileSync(path.join(taskDir, "INDEX.md"), "utf8");
 assert(confirmationIndex.includes("| Confirmation ID |"), "INDEX Human Review fields should include strict confirmation fields");

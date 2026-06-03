@@ -36,6 +36,9 @@ type ReviewConfirmationTarget = TaskScannerTarget & {
 
 type ReviewTask = {
   id?: string;
+  shortId?: string;
+  title?: string;
+  path?: string;
   reviewStatus?: string;
   walkthroughPath?: string;
   reviewQueueState?: string;
@@ -114,9 +117,10 @@ export function confirmTaskReview(
   });
   fs.writeFileSync(indexPath, ensureTrailingNewline(replaceTaskAuditMetadata(indexContent, buildAuditFields(), { locale: target.locale })));
   if (deferCommit) {
+    const task = reviewConfirmationResultTask(target, taskDir, canonicalTaskId, findTaskByDirectory(target, taskDir));
     return {
       event: "review-confirm",
-      task: findTaskByDirectory(target, taskDir) || { id: canonicalTaskId, reviewStatus: "confirmed" },
+      task,
       audit: {
         commitSha: "pending",
         auditCommitSha: "",
@@ -136,9 +140,10 @@ export function confirmTaskReview(
       fs.writeFileSync(indexPath, ensureTrailingNewline(finalIndex));
     },
   });
+  const task = reviewConfirmationResultTask(target, taskDir, canonicalTaskId, findTaskByDirectory(target, taskDir));
   return {
     event: "review-confirm",
-    task: findTaskByDirectory(target, taskDir) || { id: canonicalTaskId, reviewStatus: "confirmed" },
+    task,
     audit,
   };
 }
@@ -159,10 +164,23 @@ export function finalizeDeferredTaskReviewConfirmation(
     "Audit Status": "committed",
   }, { locale: target.locale });
   fs.writeFileSync(indexPath, ensureTrailingNewline(finalIndex));
+  const task = reviewConfirmationResultTask(target, taskDir, canonicalTaskId, findTaskByDirectory(target, taskDir));
   return {
     event: "review-confirm-audit",
-    task: findTaskByDirectory(target, taskDir) || { id: canonicalTaskId, reviewStatus: "confirmed" },
+    task,
     indexPath,
+  };
+}
+
+function reviewConfirmationResultTask(target: ReviewConfirmationTarget, taskDir: string, canonicalTaskId: string, task?: ReviewTask): ReviewTask {
+  const shortId = path.basename(taskDir);
+  return {
+    id: task?.id || canonicalTaskId,
+    shortId: task?.shortId || shortId,
+    title: task?.title || task?.id || canonicalTaskId,
+    path: task?.path || `TARGET:${toPosix(path.relative(target.projectRoot, taskDir))}`,
+    ...task,
+    reviewStatus: task?.reviewStatus || "confirmed",
   };
 }
 

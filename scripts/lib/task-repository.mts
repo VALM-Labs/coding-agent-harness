@@ -36,6 +36,8 @@ import type {
   TaskLifecycleTask as TaskRepositoryLifecycleTask,
   TaskLocation as TaskRepositoryLocation,
   TaskQuery as TaskRepositoryQuery,
+  TaskReviewConfirmationSubject as TaskRepositoryReviewConfirmationSubject,
+  TaskReviewConfirmationSubjectReader as TaskRepositoryReviewConfirmationSubjectReader,
   TaskStatusCutoverProjection as TaskRepositoryStatusCutoverProjection,
   TaskRef as TaskRepositoryRef,
   TaskStatusProjection as TaskRepositoryStatusProjection,
@@ -75,6 +77,8 @@ export type TaskOperationSubject = TaskRepositoryOperationSubject;
 export type TaskOperationSubjectReader = TaskRepositoryOperationSubjectReader;
 export type TaskLifecycleTask = TaskRepositoryLifecycleTask;
 export type TaskLifecycleReader = TaskRepositoryLifecycleReader;
+export type TaskReviewConfirmationSubject = TaskRepositoryReviewConfirmationSubject;
+export type TaskReviewConfirmationSubjectReader = TaskRepositoryReviewConfirmationSubjectReader;
 export type TaskWorkbenchReviewSubject = TaskRepositoryWorkbenchReviewSubject;
 export type TaskWorkbenchReviewSubjectReader = TaskRepositoryWorkbenchReviewSubjectReader;
 
@@ -193,6 +197,15 @@ export function createTaskWorkbenchReviewSubjectReader(targetInput: TaskScannerT
   };
 }
 
+export function createTaskReviewConfirmationSubjectReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskReviewConfirmationSubjectReader {
+  const target = normalizeRepositoryTarget(targetInput);
+  return {
+    findReviewConfirmationSubjectByDirectory(taskDir: string) {
+      return findReviewConfirmationSubjectByDirectory(target, defaults, taskDir);
+    },
+  };
+}
+
 export function createTaskStatusProjectionReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskStatusProjectionReader {
   const target = normalizeRepositoryTarget(targetInput);
   return {
@@ -281,6 +294,30 @@ function lifecycleTaskFromRecord(task: TaskRecord): TaskLifecycleTask {
     preset: typeof record.preset === "string" ? record.preset : typeof task.taskPreset === "string" ? task.taskPreset : undefined,
     presetAudit: record.presetAudit && typeof record.presetAudit === "object" ? record.presetAudit as Record<string, unknown> : null,
     longRunning: typeof record.longRunning === "boolean" ? record.longRunning : Boolean(task.longRunningContractPath),
+  };
+}
+
+function findReviewConfirmationSubjectByDirectory(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, taskDir: string): TaskReviewConfirmationSubject | undefined {
+  const absoluteTaskDir = absoluteTargetPath(target, taskDir);
+  const tasks = collectTasks(target, {
+    requireGeneratedScaffoldProvenance: defaults.requireGeneratedScaffoldProvenance,
+    includeArchived: true,
+    closeoutContent: defaults.closeoutContent,
+  });
+  const task = tasks.find((candidate) => taskDirectoryFromRecord(target, candidate) === absoluteTaskDir);
+  return task ? reviewConfirmationSubjectFromRecord(task) : undefined;
+}
+
+function reviewConfirmationSubjectFromRecord(task: TaskRecord): TaskReviewConfirmationSubject {
+  return {
+    id: task.id,
+    reviewStatus: task.reviewStatus,
+    walkthroughPath: task.walkthroughPath,
+    reviewQueueState: task.reviewQueueState,
+    state: task.state,
+    taskQueues: Array.isArray(task.taskQueues) ? task.taskQueues.map(String) : [],
+    lessonCandidateDecisionComplete: task.lessonCandidateDecisionComplete,
+    lessonCandidateStatus: task.lessonCandidateStatus,
   };
 }
 
