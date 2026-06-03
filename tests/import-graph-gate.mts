@@ -30,6 +30,7 @@ type ImportGraph = {
     runtimeMjsToTsEdges: number;
     typesValueImports: number;
     architectureBoundaryViolations: number;
+    taskRepositoryIdentityViolations: number;
   };
   nodes: ImportGraphNode[];
 };
@@ -163,6 +164,7 @@ assert(graph.summary.cycleNodes === 0, "valid graph should have no cycle nodes")
 assert(graph.summary.runtimeMjsToTsEdges === 0, "valid graph should have no .mjs to .ts/.mts edges");
 assert(graph.summary.typesValueImports === 0, "valid graph should allow import type from scripts/lib/types");
 assert(graph.summary.architectureBoundaryViolations === 0, "valid layered fixture should have no architecture boundary violations");
+assert(repoGraph.summary.taskRepositoryIdentityViolations === 0, "repo graph should have no runtime consumers of broad scanner-backed TaskRepository/TaskRecord identity outside the repository adapter and tests");
 assert(graph.architectureContract.version === "architecture-import-contract/2026-06-02-p03", "graph should expose the P03 architecture import contract version");
 assert(graph.architectureContract.layers.some((layer) => layer.id === "application" && layer.mayImport.includes("phase-open-exceptions")), "contract should expose application phase-open exception policy");
 assert(graph.architectureContract.layers.some((layer) => layer.id === "commands" && layer.owns.includes("scripts/commands/**")), "contract should expose a dedicated commands ownership layer");
@@ -210,6 +212,7 @@ assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "
 assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/infrastructure/task/scanner-subject-source.mts" && lock.ownerPhase === "P05-repository-scanner-strangler"), "contract should expose scanner subject source adapter ownership");
 assert(graph.architectureContract.boundaryRules.includes("application-imports-unregistered-legacy-surface"), "contract should expose fail-closed application legacy import rule");
 assert(graph.architectureContract.boundaryRules.includes("domain-imports-legacy-runtime"), "contract should expose fail-closed domain legacy runtime import rule");
+assert(graph.architectureContract.boundaryRules.includes("runtime-consumes-broad-task-repository-identity"), "contract should expose fail-closed broad TaskRepository identity runtime usage rule");
 
 assert(nodeByPath(graph, "scripts/harness.mjs").reachableFromBin === true, "bin entry should be bin-reachable");
 assert(nodeByPath(graph, "scripts/lib/harness-core.mjs").reachableFromBin === true, "harness-core should be bin-reachable");
@@ -249,6 +252,8 @@ writeFixture(fixtureRoot, "scripts/adapters/cli/bad-scanner-adapter.mts", 'impor
 writeFixture(fixtureRoot, "scripts/infrastructure/task/bad-legacy-writer.mts", 'import { lifecycle } from "../../lib/task-lifecycle.mjs";\nexport const badLegacyWriter = lifecycle;\n');
 writeFixture(fixtureRoot, "scripts/commands/bad-repository-command.mts", 'import { create } from "../lib/task-repository.mjs";\nexport const badRepositoryCommand = create;\n');
 writeFixture(fixtureRoot, "scripts/adapters/cli/bad-repository-adapter.mts", 'import { create } from "../../lib/task-repository.mjs";\nexport const badRepositoryAdapter = create;\n');
+writeFixture(fixtureRoot, "scripts/lib/bad-runtime-repository-identity.mts", 'import type { TaskRepository, TaskRecord } from "./task-repository.mjs";\nexport function leak(repository: TaskRepository): TaskRecord[] { return repository.list(); }\n');
+writeFixture(fixtureRoot, "scripts/lib/bad-runtime-repository-factory.mts", 'import { createScannerTaskRepository } from "./task-repository.mjs";\nexport const repository = createScannerTaskRepository(".");\n');
 writeFixture(fixtureRoot, "scripts/lib/governance-index-generator.mts", 'import { scan } from "./task-scanner.mjs";\nexport const generated = scan;\n');
 writeFixture(fixtureRoot, "scripts/lib/governance-sync.mts", "export const sync = 1;\n");
 writeFixture(fixtureRoot, "scripts/lib/preset-runner.mts", 'import { sync } from "./governance-sync.mjs";\nexport const preset = sync;\n');
@@ -280,6 +285,8 @@ assert(failed.violations.some((violation) => violation.code === "command-imports
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-lifecycle/review-confirm")), "gate should reject adapter imports from task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-repository")), "gate should reject adapter imports from task repository legacy surface");
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-scanner")), "gate should reject unregistered adapter imports from task scanner internals");
+assert(failed.violations.some((violation) => violation.code === "runtime-consumes-broad-task-repository-identity" && violation.message.includes("TaskRecord")), "gate should reject runtime code consuming raw TaskRecord identity outside the repository adapter");
+assert(failed.violations.some((violation) => violation.code === "runtime-consumes-broad-task-repository-identity" && violation.message.includes("createScannerTaskRepository")), "gate should reject runtime code recreating the broad scanner-backed repository identity outside the repository adapter");
 assert(failed.violations.some((violation) => violation.code === "task-infrastructure-imports-unregistered-legacy-surface" && violation.message.includes("task-lifecycle")), "gate should reject unregistered task infrastructure imports from legacy lifecycle writers");
 assert(failed.violations.some((violation) => violation.code === "dashboard-data-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-data imports from unregistered task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "dashboard-workbench-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-workbench imports from unregistered task lifecycle internal modules");
