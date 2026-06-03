@@ -87,6 +87,7 @@ type ImportGraph = {
     runtimeMjsToTsEdges: number;
     typesValueImports: number;
     architectureBoundaryViolations: number;
+    taskRepositoryIdentityViolations: number;
     binReachableFiles: number;
     harnessCoreBarrelTargets: number;
   };
@@ -96,6 +97,7 @@ type ImportGraph = {
   runtimeMjsToTsEdges: ImportGraphViolation[];
   typesValueImports: ImportGraphViolation[];
   architectureBoundaryViolations: ImportGraphViolation[];
+  taskRepositoryIdentityViolations: ImportGraphViolation[];
 };
 
 type ImportGraphOptions = {
@@ -285,6 +287,7 @@ export const architectureImportContract: ArchitectureImportContract = {
     "dashboard-data-imports-task-internal",
     "generated-governance-imports-task-scanner",
     "preset-runtime-imports-governance-sync",
+    "runtime-consumes-broad-task-repository-identity",
   ],
 };
 
@@ -373,6 +376,7 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
   const cycleNodeSet = new Set(cycles.flat());
   assignLayers(nodesByPath, cycleNodeSet);
   const architectureBoundaryViolations = findArchitectureBoundaryViolations(nodesByPath);
+  const taskRepositoryIdentityViolations = findTaskRepositoryIdentityViolations(repoRoot, nodesByPath);
 
   const nodes = [...nodesByPath.values()].sort((left, right) => left.path.localeCompare(right.path));
   const localEdgeCount = nodes.reduce((count, node) => count + node.imports.filter((imported) => imported.target).length, 0);
@@ -394,6 +398,7 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
       runtimeMjsToTsEdges: runtimeMjsToTsEdges.length,
       typesValueImports: typesValueImports.length,
       architectureBoundaryViolations: architectureBoundaryViolations.length,
+      taskRepositoryIdentityViolations: taskRepositoryIdentityViolations.length,
       binReachableFiles: nodes.filter((node) => node.reachableFromBin).length,
       harnessCoreBarrelTargets: barrelTargets.length,
     },
@@ -403,6 +408,7 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
     runtimeMjsToTsEdges,
     typesValueImports,
     architectureBoundaryViolations,
+    taskRepositoryIdentityViolations,
   };
 }
 
@@ -427,6 +433,9 @@ export function checkImportGraph({ repoRoot = defaultRepoRoot, expectNodes, expe
     violations.push({ ...edge, code: "types-value-import" });
   }
   for (const edge of graph.architectureBoundaryViolations) {
+    violations.push(edge);
+  }
+  for (const edge of graph.taskRepositoryIdentityViolations) {
     violations.push(edge);
   }
 
@@ -702,6 +711,49 @@ function findArchitectureBoundaryViolations(nodesByPath: Map<string, ImportGraph
     }
   }
   return violations.sort((left, right) => `${left.file}:${left.code}:${left.target}`.localeCompare(`${right.file}:${right.code}:${right.target}`));
+}
+
+function findTaskRepositoryIdentityViolations(repoRoot: string, nodesByPath: Map<string, ImportGraphNode>): ImportGraphViolation[] {
+  const violations: ImportGraphViolation[] = [];
+  for (const node of nodesByPath.values()) {
+    if (isTaskRepositoryIdentityAllowedPath(node.path)) continue;
+    const source = stripNonCode(fs.readFileSync(path.join(repoRoot, node.path), "utf8"));
+    const token = taskRepositoryIdentityToken(source);
+    if (!token) continue;
+    violations.push({
+      code: "runtime-consumes-broad-task-repository-identity",
+      file: node.path,
+      message: `${node.path} must consume a narrow task reader/projection seam instead of broad scanner-backed ${token}`,
+    });
+  }
+  return violations.sort((left, right) => `${left.file}:${left.message}`.localeCompare(`${right.file}:${right.message}`));
+}
+
+function isTaskRepositoryIdentityAllowedPath(file: string): boolean {
+  return file === "scripts/lib/task-repository.mts" || file.startsWith("tests/");
+}
+
+function taskRepositoryIdentityToken(source: string): string {
+  if (/\bcreateScannerTaskRepository\b/.test(source)) return "createScannerTaskRepository";
+  if (/\bTaskRecord\b/.test(source)) return "TaskRecord";
+  if (/\bTaskRepository\b/.test(source)) return "TaskRepository";
+  return "";
+}
+
+function stripNonCode(content: string): string {
+  let stripped = "";
+  let index = 0;
+  while (index < content.length) {
+    const skipped = skipNonCode(content, index);
+    if (skipped !== index) {
+      stripped += " ".repeat(skipped - index);
+      index = skipped;
+      continue;
+    }
+    stripped += content[index];
+    index += 1;
+  }
+  return stripped;
 }
 
 function architectureBoundaryCode(file: string, target: string): string {
