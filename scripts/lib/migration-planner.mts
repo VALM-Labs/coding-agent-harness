@@ -42,11 +42,20 @@ import {
   recommendedMigrationCapabilities,
   migrationPhases,
 } from "./migration-support.mjs";
-import type { CheckTarget, ScannedTask } from "./types/check-profiles.js";
+import type { TaskStatusCutoverProjection, TaskStatusProjection } from "./task-repository.mjs";
+import type { CheckTarget } from "./types/check-profiles.js";
 
 type MigrationTarget = CheckTarget;
 type MigrationStatus = ReturnType<typeof buildStatus>;
-type MigrationTask = ScannedTask;
+type MigrationTask = TaskStatusProjection & {
+  briefSource: string;
+  migrationClassification: string;
+  path: string;
+  shortId: string;
+  state: string;
+  visualMapSource: string;
+  visualMapStatus: string;
+};
 type FullCutoverSession = Parameters<typeof validateFullCutoverSession>[0];
 
 type MigrationPlanOptions = {
@@ -279,7 +288,7 @@ export function buildMigrationPlan(targetInput: string, { limit = 20 }: Migratio
   const recommendedCapabilities = recommendedMigrationCapabilities(status, target, registry);
   const missingExecutionStrategy = taskActions.filter((action) => action.files.includes("execution_strategy.md")).length;
   const missingVisualMap = taskActions.filter((action) => action.files.includes(visualMapFile)).length;
-  const cutoverCounters = taskCutoverCounters(tasks);
+  const cutoverCounters = taskCutoverCounters(tasks as TaskStatusCutoverProjection[]);
   const visualMapActions = taskActions.filter((action) => action.files.includes(visualMapFile)).length;
   const fullCutoverEligible =
     status.checkState.status === "pass" &&

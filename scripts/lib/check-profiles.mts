@@ -29,7 +29,7 @@ import { validateCapabilities } from "./capability-registry.mjs";
 import { readPresetPackage } from "./preset-registry.mjs";
 import { validateRegularTaskPresetContract } from "./task-preset-contract-drift.mjs";
 import { parseTaskBudget } from "./task-metadata.mjs";
-import { createTaskStatusProjectionReader, parsePhases, readVisualMapContractFile, taskPlanPathFromRecord } from "./task-repository.mjs";
+import { createTaskCheckProfileReader, parsePhases, readVisualMapContractFile, taskPlanPathFromRecord } from "./task-repository.mjs";
 import { normalizeReviewBoolean, reviewFindingColumns } from "./task-review-model.mjs";
 import { allowedPhaseActors, allowedPhaseKinds } from "./phase-kind.mjs";
 import { validateTaskCompletionConsistency } from "./task-completion-consistency.mjs";
@@ -61,7 +61,7 @@ function errorMessage(error: unknown): string {
 }
 
 function listCheckerTasks(target: CheckTarget, options: { requireGeneratedScaffoldProvenance?: boolean; closeoutContent?: string } = {}): ScannedTask[] {
-  return createTaskStatusProjectionReader(target, options).listStatusTasks() as ScannedTask[];
+  return createTaskCheckProfileReader(target, options).listCheckProfileTasks() as ScannedTask[];
 }
 
 export function runCompatibilityCheck(target: CheckTarget) {
@@ -373,8 +373,6 @@ export function buildStatus(targetInput: string | undefined, options: BuildStatu
   const taskCompletionConsistency = validateTaskCompletionConsistency(tasks);
   failures.push(...taskCompletionConsistency.failures);
   warnings.push(...taskCompletionConsistency.warnings);
-  const briefReady = tasks.filter((task) => task.briefSource === "standalone").length;
-  const briefMissing = tasks.length - briefReady;
   for (const task of tasks) {
     for (const issue of task.materialIssues || []) {
       const forceFailure = Boolean((issue as { enforceFailure?: boolean }).enforceFailure);
@@ -399,7 +397,8 @@ export function buildStatus(targetInput: string | undefined, options: BuildStatu
     legacy,
     failures,
     warnings,
-    tasks,
+    requireGeneratedScaffoldProvenance: contractStrict,
+    closeoutContent,
     validationMode: "validated",
   });
 }

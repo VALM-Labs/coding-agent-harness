@@ -34,6 +34,8 @@ import type {
   TaskOperationSubjectReader as TaskRepositoryOperationSubjectReader,
   TaskLifecycleReader as TaskRepositoryLifecycleReader,
   TaskLifecycleTask as TaskRepositoryLifecycleTask,
+  TaskCheckProfileReader as TaskRepositoryCheckProfileReader,
+  TaskCheckProfileTask as TaskRepositoryCheckProfileTask,
   TaskIndexProjection as TaskRepositoryIndexProjection,
   TaskIndexProjectionReader as TaskRepositoryIndexProjectionReader,
   TaskLocation as TaskRepositoryLocation,
@@ -72,6 +74,8 @@ export type TaskQuery = TaskRepositoryQuery;
 export type TaskStatusProjection = TaskRepositoryStatusProjection;
 export type TaskStatusCutoverProjection = TaskRepositoryStatusCutoverProjection;
 export type TaskStatusProjectionReader = TaskRepositoryStatusProjectionReader;
+export type TaskCheckProfileTask = TaskRepositoryCheckProfileTask;
+export type TaskCheckProfileReader = TaskRepositoryCheckProfileReader;
 export type TaskIndexProjection = TaskRepositoryIndexProjection;
 export type TaskIndexProjectionReader = TaskRepositoryIndexProjectionReader;
 export type TaskPlanContractTask = TaskRepositoryPlanContractTask;
@@ -219,6 +223,15 @@ export function createTaskStatusProjectionReader(targetInput: TaskScannerTarget 
   return {
     listStatusTasks(query: TaskQuery = {}) {
       return collectStatusTasks(target, defaults, query);
+    },
+  };
+}
+
+export function createTaskCheckProfileReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskCheckProfileReader {
+  const target = normalizeRepositoryTarget(targetInput);
+  return {
+    listCheckProfileTasks(query: TaskQuery = {}) {
+      return collectCheckProfileTasks(target, defaults, query);
     },
   };
 }
@@ -394,6 +407,15 @@ function collectStatusTasks(target: TaskScannerTarget, defaults: ScannerReposito
   return applyTaskQuery(tasks, query).map(taskStatusProjectionFromRecord);
 }
 
+function collectCheckProfileTasks(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, query: TaskQuery = {}): TaskCheckProfileTask[] {
+  const tasks = collectTasks(target, {
+    requireGeneratedScaffoldProvenance: query.requireGeneratedScaffoldProvenance ?? defaults.requireGeneratedScaffoldProvenance,
+    includeArchived: query.includeArchived !== false,
+    closeoutContent: query.closeoutContent ?? defaults.closeoutContent,
+  });
+  return applyTaskQuery(tasks, query).map(checkProfileTaskFromRecord);
+}
+
 function collectTaskIndexTasks(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, query: TaskQuery = {}): TaskIndexProjection[] {
   const tasks = collectTasks(target, {
     requireGeneratedScaffoldProvenance: query.requireGeneratedScaffoldProvenance ?? defaults.requireGeneratedScaffoldProvenance,
@@ -416,6 +438,33 @@ function planContractTaskFromRecord(task: TaskRecord): TaskPlanContractTask {
   return {
     path: task.path,
     taskPlanPath: task.taskPlanPath,
+  };
+}
+
+function checkProfileTaskFromRecord(task: TaskRecord): TaskCheckProfileTask {
+  return {
+    briefQuality: task.briefQuality,
+    briefSource: task.briefSource,
+    budget: task.budget,
+    closeoutStatus: task.closeoutStatus,
+    evidenceBundle: task.evidenceBundle,
+    materialIssues: task.materialIssues,
+    migrationAchievedLevel: task.migrationAchievedLevel,
+    migrationClassification: task.migrationClassification,
+    migrationSnapshot: task.migrationSnapshot,
+    migrationTargetLevel: task.migrationTargetLevel,
+    path: task.path,
+    phases: task.phases,
+    presetVersion: task.presetVersion,
+    state: task.state,
+    stateRaw: task.stateRaw,
+    stateSource: task.stateSource,
+    taskKind: task.taskKind,
+    taskPlanPath: task.taskPlanPath,
+    taskPreset: task.taskPreset,
+    visualMapPath: task.visualMapPath,
+    visualMapSource: task.visualMapSource,
+    visualMapStatus: task.visualMapStatus,
   };
 }
 
