@@ -74,6 +74,18 @@ type ArchitectureImportContract = {
   boundaryRules: string[];
 };
 
+type TaskRepositoryIdentityClassification = "repository-adapter" | "test-fixture" | "runtime-blocked";
+
+type TaskRepositoryIdentityMatrixEntry = {
+  file: string;
+  tokens: string[];
+  classification: TaskRepositoryIdentityClassification;
+  allowed: boolean;
+  ownerPhase: string;
+  expiryPhase: string;
+  reason: string;
+};
+
 type ImportGraph = {
   schemaVersion: 1;
   sourceRoots: string[];
@@ -88,6 +100,9 @@ type ImportGraph = {
     typesValueImports: number;
     architectureBoundaryViolations: number;
     taskRepositoryIdentityViolations: number;
+    taskRepositoryIdentityMatrixEntries: number;
+    taskRepositoryIdentityAllowedEntries: number;
+    taskRepositoryIdentityBlockedEntries: number;
     binReachableFiles: number;
     harnessCoreBarrelTargets: number;
   };
@@ -97,6 +112,7 @@ type ImportGraph = {
   runtimeMjsToTsEdges: ImportGraphViolation[];
   typesValueImports: ImportGraphViolation[];
   architectureBoundaryViolations: ImportGraphViolation[];
+  taskRepositoryIdentityMatrix: TaskRepositoryIdentityMatrixEntry[];
   taskRepositoryIdentityViolations: ImportGraphViolation[];
 };
 
@@ -110,7 +126,7 @@ type CheckImportGraphOptions = ImportGraphOptions & {
 };
 
 export const architectureImportContract: ArchitectureImportContract = {
-  version: "architecture-import-contract/2026-06-02-p03",
+  version: "architecture-import-contract/2026-06-03-p05-wave-a",
   layers: [
     {
       id: "kernel",
@@ -376,7 +392,8 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
   const cycleNodeSet = new Set(cycles.flat());
   assignLayers(nodesByPath, cycleNodeSet);
   const architectureBoundaryViolations = findArchitectureBoundaryViolations(nodesByPath);
-  const taskRepositoryIdentityViolations = findTaskRepositoryIdentityViolations(repoRoot, nodesByPath);
+  const taskRepositoryIdentityMatrix = buildTaskRepositoryIdentityMatrix(repoRoot, nodesByPath);
+  const taskRepositoryIdentityViolations = findTaskRepositoryIdentityViolations(taskRepositoryIdentityMatrix);
 
   const nodes = [...nodesByPath.values()].sort((left, right) => left.path.localeCompare(right.path));
   const localEdgeCount = nodes.reduce((count, node) => count + node.imports.filter((imported) => imported.target).length, 0);
@@ -399,6 +416,9 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
       typesValueImports: typesValueImports.length,
       architectureBoundaryViolations: architectureBoundaryViolations.length,
       taskRepositoryIdentityViolations: taskRepositoryIdentityViolations.length,
+      taskRepositoryIdentityMatrixEntries: taskRepositoryIdentityMatrix.length,
+      taskRepositoryIdentityAllowedEntries: taskRepositoryIdentityMatrix.filter((entry) => entry.allowed).length,
+      taskRepositoryIdentityBlockedEntries: taskRepositoryIdentityMatrix.filter((entry) => !entry.allowed).length,
       binReachableFiles: nodes.filter((node) => node.reachableFromBin).length,
       harnessCoreBarrelTargets: barrelTargets.length,
     },
@@ -408,6 +428,7 @@ export function buildImportGraph({ repoRoot = defaultRepoRoot }: ImportGraphOpti
     runtimeMjsToTsEdges,
     typesValueImports,
     architectureBoundaryViolations,
+    taskRepositoryIdentityMatrix,
     taskRepositoryIdentityViolations,
   };
 }
@@ -713,31 +734,68 @@ function findArchitectureBoundaryViolations(nodesByPath: Map<string, ImportGraph
   return violations.sort((left, right) => `${left.file}:${left.code}:${left.target}`.localeCompare(`${right.file}:${right.code}:${right.target}`));
 }
 
-function findTaskRepositoryIdentityViolations(repoRoot: string, nodesByPath: Map<string, ImportGraphNode>): ImportGraphViolation[] {
-  const violations: ImportGraphViolation[] = [];
+function buildTaskRepositoryIdentityMatrix(repoRoot: string, nodesByPath: Map<string, ImportGraphNode>): TaskRepositoryIdentityMatrixEntry[] {
+  const matrix: TaskRepositoryIdentityMatrixEntry[] = [];
   for (const node of nodesByPath.values()) {
-    if (isTaskRepositoryIdentityAllowedPath(node.path)) continue;
     const source = stripNonCode(fs.readFileSync(path.join(repoRoot, node.path), "utf8"));
-    const token = taskRepositoryIdentityToken(source);
-    if (!token) continue;
-    violations.push({
-      code: "runtime-consumes-broad-task-repository-identity",
-      file: node.path,
-      message: `${node.path} must consume a narrow task reader/projection seam instead of broad scanner-backed ${token}`,
-    });
+    const tokens = taskRepositoryIdentityTokens(source);
+    if (tokens.length === 0) continue;
+    matrix.push(classifyTaskRepositoryIdentity(node.path, tokens));
   }
-  return violations.sort((left, right) => `${left.file}:${left.message}`.localeCompare(`${right.file}:${right.message}`));
+  return matrix.sort((left, right) => left.file.localeCompare(right.file));
 }
 
-function isTaskRepositoryIdentityAllowedPath(file: string): boolean {
-  return file === "scripts/lib/task-repository.mts" || file.startsWith("tests/");
+function findTaskRepositoryIdentityViolations(matrix: TaskRepositoryIdentityMatrixEntry[]): ImportGraphViolation[] {
+  return matrix
+    .filter((entry) => !entry.allowed)
+    .map((entry) => ({
+      code: "runtime-consumes-broad-task-repository-identity",
+      file: entry.file,
+      message: `${entry.file} must consume a narrow task reader/projection seam instead of broad scanner-backed ${entry.tokens.join("/")}`,
+    }))
+    .sort((left, right) => `${left.file}:${left.message}`.localeCompare(`${right.file}:${right.message}`));
 }
 
-function taskRepositoryIdentityToken(source: string): string {
-  if (/\bcreateScannerTaskRepository\b/.test(source)) return "createScannerTaskRepository";
-  if (/\bTaskRecord\b/.test(source)) return "TaskRecord";
-  if (/\bTaskRepository\b/.test(source)) return "TaskRepository";
-  return "";
+function classifyTaskRepositoryIdentity(file: string, tokens: string[]): TaskRepositoryIdentityMatrixEntry {
+  if (file === "scripts/lib/task-repository.mts") {
+    return {
+      file,
+      tokens,
+      classification: "repository-adapter",
+      allowed: true,
+      ownerPhase: "P05-repository-scanner-strangler",
+      expiryPhase: "P11-package-facade-deletion",
+      reason: "Repository adapter owns the legacy scanner-backed TaskRepository implementation while narrow readers/projections replace runtime callers.",
+    };
+  }
+  if (file.startsWith("tests/")) {
+    return {
+      file,
+      tokens,
+      classification: "test-fixture",
+      allowed: true,
+      ownerPhase: "P05-repository-scanner-strangler",
+      expiryPhase: "P13-final-audit",
+      reason: "Tests may name legacy repository identities to assert guards and compatibility behavior.",
+    };
+  }
+  return {
+    file,
+    tokens,
+    classification: "runtime-blocked",
+    allowed: false,
+    ownerPhase: "P05-repository-scanner-strangler",
+    expiryPhase: "P05-wave-a-import-graph-final-tightening",
+    reason: "Active runtime must consume narrow task reader/projection seams instead of broad scanner-backed repository identity.",
+  };
+}
+
+function taskRepositoryIdentityTokens(source: string): string[] {
+  const tokens = [];
+  if (/\bcreateScannerTaskRepository\b/.test(source)) tokens.push("createScannerTaskRepository");
+  if (/\bTaskRecord\b/.test(source)) tokens.push("TaskRecord");
+  if (/\bTaskRepository\b/.test(source)) tokens.push("TaskRepository");
+  return tokens;
 }
 
 function stripNonCode(content: string): string {
