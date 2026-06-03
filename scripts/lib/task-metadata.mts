@@ -14,7 +14,7 @@ type TaskStateInfo = {
   source: TaskStateSource;
   raw: string;
 };
-type TaskBudget = "simple" | "standard" | "complex";
+export type TaskBudget = "simple" | "standard" | "complex";
 type TaskMetadata = {
   kind: string;
   preset: string;
