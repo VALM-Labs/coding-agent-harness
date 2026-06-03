@@ -11,7 +11,7 @@ import {
 import { buildTaskOperationSubject, buildTaskTombstoneSubject } from "../scripts/domain/task/task-subjects.mjs";
 import { buildStatusData } from "../scripts/lib/status-builder.mjs";
 import { collectTasks, listTaskPlanPaths } from "../scripts/lib/task-scanner.mjs";
-import { createScannerTaskRepository, createTaskLifecycleReader, createTaskStatusProjectionReader, createTaskWorkbenchReviewSubjectReader } from "../scripts/lib/task-repository.mjs";
+import { createScannerTaskRepository, createTaskLifecycleReader, createTaskReviewConfirmationSubjectReader, createTaskStatusProjectionReader, createTaskWorkbenchReviewSubjectReader } from "../scripts/lib/task-repository.mjs";
 
 type ComparableTask = {
   id?: string;
@@ -158,6 +158,7 @@ const target = normalizeTarget(targetPath);
 const repository = createScannerTaskRepository(target);
 const lifecycleReader = createTaskLifecycleReader(target);
 const statusProjectionReader = createTaskStatusProjectionReader(target);
+const reviewConfirmationSubjectReader = createTaskReviewConfirmationSubjectReader(target);
 const workbenchReviewSubjectReader = createTaskWorkbenchReviewSubjectReader(target);
 const legacyTaskPlanPaths = listTaskPlanPaths(target);
 const legacyTasks = collectTasks(target, { taskPlanPaths: legacyTaskPlanPaths });
@@ -191,6 +192,20 @@ assertJsonEqual(lifecycleTask.materialIssues, task.materialIssues, "lifecycle re
 assert(lifecycleTask.kind === task.taskKind, "lifecycle reader should expose task kind compatibility alias");
 assert(lifecycleTask.preset === task.taskPreset, "lifecycle reader should expose task preset compatibility alias");
 assert(lifecycleReader.listLifecycleTasks({ state: "done" }).every((item) => item.state === "done"), "lifecycle reader should preserve state filtering for task-list");
+const reviewConfirmationSubject = reviewConfirmationSubjectReader.findReviewConfirmationSubjectByDirectory(path.dirname(absoluteTargetPath(targetPath, task.taskPlanPath)));
+assert(reviewConfirmationSubject, "review confirmation subject reader should find the demo task by directory");
+assertJsonEqual(reviewConfirmationSubject, {
+  id: task.id,
+  reviewStatus: task.reviewStatus,
+  walkthroughPath: task.walkthroughPath,
+  reviewQueueState: task.reviewQueueState,
+  state: task.state,
+  taskQueues: task.taskQueues,
+  lessonCandidateDecisionComplete: task.lessonCandidateDecisionComplete,
+  lessonCandidateStatus: task.lessonCandidateStatus,
+}, "review confirmation subject reader should expose only the review-confirm gate facts");
+assert(!("taskPlanPath" in reviewConfirmationSubject), "review confirmation subject should not expose raw scanner taskPlanPath");
+assert(!("path" in reviewConfirmationSubject), "review confirmation subject should not expose raw scanner path");
 const workbenchReviewSubject = workbenchReviewSubjects.find((subject) => subject.id === task.id);
 assert(workbenchReviewSubject, "workbench review subject reader should include the demo task");
 assert(workbenchReviewSubject.aliases.includes(task.id) && workbenchReviewSubject.aliases.includes(task.shortId), "workbench review subject should expose only lookup aliases needed by bulk review actions");

@@ -93,6 +93,7 @@ const taskRepositoryTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/l
 const statusProjectionReaderSource = taskRepositorySource.match(/export function createTaskStatusProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
 const resolveTaskDirectorySource = taskRepositorySource.match(/export function resolveTaskDirectory[\s\S]*?\n}\n/)?.[0] || "";
 const broadTaskRepositoryTypeSource = taskRepositorySource.match(/export type TaskRepository =[\s\S]*?\n};/)?.[0] || "";
+const lifecycleReviewTaskByDirectorySource = taskLifecycleSource.match(/function findReviewTaskByDirectory[\s\S]*?\n}\n/)?.[0] || "";
 assert(!harnessCoreSource.includes("./task-operation-subjects.mjs"), "scanner-backed TaskOperationSubjectReader helper should not be re-exported from the broad harness-core barrel");
 assert(!harnessCoreSource.includes("../domain/task/task-subjects.mjs"), "task subject domain mapper should not be re-exported from the broad harness-core barrel");
 assert(!fs.existsSync(path.join(repoRoot, "scripts/lib/task-operation-subjects.mts")), "scanner-backed TaskOperationSubjectReader helper should not live in scripts/lib");
@@ -104,6 +105,10 @@ assert(!dashboardWorkbenchSource.includes("subjects: taskRepository"), "dashboar
 assert(!dashboardWorkbenchSource.includes("createScannerTaskRepository"), "dashboard workbench bulk review cache should consume workbench review subjects instead of creating the broad scanner-backed repository");
 assert(!dashboardWorkbenchSource.includes("TaskRecord"), "dashboard workbench bulk review cache should not store raw scanner TaskRecord objects");
 assert(!dashboardWorkbenchSource.includes("buildTaskSemanticProjection"), "dashboard workbench bulk review gate should not interpret raw task facts locally");
+assert(taskLifecycleSource.includes("createTaskReviewConfirmationSubjectReader"), "task-lifecycle review-confirm should consume the narrow review confirmation subject reader");
+assert(lifecycleReviewTaskByDirectorySource.includes("createTaskReviewConfirmationSubjectReader"), "task-lifecycle review-confirm lookup should use the narrow review confirmation subject reader");
+assert(!lifecycleReviewTaskByDirectorySource.includes("createScannerTaskRepository"), "task-lifecycle review-confirm lookup should not use the broad scanner-backed repository identity");
+assert(!lifecycleReviewTaskByDirectorySource.includes(".get({ path: taskDir })"), "task-lifecycle review-confirm lookup should not retrieve raw TaskRecord by directory");
 assert(!/export type TaskStatusProjection = \{\s*\[key: string\]: unknown;/m.test(taskRepositoryTypesSource), "TaskStatusProjection should be an explicit status/dashboard contract, not an arbitrary scanner record bag");
 assert(!statusProjectionReaderSource.includes("createScannerTaskRepository"), "TaskStatusProjectionReader should not recreate the broad scanner-backed TaskRepository identity");
 assert(!taskRepositorySource.includes("return { ...task };"), "status projection materialization should not leak scanner records by object spread");

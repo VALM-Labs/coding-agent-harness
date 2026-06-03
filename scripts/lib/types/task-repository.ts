@@ -130,6 +130,21 @@ export type TaskLifecycleReader = {
   listLifecycleTasks(query?: TaskQuery): TaskLifecycleTask[];
 };
 
+export type TaskReviewConfirmationSubject = {
+  id?: string;
+  reviewStatus?: string;
+  walkthroughPath?: string;
+  reviewQueueState?: string;
+  state?: string;
+  taskQueues?: string[];
+  lessonCandidateDecisionComplete?: boolean;
+  lessonCandidateStatus?: string;
+};
+
+export type TaskReviewConfirmationSubjectReader = {
+  findReviewConfirmationSubjectByDirectory(taskDir: string): TaskReviewConfirmationSubject | undefined;
+};
+
 export type TaskWorkbenchReviewSubject = {
   id: string;
   taskKey?: string;
