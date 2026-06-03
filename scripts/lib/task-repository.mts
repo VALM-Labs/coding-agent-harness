@@ -18,10 +18,12 @@ import {
 import {
   collectTasks,
   listTaskPlanPaths,
-  readTaskContractFile,
-  readVisualMapContractFile,
   taskCutoverCounters,
 } from "./task-scanner.mjs";
+import {
+  readTaskContractFile,
+  readVisualMapContractFile,
+} from "./task-visual-map-contract.mjs";
 import { taskIdFromArchiveStoragePath } from "./task-archive-storage.mjs";
 import { buildTaskSemanticProjection, taskMatchesVisibilityScope, taskVisibilityScopes } from "../domain/task/task-semantic-projection.mjs";
 import { buildTaskOperationSubject, buildTaskTombstoneSubject } from "../domain/task/task-subjects.mjs";
@@ -40,6 +42,10 @@ import type {
   TaskCheckProfileTask as TaskRepositoryCheckProfileTask,
   TaskIndexProjection as TaskRepositoryIndexProjection,
   TaskIndexProjectionReader as TaskRepositoryIndexProjectionReader,
+  TaskLessonPromotionReader,
+  TaskLessonPromotionTask,
+  TaskModuleReference as TaskRepositoryModuleReference,
+  TaskModuleReferenceReader as TaskRepositoryModuleReferenceReader,
   TaskLocation as TaskRepositoryLocation,
   TaskPlanContractReader as TaskRepositoryPlanContractReader,
   TaskPlanContractTask as TaskRepositoryPlanContractTask,
@@ -59,15 +65,15 @@ import type {
 
 export {
   isActiveTaskState,
-  parsePhases,
   taskCutoverCounters,
 } from "./task-scanner.mjs";
+export { parsePhases } from "./task-visual-map-contract.mjs";
 export {
   parseTaskBudget,
   parseTaskContractInfo,
   parseTaskState,
 } from "./task-metadata.mjs";
-export { readVisualMapContractFile } from "./task-scanner.mjs";
+export { readVisualMapContractFile } from "./task-visual-map-contract.mjs";
 
 export type TaskRecord = ReturnType<typeof collectTasks>[number];
 export type TaskRef = TaskRepositoryRef;
@@ -80,6 +86,9 @@ export type TaskCheckProfileTask = TaskRepositoryCheckProfileTask;
 export type TaskCheckProfileReader = TaskRepositoryCheckProfileReader;
 export type TaskIndexProjection = TaskRepositoryIndexProjection;
 export type TaskIndexProjectionReader = TaskRepositoryIndexProjectionReader;
+export type { TaskLessonPromotionReader, TaskLessonPromotionTask };
+export type TaskModuleReference = TaskRepositoryModuleReference;
+export type TaskModuleReferenceReader = TaskRepositoryModuleReferenceReader;
 export type TaskGovernanceProjection = TaskRepositoryGovernanceProjection;
 export type TaskGovernanceProjectionReader = TaskRepositoryGovernanceProjectionReader;
 export type TaskPlanContractTask = TaskRepositoryPlanContractTask;
@@ -263,6 +272,24 @@ export function createTaskPlanContractReader(targetInput: TaskScannerTarget | st
   return {
     listPlanContractTasks(query: TaskQuery = {}) {
       return collectPlanContractTasks(target, defaults, query);
+    },
+  };
+}
+
+export function createTaskLessonPromotionReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskLessonPromotionReader {
+  const target = normalizeRepositoryTarget(targetInput);
+  return {
+    resolveLessonPromotionTask(taskRef: string) {
+      return resolveLessonPromotionTask(target, defaults, taskRef);
+    },
+  };
+}
+
+export function createTaskModuleReferenceReader(targetInput: TaskScannerTarget | string | undefined = ".", defaults: ScannerRepositoryOptions = {}): TaskRepositoryModuleReferenceReader {
+  const target = normalizeRepositoryTarget(targetInput);
+  return {
+    listModuleReferences(moduleKey: string) {
+      return collectModuleReferences(target, defaults, moduleKey);
     },
   };
 }
@@ -454,6 +481,55 @@ function collectPlanContractTasks(target: TaskScannerTarget, defaults: ScannerRe
     closeoutContent: query.closeoutContent ?? defaults.closeoutContent,
   });
   return applyTaskQuery(tasks, query).map(planContractTaskFromRecord);
+}
+
+function resolveLessonPromotionTask(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, taskRef: string): TaskLessonPromotionTask {
+  const normalizedRef = normalizeTaskId(taskRef);
+  const matchesBareSlug = (item: TaskRecord): boolean => {
+    if (datePrefix.test(normalizedRef)) return false;
+    const shortBase = datePrefix.test(item.shortId) ? item.shortId.replace(datePrefix, "") : item.shortId;
+    return shortBase === normalizedRef;
+  };
+  const candidates = collectTasks(target, {
+    requireGeneratedScaffoldProvenance: defaults.requireGeneratedScaffoldProvenance,
+    includeArchived: false,
+    closeoutContent: defaults.closeoutContent,
+  }).filter((item) => item.id === taskRef || item.shortId === taskRef || item.id.endsWith(`/${taskRef}`) || matchesBareSlug(item));
+  if (candidates.length > 1) {
+    const options = candidates.map((item) => `- ${item.id}`).join("\n");
+    throw new Error(`Ambiguous task reference: ${taskRef}\n${options}`);
+  }
+  const task = candidates[0];
+  if (!task) throw new Error(`Task not found: ${taskRef}`);
+  return lessonPromotionTaskFromRecord(target, task);
+}
+
+function lessonPromotionTaskFromRecord(target: TaskScannerTarget, task: TaskRecord): TaskLessonPromotionTask {
+  const directory = taskDirectoryFromRecord(target, task);
+  const lessonCandidatePath = absoluteTargetPath(target, task.lessonCandidatePath || path.join(directory, lessonCandidatesFile));
+  return {
+    id: task.id,
+    shortId: task.shortId,
+    paths: {
+      directory,
+      lessonCandidatePath,
+      relativeLessonCandidatePath: toPosix(path.relative(target.projectRoot, lessonCandidatePath)),
+    },
+  };
+}
+
+function collectModuleReferences(target: TaskScannerTarget, defaults: ScannerRepositoryOptions, moduleKey: string): TaskRepositoryModuleReference[] {
+  return collectTasks(target, {
+    requireGeneratedScaffoldProvenance: defaults.requireGeneratedScaffoldProvenance,
+    includeArchived: false,
+    closeoutContent: defaults.closeoutContent,
+  }).filter((task) => task.module === moduleKey).map(moduleReferenceFromRecord);
+}
+
+function moduleReferenceFromRecord(task: TaskRecord): TaskRepositoryModuleReference {
+  return {
+    blocker: String(task.id || task.taskPlanPath || ""),
+  };
 }
 
 function planContractTaskFromRecord(task: TaskRecord): TaskPlanContractTask {
