@@ -93,12 +93,14 @@ const taskTombstoneCommandsSource = fs.readFileSync(path.join(repoRoot, "scripts
 const taskIndexSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-index.mts"), "utf8");
 const checkProfilesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/check-profiles.mts"), "utf8");
 const checkTaskContractsSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/check-task-contracts.mts"), "utf8");
+const governanceIndexGeneratorSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/governance-index-generator.mts"), "utf8");
 const checkProfilesTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/check-profiles.ts"), "utf8");
 const taskRepositorySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-repository.mts"), "utf8");
 const taskRepositoryTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/task-repository.ts"), "utf8");
 const statusProjectionReaderSource = taskRepositorySource.match(/export function createTaskStatusProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
 const checkProfileReaderSource = taskRepositorySource.match(/export function createTaskCheckProfileReader[\s\S]*?\n}\n/)?.[0] || "";
 const taskIndexProjectionReaderSource = taskRepositorySource.match(/export function createTaskIndexProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
+const taskGovernanceProjectionReaderSource = taskRepositorySource.match(/export function createTaskGovernanceProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
 const taskPlanContractReaderSource = taskRepositorySource.match(/export function createTaskPlanContractReader[\s\S]*?\n}\n/)?.[0] || "";
 const resolveTaskDirectorySource = taskRepositorySource.match(/export function resolveTaskDirectory[\s\S]*?\n}\n/)?.[0] || "";
 const broadTaskRepositoryTypeSource = taskRepositorySource.match(/export type TaskRepository =[\s\S]*?\n};/)?.[0] || "";
@@ -122,6 +124,9 @@ assert(!checkProfilesSource.includes("createTaskStatusProjectionReader"), "check
 assert(checkProfilesSource.includes("createTaskCheckProfileReader"), "check-profiles should compose through the check-profile reader seam");
 assert(!checkProfilesTypesSource.includes("TaskRecord"), "checker task types should not alias raw scanner TaskRecord objects");
 assert(!checkProfilesTypesSource.includes("TaskStatusProjection"), "checker task types should not alias broad status/dashboard projection objects");
+assert(!governanceIndexGeneratorSource.includes("createScannerTaskRepository"), "generated governance rebuild should consume governance projections instead of creating the broad scanner-backed repository");
+assert(!governanceIndexGeneratorSource.includes("TaskRecord"), "generated governance rebuild should not import or alias raw scanner TaskRecord objects");
+assert(governanceIndexGeneratorSource.includes("createTaskGovernanceProjectionReader"), "generated governance rebuild should compose through the governance projection reader seam");
 assert(!dashboardWorkbenchSource.includes("subjects: taskRepository"), "dashboard workbench task actions should use narrow subject readers instead of the broad TaskRepository identity");
 assert(!dashboardWorkbenchSource.includes("createScannerTaskRepository"), "dashboard workbench bulk review cache should consume workbench review subjects instead of creating the broad scanner-backed repository");
 assert(!taskTombstoneCommandsSource.includes("createScannerTaskRepository"), "task-tombstone compatibility commands should use the narrow tombstone subject reader instead of the broad scanner-backed repository");
@@ -139,6 +144,8 @@ assert(!checkProfileReaderSource.includes("createScannerTaskRepository"), "TaskC
 assert(!taskIndexProjectionReaderSource.includes("createScannerTaskRepository"), "TaskIndexProjectionReader should not recreate the broad scanner-backed TaskRepository identity");
 assert(taskRepositoryTypesSource.includes("export type TaskIndexProjectionReader"), "task repository type island should expose the narrow task-index projection reader contract");
 assert(taskRepositoryTypesSource.includes("export type TaskCheckProfileReader"), "task repository type island should expose the narrow check-profile reader contract");
+assert(!taskGovernanceProjectionReaderSource.includes("createScannerTaskRepository"), "TaskGovernanceProjectionReader should not recreate the broad scanner-backed TaskRepository identity");
+assert(taskRepositoryTypesSource.includes("export type TaskGovernanceProjectionReader"), "task repository type island should expose the narrow governance projection reader contract");
 assert(!checkTaskContractsSource.includes("createScannerTaskRepository"), "check-task-contracts should consume a narrow plan-contract reader instead of the broad scanner-backed repository");
 assert(checkTaskContractsSource.includes("createTaskPlanContractReader"), "check-task-contracts should compose through the task plan-contract reader seam");
 assert(!taskPlanContractReaderSource.includes("createScannerTaskRepository"), "TaskPlanContractReader should not recreate the broad scanner-backed TaskRepository identity");
