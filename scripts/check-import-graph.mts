@@ -249,15 +249,6 @@ export const architectureImportContract: ArchitectureImportContract = {
       evidence: "import graph check plus P08 workbench smoke fixtures",
     },
     {
-      id: "P08-dashboard-workbench-review-confirm-internal-bridge",
-      source: "scripts/lib/dashboard-workbench.mts",
-      target: "scripts/lib/task-lifecycle/review-confirm.mts",
-      ownerPhase: "P08-dashboard-workbench-consumer-cutover",
-      expiryPhase: "P08-dashboard-workbench-consumer-cutover",
-      reason: "Workbench still calls review-confirm internals directly until review confirmation is fully routed through application workbench contracts.",
-      evidence: "import graph check plus P08 review-confirm workbench fixtures",
-    },
-    {
       id: "P08-dashboard-workbench-projection-bridge",
       source: "scripts/lib/dashboard-workbench.mts",
       target: "scripts/lib/task-semantic-projection.mts",
