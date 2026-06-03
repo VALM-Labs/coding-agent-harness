@@ -168,24 +168,6 @@ export const architectureImportContract: ArchitectureImportContract = {
   ],
   phaseOpenExceptions: [
     {
-      id: "P04-application-task-operations-legacy-bridge",
-      source: "scripts/application/task/task-operations.mts",
-      target: "scripts/lib/task-lifecycle.mts",
-      ownerPhase: "P04-transaction-cutover",
-      expiryPhase: "P07-task-operations-facade-removal",
-      reason: "TaskOperations is the current application seam while lifecycle writes move behind HarnessTransaction and stable use-case ports.",
-      evidence: "import graph check plus P04 no-data-loss lifecycle fixtures",
-    },
-    {
-      id: "P04-application-task-operations-lesson-bridge",
-      source: "scripts/application/task/task-operations.mts",
-      target: "scripts/lib/task-lesson-sedimentation.mts",
-      ownerPhase: "P04-transaction-cutover",
-      expiryPhase: "P07-task-operations-facade-removal",
-      reason: "Lesson task creation remains a legacy command bridge until lifecycle writes are expressed as application changesets.",
-      evidence: "import graph check plus P04 lesson-routing fixtures",
-    },
-    {
       id: "P05-domain-task-subject-semantic-projection-bridge",
       source: "scripts/domain/task/task-subjects.mts",
       target: "scripts/lib/task-semantic-projection.mts",
@@ -193,6 +175,24 @@ export const architectureImportContract: ArchitectureImportContract = {
       expiryPhase: "P06-dashboard-projection-consumer-cutover",
       reason: "Task subject domain mapping temporarily reuses the existing CLI/Dashboard semantic projection builder for fallback parity until the projection contract is moved behind a domain/port-owned module.",
       evidence: "import graph check plus P05 domain subject fallback tests; residual must stay open until P06 projection ownership is resolved",
+    },
+    {
+      id: "P04-infrastructure-task-operation-lifecycle-writer-adapter",
+      source: "scripts/infrastructure/task/legacy-task-operation-writers.mts",
+      target: "scripts/lib/task-lifecycle.mts",
+      ownerPhase: "P04-transaction-cutover",
+      expiryPhase: "P07-task-operations-facade-removal",
+      reason: "Legacy lifecycle writes remain behind the explicit TaskOperationWriters infrastructure adapter until lifecycle writes are fully expressed as application changesets.",
+      evidence: "import graph check plus TaskOperations writer port tests and P04 no-data-loss lifecycle fixtures",
+    },
+    {
+      id: "P04-infrastructure-task-operation-lesson-writer-adapter",
+      source: "scripts/infrastructure/task/legacy-task-operation-writers.mts",
+      target: "scripts/lib/task-lesson-sedimentation.mts",
+      ownerPhase: "P04-transaction-cutover",
+      expiryPhase: "P07-task-operations-facade-removal",
+      reason: "Legacy lesson sedimentation writes remain behind the explicit TaskOperationWriters infrastructure adapter until lesson writes are fully expressed as application changesets.",
+      evidence: "import graph check plus TaskOperations writer port tests and P04 lesson-routing fixtures",
     },
     {
       id: "P08-application-workbench-review-confirmation-sync-bridge",
@@ -261,6 +261,9 @@ export const architectureImportContract: ArchitectureImportContract = {
   sharedFileLocks: [
     { path: "scripts/lib/harness-transaction.mts", ownerPhase: "P04-transaction-cutover", reason: "Transaction/ChangeSet write contract." },
     { path: "scripts/lib/task-lifecycle.mts", ownerPhase: "P04-transaction-cutover", reason: "Current lifecycle write facade and legacy bridge." },
+    { path: "scripts/ports/task/task-operation-writers.mts", ownerPhase: "P04-transaction-cutover", reason: "TaskOperations writer port and application-facing write seam." },
+    { path: "scripts/infrastructure/task/legacy-task-operation-writers.mts", ownerPhase: "P04-transaction-cutover", reason: "Legacy lifecycle/lesson writer adapter behind TaskOperations writer port." },
+    { path: "scripts/adapters/cli/task-operations.mts", ownerPhase: "P04-transaction-cutover", reason: "CLI composition for TaskOperations readers and writers." },
     { path: "scripts/lib/governance-sync.mts", ownerPhase: "P04-transaction-cutover", reason: "Current low-level write/lock implementation." },
     { path: "scripts/lib/task-repository.mts", ownerPhase: "P05-repository-scanner-strangler", reason: "TaskRepository port and scanner-backed implementation." },
     { path: "scripts/domain/task/task-subjects.mts", ownerPhase: "P05-repository-scanner-strangler", reason: "Task operation/tombstone subject domain mapping and raw fact selection." },
@@ -282,6 +285,7 @@ export const architectureImportContract: ArchitectureImportContract = {
     "domain-imports-infrastructure",
     "application-imports-adapter",
     "application-imports-unregistered-legacy-surface",
+    "task-infrastructure-imports-unregistered-legacy-surface",
     "runtime-imports-task-operations-facade",
     "adapter-imports-task-internal",
     "command-imports-task-internal",
@@ -727,6 +731,9 @@ function architectureBoundaryCode(file: string, target: string): string {
   if (file.startsWith("scripts/application/") && isLegacyTaskRuntimeSurface(target) && !isArchitecturePhaseOpenException(file, target)) {
     return "application-imports-unregistered-legacy-surface";
   }
+  if (file.startsWith("scripts/infrastructure/task/") && isLegacyTaskRuntimeSurface(target) && target !== "scripts/lib/task-scanner.mts" && !isArchitecturePhaseOpenException(file, target)) {
+    return "task-infrastructure-imports-unregistered-legacy-surface";
+  }
   if ((file.startsWith("scripts/commands/") || file === "scripts/lib/dashboard-workbench.mts") && target === "scripts/lib/task-operations.mts") {
     return "runtime-imports-task-operations-facade";
   }
@@ -758,6 +765,7 @@ function architectureBoundaryMessage(code: string, file: string, target: string)
   if (code === "domain-imports-infrastructure") return `${file} is domain code and may only import infrastructure/kernel, not ${target}`;
   if (code === "application-imports-adapter") return `${file} is application code and must not import adapter module ${target}`;
   if (code === "application-imports-unregistered-legacy-surface") return `${file} is application code and may import legacy task runtime surface ${target} only through a phase-open architecture contract exception`;
+  if (code === "task-infrastructure-imports-unregistered-legacy-surface") return `${file} is task infrastructure and may import legacy task runtime surface ${target} only through an explicit adapter exception`;
   if (code === "runtime-imports-task-operations-facade") return `${file} must import TaskOperations from scripts/application/task, not the scripts/lib compatibility facade`;
   if (code === "adapter-imports-task-internal") return `${file} adapter must go through application/repository boundaries, not task internal ${target}`;
   if (code === "command-imports-task-internal") return `${file} command adapter must go through application/repository boundaries, not task internal ${target}`;

@@ -15,6 +15,8 @@ export * from "./governance-index-generator.mjs";
 export * from "./harness-transaction.mjs";
 export * from "./task-lifecycle.mjs";
 export * from "../application/task/task-operations.mjs";
+export * from "../ports/task/task-operation-writers.mjs";
+export * from "../infrastructure/task/legacy-task-operation-writers.mjs";
 export * from "./module-registry.mjs";
 export * from "./task-lesson-sedimentation.mjs";
 export * from "./lesson-maintenance.mjs";

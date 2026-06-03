@@ -8,11 +8,8 @@ import {
 } from "../lib/harness-core.mjs";
 import fs from "node:fs";
 import { takeRepeatedOptionsFromArgs } from "../lib/command-registry.mjs";
-import { createTaskOperations, unwrapTaskOperation } from "../application/task/task-operations.mjs";
-import {
-  createScannerTaskOperationSubjectReader,
-  createScannerTaskTombstoneSubjectReader,
-} from "../adapters/cli/task-operation-subject-reader.mjs";
+import { unwrapTaskOperation } from "../application/task/task-operations.mjs";
+import { createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
 
 type FlagReader = (name: string, fallback?: boolean) => boolean;
 type OptionReader = (name: string, fallback?: string) => string;
@@ -68,10 +65,7 @@ type CreateTaskCliOptions = {
 };
 
 function taskOperations(target: string) {
-  return createTaskOperations(target, {
-    subjects: createScannerTaskOperationSubjectReader(target),
-    tombstoneSubjects: createScannerTaskTombstoneSubjectReader(target),
-  });
+  return createScannerTaskOperations(target);
 }
 
 export function runTaskCommand(command: string, { args, takeFlag, takeOption, targetArg }: CommandContext) {

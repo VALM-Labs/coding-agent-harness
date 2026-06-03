@@ -85,6 +85,7 @@ writeFixture(
 const graph = buildImportGraph({ repoRoot: fixtureRoot });
 const repoGraph = buildImportGraph({ repoRoot });
 const harnessCoreSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/harness-core.mts"), "utf8");
+const taskOperationsSource = fs.readFileSync(path.join(repoRoot, "scripts/application/task/task-operations.mts"), "utf8");
 const taskLifecycleSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle.mts"), "utf8");
 const statusBuilderSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/status-builder.mts"), "utf8");
 const dashboardWorkbenchSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/dashboard-workbench.mts"), "utf8");
@@ -97,7 +98,10 @@ const broadTaskRepositoryTypeSource = taskRepositorySource.match(/export type Ta
 const lifecycleReviewTaskByDirectorySource = taskLifecycleSource.match(/function findReviewTaskByDirectory[\s\S]*?\n}\n/)?.[0] || "";
 assert(!harnessCoreSource.includes("./task-operation-subjects.mjs"), "scanner-backed TaskOperationSubjectReader helper should not be re-exported from the broad harness-core barrel");
 assert(!harnessCoreSource.includes("../domain/task/task-subjects.mjs"), "task subject domain mapper should not be re-exported from the broad harness-core barrel");
+assert(harnessCoreSource.includes("../infrastructure/task/legacy-task-operation-writers.mjs"), "harness-core should expose the legacy writer adapter needed for package-facing TaskOperations composition");
 assert(!fs.existsSync(path.join(repoRoot, "scripts/lib/task-operation-subjects.mts")), "scanner-backed TaskOperationSubjectReader helper should not live in scripts/lib");
+assert(!taskOperationsSource.includes("../../lib/task-lifecycle.mjs"), "TaskOperations should consume injected writer ports instead of importing the legacy lifecycle writer");
+assert(!taskOperationsSource.includes("../../lib/task-lesson-sedimentation.mjs"), "TaskOperations should consume injected writer ports instead of importing the legacy lesson writer");
 assert(!taskLifecycleSource.includes("createScannerTaskRepository"), "task-lifecycle should consume the narrow lifecycle reader instead of the broad scanner-backed repository");
 assert(!resolveTaskDirectorySource.includes("createScannerTaskRepository"), "task lifecycle resolver handoff should not route resolveTaskDirectory through the broad scanner-backed repository identity");
 assert(!broadTaskRepositoryTypeSource.includes("listLifecycleTasks") && !broadTaskRepositoryTypeSource.includes("getLifecycleTaskByDirectory"), "TaskLifecycleReader should stay separate instead of widening the broad TaskRepository identity");
@@ -132,6 +136,10 @@ assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => excep
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.source === "scripts/application/task/task-operations.mts" && exception.target === "scripts/lib/task-repository.mts"), "contract should not re-register the retired TaskOperations repository bridge under a new id");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.source === "scripts/application/task/task-operations.mts" && exception.target === "scripts/lib/task-semantic-projection.mts"), "contract should not re-register the retired TaskOperations projection bridge under a new id");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P04-application-task-operations-tombstone-bridge"), "contract should not keep the retired TaskOperations tombstone bridge exception");
+assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P04-application-task-operations-legacy-bridge"), "contract should not keep the retired TaskOperations lifecycle writer bridge exception");
+assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P04-application-task-operations-lesson-bridge"), "contract should not keep the retired TaskOperations lesson writer bridge exception");
+assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.source === "scripts/application/task/task-operations.mts" && exception.target === "scripts/lib/task-lifecycle.mts"), "contract should not re-register the TaskOperations lifecycle writer bridge under a new id");
+assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.source === "scripts/application/task/task-operations.mts" && exception.target === "scripts/lib/task-lesson-sedimentation.mts"), "contract should not re-register the TaskOperations lesson writer bridge under a new id");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P04-application-module-governance-sync-bridge"), "contract should not keep the retired module governance sync bridge exception");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P04-application-tombstone-resolution-bridge"), "contract should not keep the retired tombstone lifecycle resolver bridge exception");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P05-application-tombstone-repository-resolution-bridge"), "contract should not keep the retired tombstone repository resolver exception");
@@ -151,7 +159,16 @@ const subjectProjectionBridge = graph.architectureContract.phaseOpenExceptions.f
 assert(subjectProjectionBridge?.source === "scripts/domain/task/task-subjects.mts" && subjectProjectionBridge.target === "scripts/lib/task-semantic-projection.mts", "contract should track the task subject domain mapper's temporary projection bridge");
 assert(subjectProjectionBridge?.expiryPhase === "P06-dashboard-projection-consumer-cutover", "task subject projection bridge should expire at the projection ownership phase");
 assert(subjectProjectionBridge?.reason?.includes("temporarily reuses"), "task subject projection bridge should not be presented as final domain ownership");
+const legacyWriterLifecycleBridge = graph.architectureContract.phaseOpenExceptions.find((exception) => exception.id === "P04-infrastructure-task-operation-lifecycle-writer-adapter");
+assert(legacyWriterLifecycleBridge?.source === "scripts/infrastructure/task/legacy-task-operation-writers.mts" && legacyWriterLifecycleBridge.target === "scripts/lib/task-lifecycle.mts", "contract should explicitly track the legacy lifecycle writer adapter residual");
+assert(legacyWriterLifecycleBridge?.ownerPhase === "P04-transaction-cutover" && legacyWriterLifecycleBridge.expiryPhase === "P07-task-operations-facade-removal", "legacy lifecycle writer adapter residual should stay scoped to the P04-to-P07 retirement window");
+const legacyWriterLessonBridge = graph.architectureContract.phaseOpenExceptions.find((exception) => exception.id === "P04-infrastructure-task-operation-lesson-writer-adapter");
+assert(legacyWriterLessonBridge?.source === "scripts/infrastructure/task/legacy-task-operation-writers.mts" && legacyWriterLessonBridge.target === "scripts/lib/task-lesson-sedimentation.mts", "contract should explicitly track the legacy lesson writer adapter residual");
+assert(legacyWriterLessonBridge?.ownerPhase === "P04-transaction-cutover" && legacyWriterLessonBridge.expiryPhase === "P07-task-operations-facade-removal", "legacy lesson writer adapter residual should stay scoped to the P04-to-P07 retirement window");
 assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/lib/task-scanner.mts" && lock.ownerPhase === "P05-repository-scanner-strangler"), "contract should expose scanner shared-file lock ownership");
+assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/ports/task/task-operation-writers.mts" && lock.ownerPhase === "P04-transaction-cutover"), "contract should expose TaskOperations writer port ownership");
+assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/infrastructure/task/legacy-task-operation-writers.mts" && lock.ownerPhase === "P04-transaction-cutover"), "contract should expose legacy writer adapter ownership");
+assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/adapters/cli/task-operations.mts" && lock.ownerPhase === "P04-transaction-cutover"), "contract should expose TaskOperations CLI composition ownership");
 assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/domain/task/task-subjects.mts" && lock.ownerPhase === "P05-repository-scanner-strangler"), "contract should expose task subject domain mapper ownership");
 assert(!graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/lib/task-operation-subjects.mts"), "contract should not keep a shared-file lock for the retired lib TaskOperationSubjectReader helper");
 assert(graph.architectureContract.sharedFileLocks.some((lock) => lock.path === "scripts/adapters/cli/task-operation-subject-reader.mts" && lock.ownerPhase === "P05-repository-scanner-strangler"), "contract should expose TaskOperationSubjectReader CLI adapter ownership");
@@ -194,6 +211,7 @@ writeFixture(fixtureRoot, "scripts/lib/dashboard-data.mts", 'import { scan } fro
 writeFixture(fixtureRoot, "scripts/lib/task-lifecycle.mts", "export const lifecycle = 1;\n");
 writeFixture(fixtureRoot, "scripts/lib/dashboard-workbench.mts", 'import { lifecycle } from "./task-lifecycle.mjs";\nimport { internal } from "./task-lifecycle/internal.mjs";\nexport const workbench = lifecycle + internal;\n');
 writeFixture(fixtureRoot, "scripts/adapters/cli/bad-scanner-adapter.mts", 'import { scan } from "../../lib/task-scanner.mjs";\nexport const badScannerAdapter = scan;\n');
+writeFixture(fixtureRoot, "scripts/infrastructure/task/bad-legacy-writer.mts", 'import { lifecycle } from "../../lib/task-lifecycle.mjs";\nexport const badLegacyWriter = lifecycle;\n');
 writeFixture(fixtureRoot, "scripts/commands/bad-repository-command.mts", 'import { create } from "../lib/task-repository.mjs";\nexport const badRepositoryCommand = create;\n');
 writeFixture(fixtureRoot, "scripts/adapters/cli/bad-repository-adapter.mts", 'import { create } from "../../lib/task-repository.mjs";\nexport const badRepositoryAdapter = create;\n');
 writeFixture(fixtureRoot, "scripts/lib/governance-index-generator.mts", 'import { scan } from "./task-scanner.mjs";\nexport const generated = scan;\n');
@@ -227,6 +245,7 @@ assert(failed.violations.some((violation) => violation.code === "command-imports
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-lifecycle/review-confirm")), "gate should reject adapter imports from task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-repository")), "gate should reject adapter imports from task repository legacy surface");
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-scanner")), "gate should reject unregistered adapter imports from task scanner internals");
+assert(failed.violations.some((violation) => violation.code === "task-infrastructure-imports-unregistered-legacy-surface" && violation.message.includes("task-lifecycle")), "gate should reject unregistered task infrastructure imports from legacy lifecycle writers");
 assert(failed.violations.some((violation) => violation.code === "dashboard-data-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-data imports from unregistered task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "dashboard-workbench-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-workbench imports from unregistered task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "runtime-imports-task-operations-facade"), "gate should report runtime callers importing the TaskOperations compatibility facade");
