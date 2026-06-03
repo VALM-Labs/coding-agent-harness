@@ -31,12 +31,25 @@ type ImportGraph = {
     typesValueImports: number;
     architectureBoundaryViolations: number;
     taskRepositoryIdentityViolations: number;
+    taskRepositoryIdentityMatrixEntries: number;
+    taskRepositoryIdentityAllowedEntries: number;
+    taskRepositoryIdentityBlockedEntries: number;
   };
   nodes: ImportGraphNode[];
+  taskRepositoryIdentityMatrix: {
+    file: string;
+    tokens: string[];
+    classification: "repository-adapter" | "test-fixture" | "runtime-blocked";
+    allowed: boolean;
+    ownerPhase: string;
+    expiryPhase: string;
+    reason: string;
+  }[];
 };
 type ImportGraphViolation = { code: string; message: string };
 type ImportGraphCheck = {
   ok: boolean;
+  graph: ImportGraph;
   violations: ImportGraphViolation[];
 };
 type ImportGraphApi = {
@@ -73,6 +86,7 @@ writeFixture(fixtureRoot, "scripts/lib/harness-core.mjs", 'export { leaf } from 
 writeFixture(fixtureRoot, "scripts/lib/leaf.mjs", "export const leaf = 1;\n");
 writeFixture(fixtureRoot, "scripts/lib/nested/helper.mjs", "export const helper = 2;\n");
 writeFixture(fixtureRoot, "scripts/lib/types/protocol.ts", "export type Protocol = { id: string };\n");
+writeFixture(fixtureRoot, "scripts/lib/task-repository.mts", "export type TaskRecord = { id: string };\nexport type TaskRepository = { list(): TaskRecord[] };\n");
 writeFixture(fixtureRoot, "scripts/infrastructure/kernel/path-utils.mts", "export const value = 1;\n");
 writeFixture(fixtureRoot, "scripts/domain/task/model.mts", 'import { value } from "../../infrastructure/kernel/path-utils.mjs";\nexport const model = value;\n');
 writeFixture(fixtureRoot, "scripts/application/task/use-case.mts", 'import { model } from "../../domain/task/model.mjs";\nexport const useCase = model;\n');
@@ -81,6 +95,11 @@ writeFixture(
   fixtureRoot,
   "tests/type-consumer.ts",
   'import type { Protocol } from "../scripts/lib/' + 'types/protocol' + '.js";\nconst value: Protocol = { id: "ok" };\n',
+);
+writeFixture(
+  fixtureRoot,
+  "tests/repository-identity-fixture.ts",
+  'import type { TaskRecord, TaskRepository } from "../scripts/lib/task-repository.js";\nconst value: TaskRecord = { id: "ok" };\nexport function read(repository: TaskRepository): TaskRecord[] { return repository.list().concat(value); }\n',
 );
 
 const graph = buildImportGraph({ repoRoot: fixtureRoot });
@@ -198,15 +217,28 @@ assert(!taskModuleReferenceReaderSource.includes("createScannerTaskRepository"),
 assert(taskRepositoryTypesSource.includes("export type TaskModuleReferenceReader"), "task repository type island should expose the narrow module reference reader contract");
 assert(!broadTaskRepositoryTypeSource.includes("listModuleReferences"), "TaskModuleReferenceReader should stay separate instead of widening the broad TaskRepository identity");
 assert(!taskRepositorySource.includes("return { ...task };"), "status projection materialization should not leak scanner records by object spread");
-assert(graph.summary.fileCount === 11, `expected 11 graph files, got ${graph.summary.fileCount}`);
-assert(graph.summary.localEdgeCount === 9, `expected 9 local edges, got ${graph.summary.localEdgeCount}`);
+assert(graph.summary.fileCount === 13, `expected 13 graph files, got ${graph.summary.fileCount}`);
+assert(graph.summary.localEdgeCount === 10, `expected 10 local edges, got ${graph.summary.localEdgeCount}`);
 assert(graph.summary.unresolvedLocalEdges === 0, "valid graph should have no unresolved local edges");
 assert(graph.summary.cycleNodes === 0, "valid graph should have no cycle nodes");
 assert(graph.summary.runtimeMjsToTsEdges === 0, "valid graph should have no .mjs to .ts/.mts edges");
 assert(graph.summary.typesValueImports === 0, "valid graph should allow import type from scripts/lib/types");
 assert(graph.summary.architectureBoundaryViolations === 0, "valid layered fixture should have no architecture boundary violations");
 assert(repoGraph.summary.taskRepositoryIdentityViolations === 0, "repo graph should have no runtime consumers of broad scanner-backed TaskRepository/TaskRecord identity outside the repository adapter and tests");
-assert(graph.architectureContract.version === "architecture-import-contract/2026-06-02-p03", "graph should expose the P03 architecture import contract version");
+assert(graph.summary.taskRepositoryIdentityViolations === 0, "valid layered fixture should have no runtime consumers of broad scanner-backed TaskRepository/TaskRecord identity outside the repository adapter and tests");
+assert(graph.summary.taskRepositoryIdentityMatrixEntries === 2, "valid layered fixture should expose repository adapter and test-only identity matrix entries");
+assert(graph.summary.taskRepositoryIdentityAllowedEntries === 2, "valid layered fixture should classify repository adapter and test-only identity matrix entries as allowed");
+assert(graph.summary.taskRepositoryIdentityBlockedEntries === 0, "valid layered fixture should have no blocked repository identity matrix entries");
+const repositoryAdapterMatrixEntry = graph.taskRepositoryIdentityMatrix.find((entry) => entry.file === "scripts/lib/task-repository.mts");
+assert(repositoryAdapterMatrixEntry?.classification === "repository-adapter" && repositoryAdapterMatrixEntry.allowed === true, "matrix should classify scripts/lib/task-repository.mts as the allowed repository adapter");
+assert(repositoryAdapterMatrixEntry?.tokens.includes("TaskRecord") && repositoryAdapterMatrixEntry.tokens.includes("TaskRepository"), "repository adapter matrix entry should list raw repository identity tokens");
+const testFixtureMatrixEntry = graph.taskRepositoryIdentityMatrix.find((entry) => entry.file === "tests/repository-identity-fixture.ts");
+assert(testFixtureMatrixEntry?.classification === "test-fixture" && testFixtureMatrixEntry.allowed === true, "matrix should classify test repository identity usage as test-only evidence");
+assert(testFixtureMatrixEntry?.expiryPhase === "P13-final-audit", "test-only matrix entry should carry a final audit expiry");
+assert(repoGraph.summary.taskRepositoryIdentityMatrixEntries === repoGraph.summary.taskRepositoryIdentityAllowedEntries + repoGraph.summary.taskRepositoryIdentityBlockedEntries, "repo graph repository identity matrix counts should partition allowed and blocked entries");
+assert(repoGraph.summary.taskRepositoryIdentityBlockedEntries === 0, "repo graph should have no blocked runtime broad repository identity entries");
+assert(repoGraph.taskRepositoryIdentityMatrix.some((entry) => entry.file === "scripts/lib/task-repository.mts" && entry.classification === "repository-adapter" && entry.allowed), "repo graph matrix should keep the repository adapter as the only production-owned broad repository identity surface");
+assert(graph.architectureContract.version === "architecture-import-contract/2026-06-03-p05-wave-a", "graph should expose the P05 Wave A architecture import contract version");
 assert(graph.architectureContract.layers.some((layer) => layer.id === "application" && layer.mayImport.includes("phase-open-exceptions")), "contract should expose application phase-open exception policy");
 assert(graph.architectureContract.layers.some((layer) => layer.id === "commands" && layer.owns.includes("scripts/commands/**")), "contract should expose a dedicated commands ownership layer");
 assert(graph.architectureContract.layers.some((layer) => layer.id === "commands" && layer.mayImport.includes("scripts/adapters/**")), "commands should be allowed to compose explicit CLI adapters");
@@ -262,7 +294,7 @@ assert(nodeByPath(graph, "scripts/lib/leaf.mjs").barrelReachable === true, "barr
 assert(nodeByPath(graph, "scripts/lib/leaf.mjs").layer === 0, "leaf dependency should be layer 0");
 assert(nodeByPath(graph, "scripts/harness.mjs").layer > nodeByPath(graph, "scripts/lib/leaf.mjs").layer, "importer layer should be deeper than leaf layer");
 
-const checked = checkImportGraph({ repoRoot: fixtureRoot, expectNodes: 11, expectEdges: 9 });
+const checked = checkImportGraph({ repoRoot: fixtureRoot, expectNodes: 13, expectEdges: 10 });
 assert(checked.ok === true, `valid graph gate should pass:\n${checked.violations.map((violation) => violation.message).join("\n")}`);
 
 writeFixture(fixtureRoot, "scripts/bad-missing.mjs", 'import "./missing.mjs";\n');
@@ -328,6 +360,13 @@ assert(failed.violations.some((violation) => violation.code === "adapter-imports
 assert(failed.violations.some((violation) => violation.code === "adapter-imports-task-internal" && violation.message.includes("task-scanner")), "gate should reject unregistered adapter imports from task scanner internals");
 assert(failed.violations.some((violation) => violation.code === "runtime-consumes-broad-task-repository-identity" && violation.message.includes("TaskRecord")), "gate should reject runtime code consuming raw TaskRecord identity outside the repository adapter");
 assert(failed.violations.some((violation) => violation.code === "runtime-consumes-broad-task-repository-identity" && violation.message.includes("createScannerTaskRepository")), "gate should reject runtime code recreating the broad scanner-backed repository identity outside the repository adapter");
+const blockedRuntimeIdentityEntry = failed.graph.taskRepositoryIdentityMatrix.find((entry) => entry.file === "scripts/lib/bad-runtime-repository-identity.mts");
+assert(blockedRuntimeIdentityEntry?.classification === "runtime-blocked" && blockedRuntimeIdentityEntry.allowed === false, "matrix should classify runtime TaskRepository/TaskRecord identity usage as blocked");
+assert(blockedRuntimeIdentityEntry?.tokens.includes("TaskRecord") && blockedRuntimeIdentityEntry.tokens.includes("TaskRepository"), "blocked runtime matrix entry should list raw identity tokens");
+const blockedRuntimeFactoryEntry = failed.graph.taskRepositoryIdentityMatrix.find((entry) => entry.file === "scripts/lib/bad-runtime-repository-factory.mts");
+assert(blockedRuntimeFactoryEntry?.classification === "runtime-blocked" && blockedRuntimeFactoryEntry.allowed === false, "matrix should classify runtime scanner repository factory usage as blocked");
+assert(blockedRuntimeFactoryEntry?.tokens.includes("createScannerTaskRepository"), "blocked runtime factory matrix entry should list the scanner repository factory token");
+assert(failed.graph.summary.taskRepositoryIdentityBlockedEntries >= 2, "invalid graph fixture should count blocked repository identity matrix entries");
 assert(failed.violations.some((violation) => violation.code === "task-infrastructure-imports-unregistered-legacy-surface" && violation.message.includes("task-lifecycle")), "gate should reject unregistered task infrastructure imports from legacy lifecycle writers");
 assert(failed.violations.some((violation) => violation.code === "dashboard-data-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-data imports from unregistered task lifecycle internal modules");
 assert(failed.violations.some((violation) => violation.code === "dashboard-workbench-imports-task-internal" && violation.message.includes("task-lifecycle/internal")), "gate should reject dashboard-workbench imports from unregistered task lifecycle internal modules");
