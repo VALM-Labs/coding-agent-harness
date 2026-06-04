@@ -1,6 +1,6 @@
 import { normalizeTarget, toPosix } from "./core-shared.mjs";
-import { collectTasks } from "./task-scanner.mjs";
 import { archiveBlockReason } from "./task-archive-eligibility.mjs";
+import { createTaskLifecycleReader } from "./task-repository.mjs";
 
 type PresetRuntimeTarget = ReturnType<typeof normalizeTarget>;
 
@@ -30,12 +30,14 @@ export function normalizePresetRuntimeTarget(input = "."): PresetRuntimeTarget {
 
 export function collectPresetRuntimeTasks(targetInput: PresetRuntimeTarget | string, { includeArchived = false }: { includeArchived?: boolean } = {}): PresetRuntimeTask[] {
   const target = typeof targetInput === "string" ? normalizePresetRuntimeTarget(targetInput) : targetInput;
-  return collectTasks(target, { includeArchived }).map((task) => {
-    const record = task as Record<string, unknown>;
+  return createTaskLifecycleReader(target).listLifecycleTasks({ includeArchived }).map((task) => {
+    const pathValue = normalizePresetRuntimePath(String(task.path || task.currentPath || ""));
+    const id = String(task.id || "");
+    const shortId = String(task.shortId || id.split("/").at(-1) || "");
     return {
-      id: String(task.id || ""),
-      shortId: String(task.shortId || task.id.split("/").at(-1) || ""),
-      legacyId: String(record.legacyId || ""),
+      id,
+      shortId,
+      legacyId: presetRuntimeLegacyId(task, { id, shortId }),
       title: String(task.title || ""),
       state: String(task.state || "unknown"),
       budget: String(task.budget || ""),
@@ -48,8 +50,8 @@ export function collectPresetRuntimeTasks(targetInput: PresetRuntimeTarget | str
       deletionState: String(task.deletionState || ""),
       taskPreset: String(task.taskPreset || ""),
       module: String(task.module || ""),
-      path: normalizePresetRuntimePath(String(task.path || record.localPath || "")),
-      localPath: normalizePresetRuntimePath(String(record.localPath || task.path || "")),
+      path: pathValue,
+      localPath: pathValue,
     };
   });
 }
@@ -61,4 +63,9 @@ export function presetRuntimeArchiveBlockReason(task: PresetRuntimeTask, { archi
 function normalizePresetRuntimePath(value: string): string {
   const raw = String(value || "").replace(/^TARGET:/, "").trim();
   return raw ? toPosix(raw) : "";
+}
+
+function presetRuntimeLegacyId(task: { aliases?: unknown[] }, { id, shortId }: { id: string; shortId: string }): string {
+  const aliases = Array.isArray(task.aliases) ? task.aliases.map(String) : [];
+  return aliases.find((alias) => alias && alias !== id && alias !== shortId) || "";
 }
