@@ -17,13 +17,13 @@ import { renderAgentReviewSubmission, replaceAgentReviewSubmission } from "./tas
 import { planCreateTaskChanges, resolveImplicitCreateTarget } from "./task-lifecycle/create-task-helpers.mjs";
 import { createTaskGeneratedSurfaces, createTaskTransactionSummary, materializeCreateTask, type CreateTaskMaterialization } from "./task-lifecycle/create-task-materialization.mjs";
 import { plannedLifecycleAllowedPaths } from "./task-lifecycle/planned-write-scope.mjs";
-import { governanceRelativePaths, syncModuleStepGovernance, syncTaskGovernance } from "./governance-sync.mjs";
+import { beginGovernanceSync, commitGovernanceSync, governanceRelativePaths, releaseGovernanceSync, syncModuleStepGovernance, syncTaskGovernance } from "./governance-sync.mjs";
 import { assertTransactionSucceeded, createGovernanceHarnessTransaction } from "./harness-transaction.mjs";
 import { normalizeHarnessModuleKey, prepareModuleRegistration, prepareModuleStepRegistrationUpdate, readHarnessModules, registeredHarnessModule } from "./module-registry.mjs";
 import { buildLifecyclePresetContext, evaluatePresetValues, resolveLifecyclePresetInputs } from "./task-lifecycle/preset-interop.mjs";
 import { taskIdFromDirectory } from "./harness-paths.mjs";
 import type { TaskBudget } from "./types/task-scanner.js";
-import type { CreateTaskOptions, DeferredReviewConfirmOptions, LifecycleChange, LifecycleTarget, LifecycleTask, LifecycleUpdateOptions, ListLifecycleTasksOptions, ModuleStepOptions, PhaseUpdateOptions, PresetContext, PresetInputs, PresetPackage, ReviewConfirmOptions, TaskIdentity } from "./types/task-lifecycle.js";
+import type { CreateTaskBatchOptions, CreateTaskOptions, DeferredReviewConfirmOptions, LifecycleChange, LifecycleTarget, LifecycleTask, LifecycleUpdateOptions, ListLifecycleTasksOptions, ModuleStepOptions, PhaseUpdateOptions, PresetContext, PresetInputs, PresetPackage, ReviewConfirmOptions, TaskIdentity } from "./types/task-lifecycle.js";
 
 type LifecycleGateEvent = "task-start" | "task-review" | "task-complete";
 
@@ -124,6 +124,15 @@ function automaticTaskSlug(seed: string): string {
 
 function randomTaskSuffix(): string {
   return crypto.randomBytes(4).toString("hex");
+}
+
+function firstDuplicate(values: string[]): string {
+  const seen = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) return value;
+    seen.add(value);
+  }
+  return "";
 }
 
 function resolveTaskIdentity({ target, taskId, title, presetPackage, moduleKey, automaticTaskId }: { target: LifecycleTarget; taskId: string; title: string; presetPackage: PresetPackage | null; moduleKey: string; automaticTaskId: boolean }): TaskIdentity {
@@ -288,6 +297,74 @@ export function createTask(targetInput: string, taskId: string, { title = "", lo
       transaction: createTaskTransactionSummary(transactionResult),
     },
   };
+}
+
+export function createTaskBatch(targetInput: string, { tasks = [], title = "", locale = "en-US", dryRun = false, moduleKey = "", budget = "standard", longRunning = false, preset = "" }: CreateTaskBatchOptions) {
+  const normalizedTasks = tasks.map((task) => ({
+    id: normalizeTaskId(task.id),
+    title: String(task.title || "").trim(),
+  }));
+  if (normalizedTasks.length === 0) throw new Error("new-task-batch requires at least one task in --task-list");
+  const missingIdIndex = normalizedTasks.findIndex((task) => !task.id);
+  if (missingIdIndex >= 0) throw new Error(`new-task-batch task at index ${missingIdIndex} is missing id`);
+  const duplicate = firstDuplicate(normalizedTasks.map((task) => task.id));
+  if (duplicate) throw new Error(`new-task-batch task ids must be unique: ${duplicate}`);
+  if (preset) throw new Error("new-task-batch currently supports template-based task creation only; omit --preset");
+  const target = asLifecycleTarget(normalizeTarget(targetInput));
+  const normalizedModuleKey = moduleKey ? normalizeHarnessModuleKey(moduleKey) : "";
+  const plannedTaskRoots = normalizedTasks.map((task) => ({ id: task.id, directory: taskRoot(target, ensureDatePrefix(task.id), { moduleKey: normalizedModuleKey }) }));
+  const duplicateDirectory = firstDuplicate(plannedTaskRoots.map((task) => task.directory));
+  if (duplicateDirectory) {
+    const ids = plannedTaskRoots.filter((task) => task.directory === duplicateDirectory).map((task) => task.id).join(", ");
+    throw new Error(`new-task-batch task ids resolve to the same task directory: ${ids}`);
+  }
+  const existing = plannedTaskRoots.filter((task) => fs.existsSync(task.directory));
+  if (existing.length > 0) throw new Error(`new-task-batch target task already exists: ${existing.map((task) => task.id).join(", ")}`);
+  const created: unknown[] = [];
+  const changes: LifecycleChange[] = [];
+  let allowedRelativePaths: string[] = [];
+  for (const item of normalizedTasks) {
+    const result = createTask(target.projectRoot, item.id, {
+      title: item.title || title,
+      locale,
+      dryRun,
+      moduleKey,
+      budget,
+      longRunning,
+      deferCommit: true,
+      allowDirtyRelativePaths: allowedRelativePaths,
+    });
+    created.push(result.task);
+    changes.push(...result.changes);
+    allowedRelativePaths = [...new Set([...(result.governance.commit.allowedPaths || []), ...allowedRelativePaths])].sort();
+  }
+  if (dryRun) {
+    return {
+      dryRun,
+      tasks: created,
+      changes,
+      governance: { commit: { committed: false, reason: "dry-run", allowedPaths: allowedRelativePaths } },
+    };
+  }
+  const context = beginGovernanceSync(target, {
+    operation: `new-task-batch ${normalizedTasks.length} tasks`,
+    allowDirtyWorktree: true,
+    allowDirtyWriteScope: true,
+    allowedRelativePaths,
+  });
+  try {
+    const commit = commitGovernanceSync(context, allowedRelativePaths, {
+      message: `chore(harness): register ${normalizedTasks.length} tasks`,
+    });
+    return {
+      dryRun,
+      tasks: created,
+      changes,
+      governance: { commit },
+    };
+  } finally {
+    releaseGovernanceSync(context);
+  }
 }
 
 export function updateTaskLifecycle(targetInput: string, taskId: string, { event = "task-log", state = "", message = "", evidence = "" }: LifecycleUpdateOptions = {}) {

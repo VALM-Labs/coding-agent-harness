@@ -8,6 +8,7 @@ import {
   expectJson,
   repoRoot,
   run,
+  todayLocal,
   tmpRoot,
 } from "./helpers/harness-test-utils.mjs";
 
@@ -70,11 +71,89 @@ const verifyCommands = gitCommands.filter((command) => command.startsWith("rev-p
 assert(gitCommands.length <= 80, `module new-task should stay under the CI git-call ceiling; got ${gitCommands.length}\nTop commands:\n${topGitCommands(gitCommands)}`);
 assert(verifyCommands.length === 0, `default module new-task must not audit historical review commits; got ${verifyCommands.length} rev-parse --verify calls`);
 
+const batchListPath = path.join(wrapperDir, "batch-tasks.json");
+fs.writeFileSync(
+  batchListPath,
+  `${JSON.stringify({
+    tasks: [1, 2, 3, 4, 5].map((index) => ({
+      id: `perf-batch-${index}`,
+      title: `Perf Batch ${index}`,
+    })),
+  }, null, 2)}\n`,
+);
+fs.writeFileSync(gitLog, "");
+const beforeBatchHead = gitOutput(target, ["rev-parse", "HEAD"]);
+const batchResult = run(["new-task-batch", "--task-list", batchListPath, "--module", "perf", "--budget", "standard", target], {
+  env: {
+    PATH: `${wrapperDir}${path.delimiter}${process.env.PATH || ""}`,
+  },
+});
+assert(batchResult.status === 0, `new-task-batch perf fixture should pass\nSTDOUT:\n${batchResult.stdout}\nSTDERR:\n${batchResult.stderr}`);
+const batchPayload = JSON.parse(batchResult.stdout) as { governance?: { commit?: { committed?: boolean } }; tasks?: unknown[] };
+assert(batchPayload.governance?.commit?.committed === true, "new-task-batch should commit the batch once");
+assert((batchPayload.tasks || []).length === 5, "new-task-batch should report every created task");
+const batchCommitCount = Number(gitOutput(target, ["rev-list", "--count", `${beforeBatchHead}..HEAD`]));
+assert(batchCommitCount === 1, `new-task-batch should create exactly one commit; got ${batchCommitCount}`);
+assert(gitOutput(target, ["log", "-1", "--format=%s"]) === "chore(harness): register 5 tasks", "new-task-batch commit subject should describe the batch");
+const batchGitCommands = fs.readFileSync(gitLog, "utf8").trim().split(/\r?\n/).filter(Boolean);
+const batchVerifyCommands = batchGitCommands.filter((command) => command.startsWith("rev-parse --verify "));
+assert(batchGitCommands.length <= 180, `new-task-batch should stay under the CI git-call ceiling; got ${batchGitCommands.length}\nTop commands:\n${topGitCommands(batchGitCommands)}`);
+assert(batchVerifyCommands.length === 0, `default new-task-batch must not audit historical review commits; got ${batchVerifyCommands.length} rev-parse --verify calls`);
+
+const aliasCollisionListPath = path.join(wrapperDir, "batch-alias-collision.json");
+fs.writeFileSync(
+  aliasCollisionListPath,
+  `${JSON.stringify({ tasks: [{ id: "perf-alias", title: "Alias" }, { id: `${todayLocal}-perf-alias`, title: "Dated Alias" }] }, null, 2)}\n`,
+);
+const beforeAliasCollisionHead = gitOutput(target, ["rev-parse", "HEAD"]);
+const aliasCollisionResult = run(["new-task-batch", "--task-list", aliasCollisionListPath, "--module", "perf", "--budget", "standard", target]);
+assert(aliasCollisionResult.status !== 0, "new-task-batch should reject task ids that resolve to the same final task directory");
+assert(gitOutput(target, ["rev-parse", "HEAD"]) === beforeAliasCollisionHead, "new-task-batch alias collision should not create a commit");
+assert(!fs.existsSync(path.join(target, `coding-agent-harness/planning/modules/perf/tasks/${todayLocal}-perf-alias`)), "new-task-batch alias collision should fail before writing task directories");
+
+const collisionListPath = path.join(wrapperDir, "batch-collision.json");
+fs.writeFileSync(
+  collisionListPath,
+  `${JSON.stringify({ tasks: [{ id: "perf-batch-1", title: "Existing" }, { id: "perf-batch-collision-new", title: "Should Not Write" }] }, null, 2)}\n`,
+);
+const beforeCollisionHead = gitOutput(target, ["rev-parse", "HEAD"]);
+const collisionResult = run(["new-task-batch", "--task-list", collisionListPath, "--module", "perf", "--budget", "standard", target]);
+assert(collisionResult.status !== 0, "new-task-batch should reject existing target tasks before writing");
+assert(gitOutput(target, ["rev-parse", "HEAD"]) === beforeCollisionHead, "new-task-batch collision preflight should not create a commit");
+assert(!fs.existsSync(path.join(target, `coding-agent-harness/planning/modules/perf/tasks/${todayLocal}-perf-batch-collision-new`)), "new-task-batch collision preflight should not write later task directories");
+
+const stagedOutsideListPath = path.join(wrapperDir, "batch-staged-outside.json");
+fs.writeFileSync(stagedOutsideListPath, `${JSON.stringify({ tasks: [{ id: "perf-staged-outside", title: "Staged Outside" }] }, null, 2)}\n`);
+fs.writeFileSync(path.join(target, "STAGED_OUTSIDE.txt"), "staged outside\n");
+git(target, ["add", "STAGED_OUTSIDE.txt"]);
+const beforeStagedOutsideHead = gitOutput(target, ["rev-parse", "HEAD"]);
+const stagedOutsideResult = run(["new-task-batch", "--task-list", stagedOutsideListPath, "--module", "perf", "--budget", "standard", target]);
+assert(stagedOutsideResult.status !== 0, "new-task-batch should reject staged files outside the batch write scope");
+assert(gitOutput(target, ["rev-parse", "HEAD"]) === beforeStagedOutsideHead, "new-task-batch staged-outside rejection should not create a commit");
+assert(!fs.existsSync(path.join(target, `coding-agent-harness/planning/modules/perf/tasks/${todayLocal}-perf-staged-outside`)), "new-task-batch staged-outside rejection should fail before writing task directories");
+git(target, ["reset", "--", "STAGED_OUTSIDE.txt"]);
+fs.rmSync(path.join(target, "STAGED_OUTSIDE.txt"));
+
+const unrelatedDirtyListPath = path.join(wrapperDir, "batch-unrelated-dirty.json");
+fs.writeFileSync(unrelatedDirtyListPath, `${JSON.stringify({ tasks: [{ id: "perf-unrelated-dirty-a", title: "Unrelated Dirty A" }, { id: "perf-unrelated-dirty-b", title: "Unrelated Dirty B" }] }, null, 2)}\n`);
+fs.writeFileSync(path.join(target, "UNRELATED_DIRTY.txt"), "unrelated dirty\n");
+const unrelatedDirtyResult = run(["new-task-batch", "--task-list", unrelatedDirtyListPath, "--module", "perf", "--budget", "standard", target]);
+assert(unrelatedDirtyResult.status === 0, `new-task-batch should allow unrelated unstaged dirty files and leave them untouched\nSTDOUT:\n${unrelatedDirtyResult.stdout}\nSTDERR:\n${unrelatedDirtyResult.stderr}`);
+const unrelatedStatus = gitOutput(target, ["status", "--short"]);
+assert(unrelatedStatus.includes("?? UNRELATED_DIRTY.txt"), `new-task-batch should leave unrelated dirty file uncommitted; status was:\n${unrelatedStatus}`);
+fs.rmSync(path.join(target, "UNRELATED_DIRTY.txt"));
+
 console.log("CLI write performance tests passed");
 
 function git(cwd: string, args: string[]): void {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert(result.status === 0, `git ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
+}
+
+function gitOutput(cwd: string, args: string[]): string {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8" });
+  assert(result.status === 0, `git ${args.join(" ")} failed\nSTDOUT:\n${result.stdout}\nSTDERR:\n${result.stderr}`);
+  return result.stdout.trim();
 }
 
 function topGitCommands(commands: string[]): string {

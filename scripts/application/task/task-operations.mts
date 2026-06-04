@@ -1,7 +1,7 @@
 import { normalizeTarget } from "../../lib/core-shared.mjs";
 import { createTombstoneOperations } from "./tombstone-operations.mjs";
 import type { TaskOperationSubject, TaskOperationSubjectReader, TombstoneSubjectReader } from "../../lib/types/task-repository.js";
-import type { CreateTaskOptions, LifecycleUpdateOptions, ReviewConfirmOptions } from "../../lib/types/task-lifecycle.js";
+import type { CreateTaskBatchOptions, CreateTaskOptions, LifecycleUpdateOptions, ReviewConfirmOptions } from "../../lib/types/task-lifecycle.js";
 import type { TaskOperationWriters } from "../../ports/task/task-operation-writers.mjs";
 
 type JsonPayload = Record<string, unknown>;
@@ -34,6 +34,10 @@ export type TaskOperationsOptions = {
 
 export type CreateTaskInput = CreateTaskOptions & {
   taskId: string;
+  targetInput?: string;
+};
+
+export type CreateTaskBatchInput = CreateTaskBatchOptions & {
   targetInput?: string;
 };
 
@@ -94,6 +98,7 @@ export type LessonSedimentInput = {
 
 export type TaskOperations = {
   create(input: CreateTaskInput): OperationResult;
+  createBatch(input: CreateTaskBatchInput): OperationResult;
   updateLifecycle(input: LifecycleOperationInput): OperationResult;
   start(input: Omit<LifecycleOperationInput, "event" | "state">): OperationResult;
   review(input: Omit<LifecycleOperationInput, "event" | "state">): OperationResult;
@@ -142,6 +147,10 @@ export function createTaskOperations(targetInput: string = ".", options: TaskOpe
     create(input) {
       const { taskId, targetInput: createTargetInput, ...createOptions } = input;
       return runOperation(() => writers.createTask(createTargetInput || rawTargetInput, taskId, createOptions));
+    },
+    createBatch(input) {
+      const { targetInput: createTargetInput, ...createOptions } = input;
+      return runOperation(() => writers.createTaskBatch(createTargetInput || rawTargetInput, createOptions));
     },
     updateLifecycle(input) {
       const { taskId, ...lifecycleOptions } = input;
