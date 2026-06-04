@@ -98,6 +98,18 @@ const decisionTokenPattern = /\b(?:if|switch|return)\b|[?]|&&|\|\|/;
 const rawFactDecisionPattern = new RegExp(`(?:\\b(?:if|switch|return)\\b|[?]|&&|\\|\\|).*?\\b(?:task|item|raw|record|entry)\\.(?:${rawFactFieldAlternation})\\b`);
 const rawFactBracketDecisionPattern = new RegExp(`(?:\\b(?:if|switch|return)\\b|[?]|&&|\\|\\|).*?\\b(?:task|item|raw|record|entry)\\[["'](?:${rawFactFieldAlternation})["']\\]`);
 const compatExemptionPattern = /\bmigration-only\b|runtimeTruth["']?\s*:\s*false|legacy-migration-input\/v1|\bstable-kernel\b|pure helper|\btest-only-compat\b|test only compat/i;
+const ignoredScanPathSegments = new Set(["node_modules", ".git", ".vite", "dist"]);
+const legalRawFactDecisionSurfacePatterns = [
+  /^scripts\/domain\/task\//,
+  /^scripts\/lib\/task-repository\.mts$/,
+  /^scripts\/lib\/task-lifecycle\.mts$/,
+  /^scripts\/lib\/task-lifecycle\/review-gates\.mts$/,
+  /^scripts\/lib\/task-command-results\.mts$/,
+  /^scripts\/lib\/task-completion-consistency\.mts$/,
+  /^harness-gui\/src\/server\/scanner\.ts$/,
+  /^harness-gui\/src\/server\/source-adapter\.ts$/,
+  /^tests\//,
+];
 
 export function analyzeLegacyFallbackSurfaces(options: DetectorOptions = {}): LegacyFallbackReport {
   const repoRoot = path.resolve(options.repoRoot || defaultRepoRoot);
@@ -122,7 +134,7 @@ function scanSourceText(relativeFile: string, content: string): LegacyFallbackFi
   const rawFactAliases = new Set<string>();
 
   for (const [index, line] of lines.entries()) {
-    const exemptCompat = isCompatExemptLine(lines, index);
+    const exemptCompat = isCompatExemptLine(relativeFile, lines, index);
     collectRawFactAliases(line, rawFactAliases);
     if (!exemptCompat && rawInferencePattern.test(line)) {
       findings.push({
@@ -180,15 +192,25 @@ function scanRegistry(repoRoot: string, registryPath: string, finalAudit: boolea
   const content = fs.readFileSync(absolutePath, "utf8");
   const findings: LegacyFallbackFinding[] = [];
   let headerMap: Map<string, number> | undefined;
-  for (const [index, line] of content.split(/\r?\n/).entries()) {
+  const lines = content.split(/\r?\n/);
+  let sectionHeading = "";
+  for (const [index, line] of lines.entries()) {
+    if (isMarkdownHeading(line)) {
+      sectionHeading = normalizeHeading(line);
+      headerMap = undefined;
+      continue;
+    }
     if (!line.startsWith("|")) continue;
+    if (isIgnoredRegistrySection(sectionHeading)) continue;
     const cells = parseMarkdownTableCells(line);
     if (cells.length === 0) continue;
     if (isMarkdownTableDivider(cells)) continue;
-    if (!headerMap) {
-      headerMap = buildHeaderMap(cells);
+    if (isMarkdownTableHeader(lines, index)) {
+      const nextHeaderMap = buildHeaderMap(cells);
+      headerMap = nextHeaderMap.has("class") && nextHeaderMap.has("review state") ? nextHeaderMap : undefined;
       continue;
     }
+    if (!headerMap) continue;
     const classIndex = headerMap.get("class");
     const reviewStateIndex = headerMap.get("review state");
     if (classIndex === undefined || reviewStateIndex === undefined) continue;
@@ -270,6 +292,7 @@ function walkTextFiles(current: string, repoRoot: string): string[] {
   const stat = fs.lstatSync(current);
   if (stat.isSymbolicLink()) return [];
   if (stat.isFile()) return textFilePattern.test(current) ? [toPosix(path.relative(repoRoot, current))] : [];
+  if (ignoredScanPathSegments.has(path.basename(current))) return [];
   const files: string[] = [];
   for (const entry of fs.readdirSync(current)) files.push(...walkTextFiles(path.join(current, entry), repoRoot));
   return files;
@@ -293,8 +316,12 @@ function hasRawFactAliasDecision(line: string, aliases: Set<string>): boolean {
   return [...aliases].some((alias) => new RegExp(`\\b${escapeRegExp(alias)}\\b`).test(line));
 }
 
-function isCompatExemptLine(lines: string[], index: number): boolean {
-  return compatExemptionPattern.test(lines[index]);
+function isCompatExemptLine(relativeFile: string, lines: string[], index: number): boolean {
+  return isLegalRawFactDecisionSurface(relativeFile) || compatExemptionPattern.test(lines[index]);
+}
+
+function isLegalRawFactDecisionSurface(relativeFile: string): boolean {
+  return legalRawFactDecisionSurfacePatterns.some((pattern) => pattern.test(relativeFile));
 }
 
 function isPublishedText(relativeFile: string): boolean {
@@ -313,8 +340,27 @@ function normalizeHeader(value: string): string {
   return stripInlineCode(value).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function isMarkdownHeading(line: string): boolean {
+  return /^#{1,6}\s+\S/.test(line);
+}
+
+function normalizeHeading(line: string): string {
+  return line.replace(/^#{1,6}\s+/, "").trim().toLowerCase();
+}
+
+function isIgnoredRegistrySection(sectionHeading: string): boolean {
+  return sectionHeading === "historical seed registry";
+}
+
 function isMarkdownTableDivider(cells: string[]): boolean {
   return cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function isMarkdownTableHeader(lines: string[], index: number): boolean {
+  const nextLine = lines[index + 1];
+  if (!nextLine?.startsWith("|")) return false;
+  const nextCells = parseMarkdownTableCells(nextLine);
+  return nextCells.length > 0 && isMarkdownTableDivider(nextCells);
 }
 
 type PackageSurfaceEntry = {

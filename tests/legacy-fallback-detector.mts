@@ -95,6 +95,34 @@ export function ${inferReviewStatusName}() { // test-only-compat fixture
   return "agent-reviewed";
 }
 `);
+  writeFixture("scripts/domain/task/task-semantic-projection.mts", `
+export function project(task: { ${rawStateField}?: string }) {
+  if (task.${rawStateField} === "done") return "done";
+  return "active";
+}
+`);
+  writeFixture("scripts/lib/task-repository.mts", `
+export function list(tasks: Array<{ ${rawStateField}?: string }>) {
+  return tasks.filter((task) => task.${rawStateField} === "done");
+}
+`);
+  writeFixture("harness-gui/src/server/scanner.ts", `
+export function ${inferLifecycleName}(task: { ${rawStateField}?: string }) {
+  return task.${rawStateField} === "done" ? "done" : "active";
+}
+`);
+  writeFixture("tests/legal-raw-fixture.mts", `
+export function assertProjection(item: { ${rawReviewStatusField}?: string }) {
+  if (item.${rawReviewStatusField} === "confirmed") return true;
+  return false;
+}
+`);
+  writeFixture("harness-gui/node_modules/vendor/noise.js", `
+if (entry.${rawStateField} === "done") console.log(entry);
+`);
+  writeFixture("harness-gui/dist/assets/generated.js", `
+if (entry.${rawStateField} === "done") console.log(entry);
+`);
   writeFixture("src/positive/mixed-runtime.ts", `
 export const metadata = { schemaVersion: "legacy-migration-input/v1", runtimeTruth: false };
 
@@ -114,6 +142,30 @@ export function ${inferLifecycleName}() {
 | RAW-1 | raw-runtime | bypass-to-migrate | open-runtime-fallback | P03 |
 | OK-1 | final-helper | stable-kernel | closed | P13 |
 | BAD-1 | bad-class | maybe-legacy | closed | P13 |
+`);
+  writeFixture("registry-multi-table.md", `
+| ID | Type | Path |
+| --- | --- | --- |
+| REF-001 | runbook | references/project-protocol.md |
+
+| Surface | Class | Review State | Owner | Next Phase |
+| --- | --- | --- | --- | --- |
+| later-runtime | bypass-to-migrate | open-runtime-fallback | architecture | P13 |
+| later-bad-class | maybe-legacy | closed | architecture | P13 |
+`);
+  writeFixture("registry-historical-section.md", `
+## Historical Seed Registry
+
+| Surface | Class | Review State | Owner | Next Phase |
+| --- | --- | --- | --- | --- |
+| historical-runtime | bypass-to-migrate | open-runtime-fallback | architecture | P13 |
+| historical-bad-class | maybe-legacy | open | architecture | P13 |
+
+## Current Registry
+
+| Surface | Class | Review State | Owner | Next Phase |
+| --- | --- | --- | --- | --- |
+| current-helper | stable-kernel | closed | architecture | P13 |
 `);
   writeFixture("pack.json", JSON.stringify({
     main: retiredDistFacade,
@@ -157,6 +209,18 @@ export function ${inferLifecycleName}() {
     scanRoots: [],
     packageJsonPath: "pack-dry-run.json",
   });
+  const multiTableRegistryReport = analyzeLegacyFallbackSurfaces({
+    repoRoot: tmpRoot,
+    scanRoots: [],
+    registryPath: "registry-multi-table.md",
+    finalAudit: true,
+  });
+  const historicalRegistryReport = analyzeLegacyFallbackSurfaces({
+    repoRoot: tmpRoot,
+    scanRoots: ["registry-historical-section.md"],
+    registryPath: "registry-historical-section.md",
+    finalAudit: true,
+  });
   const exportKeyReport = analyzeLegacyFallbackSurfaces({
     repoRoot: tmpRoot,
     scanRoots: [],
@@ -165,6 +229,10 @@ export function ${inferLifecycleName}() {
   const selfScanReport = analyzeLegacyFallbackSurfaces({
     repoRoot,
     scanRoots: ["tests/legacy-fallback-detector.mts"],
+  });
+  const legalSurfaceReport = analyzeLegacyFallbackSurfaces({
+    repoRoot: tmpRoot,
+    scanRoots: ["scripts", "harness-gui", "tests"],
   });
 
   expectFinding(report.findings, "legacy-raw-runtime-fallback", "src/positive/raw-runtime.ts");
@@ -184,11 +252,21 @@ export function ${inferLifecycleName}() {
   expectFinding(report.findings, "registry-class-out-of-range", "registry.md");
   expectFinding(report.findings, "registry-p13-illegal-class", "registry.md");
   expectFinding(report.findings, "registry-open-review-state", "registry.md");
+  expectFinding(multiTableRegistryReport.findings, "registry-class-out-of-range", "registry-multi-table.md");
+  expectFinding(multiTableRegistryReport.findings, "registry-p13-illegal-class", "registry-multi-table.md");
+  expectFinding(multiTableRegistryReport.findings, "registry-open-review-state", "registry-multi-table.md");
+  assert(historicalRegistryReport.findings.length === 0, `historical seed registry section should not be final-audit authoritative; got ${JSON.stringify(historicalRegistryReport.findings, null, 2)}`);
   expectFinding(packReport.findings, "stale-package-export", "pack-dry-run.json");
   expectFinding(exportKeyReport.findings, "stale-package-export", "pack-export-key.json");
   expectNoFinding(report.findings, "src/negative/migration-only.ts");
   expectNoFinding(report.findings, "src/negative/stable-kernel.ts");
   expectNoFinding(report.findings, "src/negative/test-only-compat.ts");
+  expectNoFinding(legalSurfaceReport.findings, "scripts/domain/task/task-semantic-projection.mts");
+  expectNoFinding(legalSurfaceReport.findings, "scripts/lib/task-repository.mts");
+  expectNoFinding(legalSurfaceReport.findings, "harness-gui/src/server/scanner.ts");
+  expectNoFinding(legalSurfaceReport.findings, "tests/legal-raw-fixture.mts");
+  assert(!legalSurfaceReport.scannedFiles.some((file) => file.includes("node_modules")), "detector should not scan vendored node_modules");
+  assert(!legalSurfaceReport.scannedFiles.some((file) => file.includes("dist/assets")), "detector should not scan generated GUI dist assets");
   assert(selfScanReport.findings.length === 0, `detector test source must not pollute repo scans; got ${JSON.stringify(selfScanReport.findings, null, 2)}`);
   assert(report.schemaVersion === "legacy-fallback-detector/v1", "detector should expose stable schema version");
   assert(report.scannedFiles.includes("src/positive/raw-runtime.ts"), "detector should record scanned files");

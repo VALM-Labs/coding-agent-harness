@@ -49,6 +49,24 @@ Give the installation prompt to your agent, and it can initialize, scan, migrate
 
 Any agent that can read files, write files, and run commands can use this Harness. It works with Codex, Claude Code, Gemini CLI, Cursor-style agents, OpenClaw, and similar coding agents.
 
+### Recommended Models
+
+This Harness is opinionated about model choice. For execution work, the project
+recommends GPT 5.5 because strong instruction following matters more than raw
+code generation breadth for task creation, evidence updates, review submission,
+and closeout discipline.
+
+Claude Opus models are recommended as review models. They can be useful for
+reading plans, challenging implementation quality, and finding risks, but they
+are not the preferred primary executor for this Harness because their
+instruction following is weaker and they are less proactive about updating
+Harness documentation and task materials.
+
+Other model families are not recommended for operating this Harness, including
+Gemini, Grok, DeepSeek, GLM, and similar models. They may be able to read and
+write the files mechanically, but the project does not recommend relying on them
+for Harness-governed task execution.
+
 ### Document-Native And Transparent
 
 Important project state stays visible in the repository:
@@ -72,17 +90,23 @@ It gives each agent step context, evidence, and a finish condition.
 ### Reusable Presets For Task Families
 
 A preset is a versioned, declarative task method package. It does not install a
-new agent and it does not replace the Harness. It tells `harness new-task` how
-to create a task for a repeatable work type: what task kind to set, which inputs
-to ask for, which shared references or artifacts to copy into the task, which
-files the agent must read first, and what audit/evidence files should prove the
-task was created correctly.
+new agent and it does not replace the Harness. It packages how your team wants a
+repeatable kind of work to start: required inputs, shared references, artifacts,
+review expectations, validation commands, evidence files, and the first files an
+agent must read before coding.
 
-Use presets when a group of tasks share the same setup. For example, several
-interface tasks may all depend on the same upstream microservice contract,
-fixture packet, runbook, and verification checklist. Instead of repeating that
-context in every prompt, put it in a preset and create each task with
-`harness new-task --preset <preset-id> ...`.
+Use presets when a group of tasks share the same workflow. For example, a backend
+API change may always require a staging deploy runbook, interface smoke tests,
+fixture data, PR checklist, and rollback notes. A frontend task may always need a
+browser or Playwright regression path. Instead of re-explaining that chain in
+every prompt and hoping the agent remembers it, put the chain in a preset and
+create each task with `harness new-task --preset <preset-id> ...`.
+
+This is the difference between a Skill and a preset: a Skill helps an agent know
+how to do something when it is invoked; a preset makes that method part of every
+task created for that work family. Good presets turn repeated human operating
+habits into task structure, so later agents inherit the same standards without a
+long chat preamble.
 
 Harness ships bundled presets, `harness init` seeds them into the target project,
 and teams can add project-local presets under `.coding-agent-harness/presets/`.
@@ -91,6 +115,9 @@ This dotdir is a preset overlay exception: operational task state lives under
 so user and project preset precedence remains stable across upgrades.
 The `preset-creator` Skill is for authoring these preset packages; the Harness
 CLI is what checks, installs, lists, and applies them.
+
+See [Preset Development](docs-release/guides/preset-development.md) for how to
+decide what belongs in a preset and how to validate one.
 
 Default task and module templates come from the installed npm package at command
 runtime. Target projects should not treat `planning/**/_task-template` or
