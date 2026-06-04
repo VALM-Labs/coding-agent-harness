@@ -133,6 +133,7 @@ const moduleRegistrySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/mo
 const reviewConfirmSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle/review-confirm.mts"), "utf8");
 const reviewGatesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle/review-gates.mts"), "utf8");
 const presetRunnerSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/preset-runner.mts"), "utf8");
+const presetRuntimeBridgeSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/preset-runtime-bridge.mts"), "utf8");
 const migrationPlannerSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/migration-planner.mts"), "utf8");
 const migrationSupportSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/migration-support.mts"), "utf8");
 const migrationTaskSampleSource = fs.readFileSync(path.join(repoRoot, "scripts/infrastructure/task/migration-task-sample-source.mts"), "utf8");
@@ -175,6 +176,9 @@ assert(!broadTaskRepositoryTypeSource.includes("listLifecycleTasks") && !broadTa
 assert(!statusBuilderSource.includes("createScannerTaskRepository"), "status-builder should consume task status projections instead of creating the scanner-backed repository");
 assert(!taskIndexSource.includes("createScannerTaskRepository"), "task-index should consume task-index projections instead of creating the broad scanner-backed repository");
 assert(!presetRunnerSource.includes("./task-scanner.mjs"), "preset-runner should use harness path contracts instead of importing the task scanner");
+assert(!presetRuntimeBridgeSource.includes("./task-scanner.mjs"), "preset runtime bridge should consume a narrow lifecycle reader instead of importing the task scanner");
+assert(!presetRuntimeBridgeSource.includes("collectTasks"), "preset runtime bridge should not collect raw scanner TaskRecord objects");
+assert(presetRuntimeBridgeSource.includes("createTaskLifecycleReader"), "preset runtime bridge should compose through the narrow lifecycle reader seam");
 assert(!migrationPlannerSource.includes("./task-scanner.mjs"), "migration-planner should consume migration/status projections instead of importing the task scanner directly");
 assert(!taskIndexSource.includes("TaskRecord"), "task-index should not import or retype raw scanner TaskRecord objects");
 assert(!taskIndexSource.includes("task-semantic-projection"), "task-index should consume materialized visibility scopes instead of reinterpreting raw task visibility facts");
