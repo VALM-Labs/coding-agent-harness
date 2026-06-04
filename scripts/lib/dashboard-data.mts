@@ -4,6 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import {
+  readDashboardBundle,
+} from "../application/dashboard/bundle-reader.mjs";
+import {
   bundledCheckScript,
   repoRoot,
   builtinPresetRoot,
@@ -46,6 +49,7 @@ import { listPresetPackageLayers } from "./preset-registry.mjs";
 import { validateGovernanceTableBoundaries } from "./governance-table-boundary.mjs";
 import { summarizeGitState } from "./git-status-summary.mjs";
 import type { ResolvedHarnessPaths } from "./harness-paths.mjs";
+import type { DashboardBundleReader, DashboardBundleReadOptions } from "../application/dashboard/bundle-reader.mjs";
 import type { TaskStatusProjection } from "./task-repository.mjs";
 import type { CheckTarget } from "./types/check-profiles.js";
 
@@ -672,10 +676,11 @@ function isArchivedDashboardTask(task: Record<string, unknown>): boolean {
 
 function dashboardTaskHasRisk(task: Record<string, unknown>): boolean {
   const reviewView = dashboardTaskReviewWorkbenchQueueView(task);
+  const lifecycle = dashboardTaskLifecycleProjection(task);
   if (reviewView.blocked === true || reviewView.needsMaterials === true) return true;
   if (Array.isArray(reviewView.reasonCodes) && reviewView.reasonCodes.length > 0) return true;
   if (dashboardTaskStateValue(task) === "blocked") return true;
-  if (String(task.reviewStatus || "").includes("blocked")) return true;
+  if (String(lifecycle.reviewStatus || "").includes("blocked")) return true;
   if (Array.isArray(task.materialIssues) && task.materialIssues.length > 0) return true;
   if (Array.isArray(task.queueReasons) && task.queueReasons.length > 0) return true;
   if (String(task.visualMapStatus || "") === "missing") return true;
@@ -972,6 +977,14 @@ export function buildDashboardBundle(targetInput: string, options: DashboardOpti
   }) as DashboardBundle;
 }
 
+export function createDashboardBundleReader(): DashboardBundleReader<DashboardBundle> {
+  return {
+    readDashboardBundle(targetInput: string, options: DashboardBundleReadOptions = {}) {
+      return buildDashboardBundle(targetInput, options as DashboardOptions);
+    },
+  };
+}
+
 function attachDocumentProjection(status: DashboardStatus, documents: DashboardDocument[]): void {
   const tasks = Array.isArray(status.tasks) ? status.tasks as Array<Record<string, unknown>> : [];
   for (const task of tasks) {
@@ -1046,11 +1059,11 @@ export function collectPresetCatalog(targetInput: string, target: DashboardTarge
   };
 }
 
-export function writeDashboardFolder(outDir: string, targetInput: string, options: DashboardOptions = {}) {
+export function writeDashboardFolder(outDir: string, targetInput: string, options: DashboardOptions = {}, reader: DashboardBundleReader<DashboardBundle> = createDashboardBundleReader()) {
   const target = normalizeTarget(targetInput) as DashboardTarget;
   const registry = readCapabilityRegistry(target);
   const locale = options.localeOverride || registry.locale;
-  const bundle = buildDashboardBundle(targetInput, options);
+  const bundle = readDashboardBundle(reader, targetInput, options);
   return writeDashboardDirectory(outDir, bundle, {
     repoRoot,
     projectRoot: target.projectRoot,
@@ -1062,10 +1075,10 @@ export function writeDashboardFolder(outDir: string, targetInput: string, option
   });
 }
 
-export function writeDashboardSingleFile(outFile: string, targetInput: string, options: DashboardOptions = {}) {
+export function writeDashboardSingleFile(outFile: string, targetInput: string, options: DashboardOptions = {}, reader: DashboardBundleReader<DashboardBundle> = createDashboardBundleReader()) {
   const target = normalizeTarget(targetInput) as DashboardTarget;
   const registry = readCapabilityRegistry(target);
   const locale = options.localeOverride || registry.locale;
-  const bundle = buildDashboardBundle(targetInput, options);
+  const bundle = readDashboardBundle(reader, targetInput, options);
   return writeDashboardFile(outFile, bundle, { repoRoot, projectRoot: target.projectRoot, docsRoot: target.docsRoot, locale });
 }

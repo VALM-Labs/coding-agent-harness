@@ -6,7 +6,8 @@ import path from "node:path";
 import vm from "node:vm";
 import { spawn, spawnSync } from "node:child_process";
 import type { SpawnSyncOptionsWithStringEncoding, SpawnSyncReturns } from "node:child_process";
-import { buildDashboardBundle } from "../scripts/lib/dashboard-data.mjs";
+import { buildDashboardBundle, createDashboardBundleReader, writeDashboardFolder, writeDashboardSingleFile } from "../scripts/lib/dashboard-data.mjs";
+import { readDashboardBundle } from "../scripts/application/dashboard/bundle-reader.mjs";
 
 type TestRunOptions = Omit<SpawnSyncOptionsWithStringEncoding, "encoding"> & {
   encoding?: BufferEncoding;
@@ -203,6 +204,12 @@ const folderDataScript = fs.readFileSync(path.join(dashboardDir, "assets/dashboa
 const folderBundleMatch = folderDataScript.match(/window\.__HARNESS_DASHBOARD__\s*=\s*([\s\S]*);\s*$/);
 assert(folderBundleMatch, "dashboard-data.js should contain a generated dashboard bundle");
 const folderBundle = JSON.parse(folderBundleMatch[1]) as DashboardGeneratedBundle;
+const readerBundle = readDashboardBundle(createDashboardBundleReader(), "examples/minimal-project") as DashboardGeneratedBundle;
+const directBundle = buildDashboardBundle("examples/minimal-project") as DashboardGeneratedBundle;
+assert(readerBundle.schemaVersion === directBundle.schemaVersion, "DashboardBundleReader should preserve buildDashboardBundle schema version");
+assert(readerBundle.status.tasks.length === directBundle.status.tasks.length, "DashboardBundleReader should preserve buildDashboardBundle task projections");
+assert(readerBundle.status.tasks[0]?.semanticProjection, "DashboardBundleReader should preserve semantic task projection");
+assertDeepEqual(readerBundle.schemaVersion, folderBundle.schemaVersion, "dashboard folder output should preserve reader schema version");
 assert(folderBundle.schemaVersion === "dashboard-bundle/v1", "dashboard bundle should expose explicit schemaVersion");
 assert(folderBundle.status.schemaVersion === 2, "dashboard bundle status should preserve schemaVersion 2");
 assert(folderBundle.status.tasks.length > 0, "dashboard bundle should include task projections");
@@ -258,6 +265,22 @@ const demoTask = siblingStatus.tasks.find((task) => task.id === "TASKS/demo-task
 assert(demoTask, "sibling-prefix fixture should include demo-task");
 assert(String(demoTask.documentsByKey?.["brief.md"] && (demoTask.documentsByKey["brief.md"] as DashboardDocument).path).endsWith("/demo-task/brief.md"), "document projection must not attach sibling-prefix task documents to the current task");
 assert(!JSON.stringify(demoTask.documentProjection?.byKey || {}).includes("demo-task-extra"), "documentProjection.byKey should be scoped by task directory boundary");
+
+const customReaderBundle = buildDashboardBundle("examples/minimal-project");
+const customReader = {
+  readDashboardBundle(targetInput: string) {
+    assert(targetInput === "examples/minimal-project", "writeDashboardFolder should pass the requested target to DashboardBundleReader");
+    return customReaderBundle;
+  }
+};
+const readerFolderDir = path.join(tmpRoot, "dashboard-reader-folder");
+writeDashboardFolder(readerFolderDir, "examples/minimal-project", {}, customReader);
+const readerFolderBundleMatch = fs.readFileSync(path.join(readerFolderDir, "assets/dashboard-data.js"), "utf8").match(/window\.__HARNESS_DASHBOARD__\s*=\s*([\s\S]*);\s*$/);
+assert(readerFolderBundleMatch, "reader dashboard-data.js should contain a generated dashboard bundle");
+assertDeepEqual(JSON.parse(readerFolderBundleMatch[1]), customReaderBundle, "writeDashboardFolder should serialize the DashboardBundleReader output without data loss");
+const readerSingleFile = path.join(tmpRoot, "dashboard-reader-single.html");
+writeDashboardSingleFile(readerSingleFile, "examples/minimal-project", {}, customReader);
+assert(fs.readFileSync(readerSingleFile, "utf8").includes("window.__HARNESS_DASHBOARD__"), "writeDashboardSingleFile should serialize the DashboardBundleReader output");
 
 const materialProject = path.join(tmpRoot, "material-library-project");
 fs.cpSync(path.join(repoRoot, "examples/minimal-project"), materialProject, { recursive: true });
@@ -352,8 +375,10 @@ assert(dashboardApp.includes("dashboardBundleSchemaVersion"), "dashboard startup
 assert(dashboardApp.includes("bundleSchemaCompatible"), "dashboard startup should expose schema compatibility gating");
 assert(dashboardApp.includes("function taskLifecycleProjection("), "dashboard should use task lifecycle projection helper");
 assert(dashboardApp.includes("function taskLifecycleDisplay("), "dashboard list/module views should render lifecycle through projection");
-assert(!dashboardApp.includes("projection.lifecycleState || task.lifecycleState"), "dashboard overview must not silently derive lifecycle from raw lifecycleState fallback");
-assert(!dashboardApp.includes("projection.closeoutStatus || task.closeoutStatus"), "dashboard overview must not silently derive closeout from raw closeoutStatus fallback");
+const forbiddenLifecycleFallback = "projection.lifecycleState || " + "task." + "lifecycleState";
+const forbiddenCloseoutFallback = "projection.closeoutStatus || " + "task." + "closeoutStatus";
+assert(!dashboardApp.includes(forbiddenLifecycleFallback), "dashboard overview must not silently derive lifecycle from raw lifecycleState fallback");
+assert(!dashboardApp.includes(forbiddenCloseoutFallback), "dashboard overview must not silently derive closeout from raw closeoutStatus fallback");
 assert(dashboardApp.includes("taskCanBeHumanConfirmed("), "dashboard missing canonical human confirmation gate helper");
 assert(dashboardApp.includes("taskReviewWorkbenchQueueView(task)"), "dashboard human confirmation gate should consume review workbench projection");
 assert(!dashboardApp.includes("queues.includes(\"review\")"), "dashboard human confirmation gate should not derive confirmability from raw or lifecycle queue fallback");
