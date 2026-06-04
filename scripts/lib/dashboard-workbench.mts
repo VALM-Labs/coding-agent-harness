@@ -6,11 +6,12 @@ import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
 import { URL } from "node:url";
+import { isWorkbenchActionRequest, listWorkbenchWritableActionIds } from "../application/workbench/action-catalog.mjs";
 import { confirmWorkbenchReviewBatch } from "../application/workbench/review-confirmation.mjs";
 import { createAggregateLessonSedimentationTask } from "./task-lesson-sedimentation.mjs";
 import { normalizeTarget } from "./core-shared.mjs";
 import { dashboardWatchRoots } from "./harness-paths.mjs";
-import { createTaskWorkbenchReviewSubjectReader } from "./task-repository.mjs";
+import { createWorkbenchReviewSubjectSource } from "../adapters/workbench/workbench-review-subject-source.mjs";
 import { taskOperationFailurePayload } from "../application/task/task-operations.mjs";
 import { createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
 import { writeDashboardFolder } from "./dashboard-data.mjs";
@@ -69,7 +70,7 @@ type JsonPayload = Record<string, unknown>;
 export async function serveDashboardWorkbench(outDir: string, targetInput: string, { host = "127.0.0.1", port = 0, localeOverride = "", autoRefresh = false, open = false, label = "dashboard workbench", recoverGeneratedDashboard = false, replaceExistingDashboardOutput = false }: WorkbenchOptions = {}) {
   if (host !== "127.0.0.1") throw new Error("dashboard workbench only supports --host 127.0.0.1");
   const target = normalizeTarget(targetInput) as WorkbenchTarget;
-  const workbenchReviewSubjects = createTaskWorkbenchReviewSubjectReader(target);
+  const workbenchReviewSubjects = createWorkbenchReviewSubjectSource(target);
   const taskOperations = createScannerTaskOperations(target.projectRoot);
   const outputDir = path.resolve(outDir);
   const csrfToken = crypto.randomBytes(24).toString("hex");
@@ -92,7 +93,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         writeJson(response, 200, {
           mode: "workbench",
           csrfToken,
-          writableActions: ["review-complete", "review-complete-bulk", "task-complete", "lesson-sedimentation-task", "lesson-sedimentation-bulk", "preset-check", "preset-install", "preset-seed", "preset-uninstall"],
+          writableActions: listWorkbenchWritableActionIds(),
           target: target.projectRoot,
           autoRefresh: autoRefresh === true,
           snapshotVersion,
@@ -100,7 +101,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/tasks/review-complete" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "review-complete")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const taskId = String(body.taskId || "");
@@ -120,7 +121,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/tasks/task-complete" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "task-complete")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const taskId = String(body.taskId || "");
@@ -138,7 +139,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/tasks/review-complete-bulk" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "review-complete-bulk")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const requestedTaskIds = Array.isArray(body.taskIds) ? body.taskIds.map((id) => String(id || "").trim()).filter(Boolean) : [];
@@ -157,7 +158,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/tasks/lesson-sedimentation" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "lesson-sedimentation-task")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const taskId = String(body.taskId || "");
@@ -180,7 +181,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/tasks/lesson-sedimentation-bulk" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "lesson-sedimentation-bulk")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const selections = normalizeBulkLessonSelections(body.selections);
@@ -214,7 +215,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/presets/check" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "preset-check")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const id = String(body.id || "");
@@ -227,7 +228,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/presets/install" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "preset-install")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const source = String(body.source || "");
@@ -246,7 +247,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/presets/seed" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "preset-seed")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const scope = normalizePresetScope(body.scope);
@@ -256,7 +257,7 @@ export async function serveDashboardWorkbench(outDir: string, targetInput: strin
         return;
       }
 
-      if (requestUrl.pathname === "/api/presets/uninstall" && request.method === "POST") {
+      if (isWorkbenchActionRequest(requestUrl.pathname, request.method, "preset-uninstall")) {
         assertTrustedWorkbenchRequest(request, { origin, csrfToken });
         const body = await readJsonBody(request);
         const id = String(body.id || "");
