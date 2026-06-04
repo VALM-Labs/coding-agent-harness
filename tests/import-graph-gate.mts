@@ -112,6 +112,7 @@ const taskLifecycleSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/tas
 const statusBuilderSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/status-builder.mts"), "utf8");
 const dashboardWorkbenchSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/dashboard-workbench.mts"), "utf8");
 const taskTombstoneCommandsSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-tombstone-commands.mts"), "utf8");
+const dashboardBundleReaderSource = fs.readFileSync(path.join(repoRoot, "scripts/application/dashboard/bundle-reader.mts"), "utf8");
 const taskIndexSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-index.mts"), "utf8");
 const checkProfilesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/check-profiles.mts"), "utf8");
 const checkTaskContractsSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/check-task-contracts.mts"), "utf8");
@@ -175,6 +176,9 @@ assert(!taskAuditMigrationSource.includes("task-scanner"), "task audit migration
 assert(!taskAuditMigrationSource.includes("listTaskPlanPaths"), "task audit migration should not directly use task scanner plan-path helpers");
 assert(!dashboardDataSource.includes("createScannerTaskRepository"), "dashboard bundle generation should consume status projections instead of creating the broad scanner-backed repository");
 assert(dashboardDataSource.includes("createTaskStatusProjectionReader"), "dashboard bundle generation should compose through the status projection reader seam");
+assert(dashboardBundleReaderSource.includes("DashboardBundleReader"), "dashboard bundle reader contract should expose a stable DashboardBundleReader interface");
+assert(dashboardDataSource.includes("createDashboardBundleReader"), "dashboard bundle generation should expose a DashboardBundleReader implementation");
+assert(dashboardDataSource.includes("readDashboardBundle(reader"), "dashboard write paths should consume DashboardBundleReader instead of calling buildDashboardBundle directly");
 assert(!governanceSyncSource.includes("collectTasks"), "module governance generated indexes should not default to raw scanner task collection");
 assert(!governanceSyncSource.includes("task-scanner"), "module governance generated indexes should not import task-scanner directly");
 assert(!governanceSyncSource.includes("TaskRecord"), "module governance generated indexes should not import or alias raw scanner TaskRecord objects");
