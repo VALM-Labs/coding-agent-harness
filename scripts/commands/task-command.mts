@@ -5,7 +5,7 @@ import { takeRepeatedOptionsFromArgs } from "../lib/command-registry.mjs";
 import { writeCommandResult } from "../lib/command-result.mjs";
 import { buildModuleStepCommandResult, buildTaskIndexCommandResult, buildTaskListCommandResult, buildTaskPhaseCommandResult } from "../lib/task-command-results.mjs";
 import { unwrapTaskOperation } from "../application/task/task-operations.mjs";
-import { createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
+import { buildTaskListComparisonCommandResult, createScannerTaskOperations } from "../adapters/cli/task-operations.mjs";
 
 type FlagReader = (name: string, fallback?: boolean) => boolean;
 type OptionReader = (name: string, fallback?: string) => string;
@@ -68,7 +68,7 @@ function taskOperations(target: string) {
   return createScannerTaskOperations(target);
 }
 
-export function runTaskCommand(command: string, { args, takeFlag, takeOption, targetArg }: CommandContext) {
+export async function runTaskCommand(command: string, { args, takeFlag, takeOption, targetArg }: CommandContext) {
   if (command === "new-task") {
     const dryRun = takeFlag("--dry-run");
     const locale = takeOption("--locale", "");
@@ -210,6 +210,8 @@ export function runTaskCommand(command: string, { args, takeFlag, takeOption, ta
 
   if (command === "task-list") {
     const json = takeFlag("--json");
+    const useTaskKernel = takeFlag("--task-kernel");
+    const compareTaskKernel = takeFlag("--compare-task-kernel");
     const state = takeOption("--state", "");
     const moduleKey = takeOption("--module", "");
     const queue = takeOption("--queue", "");
@@ -219,7 +221,27 @@ export function runTaskCommand(command: string, { args, takeFlag, takeOption, ta
     const search = takeOption("--search", "");
     const missingMaterials = takeFlag("--missing-materials");
     const includeArchived = takeFlag("--include-archived");
-    writeCommandResult(buildTaskListCommandResult(targetArg(), { state, moduleKey, queue, preset, review, lesson, search, missingMaterials, includeArchived }), { json });
+    const target = targetArg();
+    if (useTaskKernel && compareTaskKernel) {
+      console.error("task-list accepts only one of --task-kernel or --compare-task-kernel");
+      process.exit(2);
+    }
+    if ((useTaskKernel || compareTaskKernel) && (state || preset || review || lesson || search || missingMaterials)) {
+      console.error("--task-kernel and --compare-task-kernel currently support only --module, --queue, and --include-archived filters");
+      process.exit(2);
+    }
+    if (useTaskKernel || compareTaskKernel) {
+      const { buildKernelTaskListCommandResult } = await import("../kernel/task/adapters/index.mjs");
+      const kernelResult = buildKernelTaskListCommandResult(target, { moduleKey, queue, includeArchived });
+      if (useTaskKernel) {
+        writeCommandResult(kernelResult, { json });
+        return;
+      }
+      const oldResult = buildTaskListCommandResult(target, { state, moduleKey, queue, preset, review, lesson, search, missingMaterials, includeArchived });
+      writeCommandResult(buildTaskListComparisonCommandResult(oldResult.payload, kernelResult), { json });
+      return;
+    }
+    writeCommandResult(buildTaskListCommandResult(target, { state, moduleKey, queue, preset, review, lesson, search, missingMaterials, includeArchived }), { json });
     return;
   }
 
