@@ -204,7 +204,10 @@ assert.equal(activeMaterialsIssues.issues.length, 0);
 const relationGraph = await Effect.runPromise(
   TaskQueries.getRelationGraph({ root: activeRef }).pipe(Effect.provide(TestApplicationLayer)),
 );
-assert.deepEqual(relationGraph.nodes.map((node) => [node.taskId, node.title]), [[activeId, "Active standard task"]]);
+assert.deepEqual(relationGraph.nodes.map((node) => [node.taskId, node.title]), [
+  [activeId, "Active standard task"],
+  [missingId, "Missing materials task"],
+]);
 assert.equal(relationGraph.edges[0]?.sourceTaskId, activeId);
 assert.equal(relationGraph.edges[0]?.relation.type, "depends-on");
 assert.equal(relationGraph.edges[0]?.relation.target.value, missingId);

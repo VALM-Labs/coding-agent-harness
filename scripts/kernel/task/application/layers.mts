@@ -107,7 +107,7 @@ export function makeTaskQueryService(repository: TaskPackageStoreServiceShape): 
     getRelationGraph: (input) =>
       Effect.gen(function* () {
         const details = input.root
-          ? [yield* repository.get(input.root)]
+          ? yield* collectRootRelationGraphDetails(repository, yield* repository.get(input.root))
           : yield* listScopedTaskDetails(input);
         return {
           nodes: relationGraphNodes(details),
@@ -260,6 +260,27 @@ function relationGraphNodes(details: readonly TaskPackageStoreDetail[]): readonl
     });
   }
   return [...nodes.values()];
+}
+
+function collectRootRelationGraphDetails(
+  repository: TaskPackageStoreServiceShape,
+  root: TaskPackageStoreDetail,
+): Effect.Effect<readonly TaskPackageStoreDetail[], TaskKernelError> {
+  return Effect.gen(function* () {
+    const targetDetails = yield* Effect.forEach(root.task.relations, (relation) =>
+      repository.get(relation.target).pipe(
+        Effect.map((detail) => [detail] as const),
+        Effect.catchAll(() => Effect.succeed([] as const)),
+      ),
+    );
+    return dedupeDetailsByTaskId([root, ...targetDetails.flat()]);
+  });
+}
+
+function dedupeDetailsByTaskId(details: readonly TaskPackageStoreDetail[]): readonly TaskPackageStoreDetail[] {
+  const unique = new Map<TaskId, TaskPackageStoreDetail>();
+  for (const detail of details) unique.set(detail.task.id, detail);
+  return [...unique.values()];
 }
 
 function relationGraphEdges(details: readonly TaskPackageStoreDetail[]): readonly RelationGraphEdge[] {
