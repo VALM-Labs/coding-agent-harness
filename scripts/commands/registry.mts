@@ -256,7 +256,7 @@ function taskCommands(): CommandDefinition[] {
     { name: "task-complete", description: "Complete a task", usage: "harness task-complete <task-id> [--message text] [target]", positionals: ["task-id"], flags: lifecycleFlags, handler: legacyTaskHandler("task-complete") },
     { name: "lesson-promote", description: "Promote a lesson candidate", usage: "harness lesson-promote <task-id> <candidate-id> [--dry-run|--apply] [target]", positionals: ["task-id", "candidate-id"], flags: [dryRunFlag, applyFlag], handler: legacyTaskHandler("lesson-promote") },
     { name: "lesson-sediment", description: "Create a lesson sedimentation task", usage: "harness lesson-sediment <task-id> <candidate-id> [--dry-run] [--title title] [target]", positionals: ["task-id", "candidate-id"], flags: [dryRunFlag, option("--title", "Lesson title")], handler: legacyTaskHandler("lesson-sediment") },
-    { name: "task-list", description: "List tasks", usage: "harness task-list [--json] [--state state] [--module key] [--queue queue] [--preset id] [--review status] [--lesson status] [--missing-materials] [--include-archived] [--search text] [target]", flags: [jsonFlag, option("--state", "Filter state"), option("--module", "Filter module"), option("--queue", "Filter queue"), option("--preset", "Filter preset"), option("--review", "Filter review status"), option("--lesson", "Filter lesson status"), flag("--missing-materials", "Only tasks missing materials"), flag("--include-archived", "Include archived tasks"), option("--search", "Search text")], handler: legacyTaskHandler("task-list") },
+    { name: "task-list", description: "List tasks", usage: "harness task-list [--json] [--task-kernel|--compare-task-kernel] [--state state] [--module key] [--queue queue] [--preset id] [--review status] [--lesson status] [--missing-materials] [--include-archived] [--search text] [target]", flags: [jsonFlag, flag("--task-kernel", "Use Task Kernel query adapter"), flag("--compare-task-kernel", "Compare legacy and Task Kernel output"), option("--state", "Filter state"), option("--module", "Filter module"), option("--queue", "Filter queue"), option("--preset", "Filter preset"), option("--review", "Filter review status"), option("--lesson", "Filter lesson status"), flag("--missing-materials", "Only tasks missing materials"), flag("--include-archived", "Include archived tasks"), option("--search", "Search text")], handler: legacyTaskHandler("task-list") },
     { name: "task-index", description: "Build task index", usage: "harness task-index [--json] [target]", flags: [jsonFlag], handler: legacyTaskHandler("task-index") },
     { name: "task-supersede", description: "Supersede a task", usage: "harness task-supersede <old-task-id> --by <new-task-id> [--reason text] [--deleted-by name-or-email] [--confirm task-id] [--allow-open-findings] [target]", positionals: ["old-task-id"], flags: [option("--by", "Replacement task id"), option("--reason", "Supersede reason"), option("--deleted-by", "Actor"), option("--confirm", "Confirmation task id"), flag("--allow-open-findings", "Allow open findings")], handler: legacyTaskHandler("task-supersede") },
     { name: "task-delete", description: "Delete a task", usage: "harness task-delete <task-id> [--soft|--hard] [--confirm canonical-id] [--deleted-by name-or-email] [--reason text] [target]", positionals: ["task-id"], flags: [flag("--soft", "Soft delete"), flag("--hard", "Hard delete"), option("--confirm", "Confirmation id"), option("--deleted-by", "Actor"), option("--reason", "Delete reason")], handler: legacyTaskHandler("task-delete") },
@@ -405,10 +405,10 @@ function legacyModuleHandler(subcommand?: string): (ctx: CommandContext) => void
   };
 }
 
-function legacyTaskHandler(command: string): (ctx: CommandContext) => void {
+function legacyTaskHandler(command: string): (ctx: CommandContext) => Promise<void> {
   return (ctx) => {
     const args = [...ctx.raw];
-    runTaskCommand(command, { args, ...createArgReaders(args) });
+    return runTaskCommand(command, { args, ...createArgReaders(args) });
   };
 }
 
