@@ -134,6 +134,8 @@ const reviewConfirmSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/tas
 const reviewGatesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-lifecycle/review-gates.mts"), "utf8");
 const presetRunnerSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/preset-runner.mts"), "utf8");
 const presetRuntimeBridgeSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/preset-runtime-bridge.mts"), "utf8");
+const presetTaskKernelAdapterSource = fs.readFileSync(path.join(repoRoot, "scripts/kernel/task/adapters/preset-closeout.mts"), "utf8");
+const presetTaskKernelMaterializationBoundarySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/preset-task-kernel-materialization-boundary.mts"), "utf8");
 const migrationPlannerSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/migration-planner.mts"), "utf8");
 const migrationSupportSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/migration-support.mts"), "utf8");
 const migrationTaskSampleSource = fs.readFileSync(path.join(repoRoot, "scripts/infrastructure/task/migration-task-sample-source.mts"), "utf8");
@@ -141,7 +143,6 @@ const checkProfilesTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/li
 const taskRepositorySource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-repository.mts"), "utf8");
 const taskRepositoryTypesSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/types/task-repository.ts"), "utf8");
 const taskSubjectsSource = fs.readFileSync(path.join(repoRoot, "scripts/domain/task/task-subjects.mts"), "utf8");
-const taskSemanticProjectionSource = fs.readFileSync(path.join(repoRoot, "scripts/lib/task-semantic-projection.mts"), "utf8");
 const statusProjectionReaderSource = taskRepositorySource.match(/export function createTaskStatusProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
 const checkProfileReaderSource = taskRepositorySource.match(/export function createTaskCheckProfileReader[\s\S]*?\n}\n/)?.[0] || "";
 const taskIndexProjectionReaderSource = taskRepositorySource.match(/export function createTaskIndexProjectionReader[\s\S]*?\n}\n/)?.[0] || "";
@@ -179,6 +180,13 @@ assert(!presetRunnerSource.includes("./task-scanner.mjs"), "preset-runner should
 assert(!presetRuntimeBridgeSource.includes("./task-scanner.mjs"), "preset runtime bridge should consume a narrow lifecycle reader instead of importing the task scanner");
 assert(!presetRuntimeBridgeSource.includes("collectTasks"), "preset runtime bridge should not collect raw scanner TaskRecord objects");
 assert(presetRuntimeBridgeSource.includes("createTaskLifecycleReader"), "preset runtime bridge should compose through the narrow lifecycle reader seam");
+assert(presetRunnerSource.includes("await import(\"../kernel/task/adapters/preset-closeout.mjs\")"), "preset action runner should lazy-load the Effect-backed Task Kernel preset adapter");
+assert(presetRunnerSource.includes("./preset-task-kernel-materialization-boundary.mjs"), "preset action runner should enforce active task truth materialization through a dist-help-safe boundary");
+assert(presetTaskKernelAdapterSource.includes("makeTaskQueryService"), "preset Task Kernel adapter should call Task Kernel application query services");
+assert(presetTaskKernelAdapterSource.includes("createMarkdownTaskPackageStoreReader"), "preset Task Kernel adapter should keep filesystem reads in the Task Kernel infrastructure reader");
+assert(presetTaskKernelMaterializationBoundarySource.includes("kernelCommandForMaterial") && presetTaskKernelMaterializationBoundarySource.includes("preset action materialization yet"), "preset Task Kernel materialization boundary should fail closed for active progress truth until command cutover");
+assert(!presetTaskKernelAdapterSource.includes("./task-lifecycle.mjs"), "preset Task Kernel adapter must not route active runtime truth through legacy lifecycle");
+assert(!presetTaskKernelAdapterSource.includes("./task-repository.mjs"), "preset Task Kernel adapter must not route active runtime truth through legacy task repository");
 assert(!migrationPlannerSource.includes("./task-scanner.mjs"), "migration-planner should consume migration/status projections instead of importing the task scanner directly");
 assert(!taskIndexSource.includes("TaskRecord"), "task-index should not import or retype raw scanner TaskRecord objects");
 assert(!taskIndexSource.includes("task-semantic-projection"), "task-index should consume materialized visibility scopes instead of reinterpreting raw task visibility facts");
@@ -331,7 +339,7 @@ assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => excep
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P08-dashboard-workbench-repository-bridge"), "contract should not keep the retired dashboard workbench repository bridge");
 assert(!graph.architectureContract.phaseOpenExceptions.some((exception) => exception.id === "P08-dashboard-workbench-projection-bridge"), "contract should not keep the retired dashboard workbench projection bridge");
 assert(!taskSubjectsSource.includes("../../lib/task-semantic-projection"), "task subject domain mapper should consume the domain-owned semantic projection module");
-assert(taskSemanticProjectionSource.includes("export * from \"../domain/task/task-semantic-projection.mjs\""), "legacy task semantic projection module should be a compatibility re-export");
+assert(!fs.existsSync(path.join(repoRoot, "scripts/lib/task-semantic-projection.mts")), "legacy task semantic projection compatibility re-export should be deleted after TK-12");
 const legacyWriterLifecycleBridge = graph.architectureContract.phaseOpenExceptions.find((exception) => exception.id === "P04-infrastructure-task-operation-lifecycle-writer-adapter");
 assert(legacyWriterLifecycleBridge?.source === "scripts/infrastructure/task/legacy-task-operation-writers.mts" && legacyWriterLifecycleBridge.target === "scripts/lib/task-lifecycle.mts", "contract should explicitly track the legacy lifecycle writer adapter residual");
 assert(legacyWriterLifecycleBridge?.ownerPhase === "P04-transaction-cutover" && legacyWriterLifecycleBridge.expiryPhase === "P07-task-operations-facade-removal", "legacy lifecycle writer adapter residual should stay scoped to the P04-to-P07 retirement window");
